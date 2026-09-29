@@ -3,6 +3,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { EventV2 } from "@opencode-ai/core/event"
+import { CoordinationEvents } from "@opencode-ai/core/coordination/events/events"
 import { Credential } from "@opencode-ai/core/credential"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
 import { PtyTicket } from "@opencode-ai/core/pty/ticket"
@@ -23,12 +24,8 @@ import { PtyEnvironment } from "./pty-environment"
 import { layer as locationLayer } from "./location"
 import { sessionLocationLayer } from "./middleware/session-location"
 import { coordinationAuthLayer } from "./middleware/coordination-auth"
-import { CoordinationRuntime } from "./coordination-runtime"
-
-const coordinationRuntimeLayer = Layer.succeed(
-  CoordinationRuntime,
-  CoordinationRuntime.of({ missing: ["coordination identity and service adapters"] }),
-)
+import { coordinationLayer } from "./coordination-composition"
+import type { CoordinationPorts } from "./coordination-composition"
 
 const applicationServices = LayerNode.group([
   Database.node,
@@ -43,19 +40,23 @@ const applicationServices = LayerNode.group([
   LocationServiceMap.node,
 ])
 
-export function createRoutes(password?: string) {
+export function createRoutes(password?: string, coordinationPorts: CoordinationPorts = {}) {
   return makeRoutes(
     password
       ? ServerAuth.Config.configLayer({ username: "opencode", password: Option.some(password) })
       : ServerAuth.Config.layer,
+    coordinationPorts,
   )
 }
 
-export function createEmbeddedRoutes() {
-  return makeRoutes(ServerAuth.Config.configLayer({ username: "opencode", password: Option.none() }))
+export function createEmbeddedRoutes(coordinationPorts: CoordinationPorts = {}) {
+  return makeRoutes(ServerAuth.Config.configLayer({ username: "opencode", password: Option.none() }), coordinationPorts)
 }
 
-function makeRoutes<AuthError, AuthServices>(auth: Layer.Layer<ServerAuth.Config, AuthError, AuthServices>) {
+function makeRoutes<AuthError, AuthServices>(
+  auth: Layer.Layer<ServerAuth.Config, AuthError, AuthServices>,
+  coordinationPorts: CoordinationPorts,
+) {
   const serviceLayer = AppNodeBuilder.build(applicationServices, [[SessionExecution.node, SessionExecutionLocal.node]])
 
   return HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
@@ -64,7 +65,8 @@ function makeRoutes<AuthError, AuthServices>(auth: Layer.Layer<ServerAuth.Config
     Layer.provide(locationLayer),
     Layer.provide(authorizationLayer),
     Layer.provide(coordinationAuthLayer),
-    Layer.provide(coordinationRuntimeLayer),
+    Layer.provide(coordinationLayer(coordinationPorts)),
+    Layer.provide(CoordinationEvents.layer),
     Layer.provide(schemaErrorLayer),
     Layer.provide(auth),
     Layer.provide(serviceLayer),

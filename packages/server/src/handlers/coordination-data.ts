@@ -36,64 +36,63 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
       )
 
     return handlers
-      .handle("coordination.projects.list", () => use((services, auth) => services.projects.list(auth)))
-      .handle("coordination.projects.create", (ctx) =>
+      .handle("coordination.projectList", () => use((services, auth) => services.projects.list(auth)))
+      .handle("coordination.projectCreate", (ctx) =>
         use((services, auth) => services.projects.create({ auth, ...ctx.payload })),
       )
-      .handle("coordination.projects.get", (ctx) =>
+      .handle("coordination.projectGet", (ctx) =>
         use((services, auth) => services.projects.get(auth, ctx.params.projectId)),
       )
-      .handle("coordination.projects.members", (ctx) =>
+      .handle("coordination.memberGrant", (ctx) =>
         use((services, auth) =>
           services.projects.grantMember({ auth, projectId: ctx.params.projectId, ...ctx.payload }),
         ),
       )
-      .handle("coordination.projects.contributions", (ctx) =>
+      .handle("coordination.contributionList", (ctx) =>
         use((services, auth) => services.projects.contributions(auth, ctx.params.projectId, ctx.query.userId)),
       )
-      .handle("coordination.projects.threads", (ctx) =>
+      .handle("coordination.projectThreadList", (ctx) =>
         use((services, auth) => services.projects.listThreads(auth, ctx.params.projectId)),
       )
-      .handle("coordination.threads.create", (ctx) =>
+      .handle("coordination.threadCreate", (ctx) =>
         use((services, auth) =>
           services.projects.createThread({ auth, projectId: ctx.params.projectId, ...ctx.payload }),
         ),
       )
-      .handle("coordination.threads.get", (ctx) =>
+      .handle("coordination.threadGet", (ctx) =>
         use((services, auth) => services.snapshot.thread(auth, ctx.params.threadId)),
       )
-      .handle("coordination.comments.list", (ctx) =>
+      .handle("coordination.commentList", (ctx) =>
         use((services, auth) => services.comments.list(auth, ctx.params.threadId)),
       )
-      .handle("coordination.comments.create", (ctx) =>
+      .handle("coordination.commentCreate", (ctx) =>
         use((services, auth) => services.comments.create({ auth, threadId: ctx.params.threadId, ...ctx.payload })),
       )
-      .handle("coordination.instructions.submit", (ctx) =>
+      .handle("coordination.instructionSubmit", (ctx) =>
         use((services, principal) =>
           services.queue.submit({ principal, threadId: ctx.params.threadId, ...ctx.payload }),
         ),
       )
-      .handle("coordination.instructions.cancel", (ctx) =>
+      .handle("coordination.instructionCancel", (ctx) =>
         use((services, principal) =>
           services.runner.cancel({ principal, threadId: ctx.params.threadId, instructionId: ctx.params.instructionId }),
         ),
       )
-      .handle("coordination.runner.reserve", (ctx) =>
+      .handle("coordination.runnerReserve", (ctx) =>
         use((services, principal) =>
-          principal.kind === "runner"
-            ? services.runner
-                .claim(principal, ctx.params.threadId, {
-                  workerId: principal.workerId,
-                  instanceId: principal.instanceId,
-                })
-                .pipe(Effect.map((run) => ({ run })))
-            : Effect.fail({ code: "forbidden" as const, message: "Runner credential required" }),
+          Effect.gen(function* () {
+            if (principal.kind !== "runner")
+              return yield* Effect.fail({ code: "forbidden" as const, message: "Runner credential required" })
+            const owner = { workerId: principal.workerId, instanceId: principal.instanceId }
+            const run = yield* services.runner.claim(principal, ctx.params.threadId, owner)
+            return { run }
+          }),
         ),
       )
-      .handle("coordination.runner.report", (ctx) =>
+      .handle("coordination.runnerReport", (ctx) =>
         use((services, principal) => services.runner.report({ principal, runId: ctx.params.runId, ...ctx.payload })),
       )
-      .handle("coordination.approvals.claim", (ctx) =>
+      .handle("coordination.approvalClaim", (ctx) =>
         use((services, principal) =>
           services.runner.claimApproval({
             principal,
@@ -103,7 +102,7 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
           }),
         ),
       )
-      .handle("coordination.approvals.decide", (ctx) =>
+      .handle("coordination.approvalDecide", (ctx) =>
         use((services, principal) =>
           services.runner.decideApproval({
             principal,
@@ -113,7 +112,7 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
           }),
         ),
       )
-      .handle("coordination.projectEvents.replay", (ctx) =>
+      .handle("coordination.projectReplay", (ctx) =>
         use((services, auth) =>
           CoordinationEvents.authorizedReplayProject(
             services.access,
@@ -125,7 +124,7 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
           ),
         ),
       )
-      .handleRaw("coordination.projectEvents.stream", (ctx) =>
+      .handleRaw("coordination.projectStream", (ctx) =>
         use((services, auth) =>
           CoordinationEvents.authorizedSubscribeProject(
             services.access,
@@ -136,7 +135,7 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
           ).pipe(Effect.map(sseResponse)),
         ),
       )
-      .handle("coordination.threadEvents.replay", (ctx) =>
+      .handle("coordination.threadReplay", (ctx) =>
         use((services, auth) =>
           CoordinationEvents.authorizedReplayThread(
             services.access,
@@ -148,7 +147,7 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
           ),
         ),
       )
-      .handleRaw("coordination.threadEvents.stream", (ctx) =>
+      .handleRaw("coordination.threadStream", (ctx) =>
         use((services, auth) =>
           CoordinationEvents.authorizedSubscribeThread(
             services.access,
@@ -159,21 +158,22 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
           ).pipe(Effect.map(sseResponse)),
         ),
       )
-      .handle("coordination.workCard.get", (ctx) =>
+      .handle("coordination.workCardGet", (ctx) =>
         use((services, auth) =>
-          services.access.getThread(auth, ctx.params.threadId, "read").pipe(
-            Effect.andThen(services.workCards.get(ctx.params.threadId)),
-            Effect.map((card) => ({ card })),
-          ),
+          services.workCards.read(auth, ctx.params.threadId).pipe(Effect.map((card) => ({ card }))),
         ),
       )
-      .handle("coordination.workCard.update", (ctx) =>
+      .handle("coordination.workCardUpdate", (ctx) =>
         use((services, principal) =>
           services.workCards.update({ principal, threadId: ctx.params.threadId, ...ctx.payload }),
         ),
       )
-      .handle("coordination.workCards.list", () => Effect.fail(unavailable()))
-      .handle("coordination.activity.list", () => Effect.fail(unavailable()))
+      .handle("coordination.workCardList", (ctx) =>
+        use((services, auth) => services.workCards.list(auth, ctx.params.projectId)),
+      )
+      .handle("coordination.activityList", (ctx) =>
+        use((services, auth) => services.activity.read(auth, ctx.params.projectId)),
+      )
   }),
 )
 

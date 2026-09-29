@@ -1,4 +1,5 @@
 import type { CoordinationContracts } from "@opencode-ai/core/coordination/contracts"
+import type { CoordinationActivity } from "@opencode-ai/core/coordination/activity/activity"
 import { Context } from "effect"
 
 export interface CoordinationServices {
@@ -10,6 +11,7 @@ export interface CoordinationServices {
   readonly queue: CoordinationContracts.Queue
   readonly runner: CoordinationContracts.Runner
   readonly workCards: CoordinationContracts.WorkCards
+  readonly activity: CoordinationActivity.Interface
 }
 
 export interface CoordinationRuntimeValue {

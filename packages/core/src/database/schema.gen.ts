@@ -57,6 +57,124 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`coordination_approval\` (
+          \`id\` text PRIMARY KEY,
+          \`project_id\` text NOT NULL,
+          \`thread_id\` text NOT NULL,
+          \`run_id\` text NOT NULL,
+          \`tool_call_id\` text NOT NULL,
+          \`version\` integer NOT NULL,
+          \`state\` text NOT NULL,
+          \`requested_at\` integer NOT NULL,
+          \`requested_seq\` integer NOT NULL,
+          \`claimed_by\` text,
+          \`claim_expires_at\` integer,
+          \`decision_id\` text,
+          \`decision\` text,
+          \`delivery_state\` text NOT NULL,
+          \`decided_by\` text,
+          \`decided_at\` integer
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_comment\` (
+          \`id\` text PRIMARY KEY,
+          \`thread_id\` text NOT NULL,
+          \`author_id\` text NOT NULL,
+          \`body\` text NOT NULL,
+          \`created_at\` integer NOT NULL,
+          \`event_seq\` integer NOT NULL,
+          \`request_id\` text NOT NULL,
+          CONSTRAINT \`fk_coordination_comment_thread_id_coordination_thread_id_fk\` FOREIGN KEY (\`thread_id\`) REFERENCES \`coordination_thread\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_membership\` (
+          \`project_id\` text NOT NULL,
+          \`user_id\` text NOT NULL,
+          \`role\` text NOT NULL,
+          \`joined_at\` integer NOT NULL,
+          \`added_by\` text,
+          \`request_id\` text,
+          CONSTRAINT \`coordination_membership_pk\` PRIMARY KEY(\`project_id\`, \`user_id\`),
+          CONSTRAINT \`fk_coordination_membership_project_id_coordination_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`coordination_project\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_project\` (
+          \`id\` text PRIMARY KEY,
+          \`name\` text NOT NULL,
+          \`created_by\` text NOT NULL,
+          \`created_at\` integer NOT NULL,
+          \`request_id\` text NOT NULL,
+          CONSTRAINT \`fk_coordination_project_id_project_id_fk\` FOREIGN KEY (\`id\`) REFERENCES \`project\`(\`id\`) ON DELETE RESTRICT
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_instruction\` (
+          \`id\` text PRIMARY KEY,
+          \`request_id\` text NOT NULL,
+          \`project_id\` text NOT NULL,
+          \`thread_id\` text NOT NULL,
+          \`actor_id\` text NOT NULL,
+          \`text\` text NOT NULL,
+          \`queue_seq\` integer NOT NULL,
+          \`submitted_at\` integer NOT NULL,
+          \`run_id\` text NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_run_callback\` (
+          \`callback_id\` text PRIMARY KEY,
+          \`run_id\` text NOT NULL,
+          \`callback\` text NOT NULL,
+          \`recorded_at\` integer NOT NULL,
+          CONSTRAINT \`fk_coordination_run_callback_run_id_coordination_run_id_fk\` FOREIGN KEY (\`run_id\`) REFERENCES \`coordination_run\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_run\` (
+          \`id\` text PRIMARY KEY,
+          \`thread_id\` text NOT NULL,
+          \`instruction_id\` text NOT NULL,
+          \`state\` text NOT NULL,
+          \`attempt\` integer NOT NULL,
+          \`runner_message_id\` text NOT NULL,
+          \`execution_owner_worker_id\` text,
+          \`execution_owner_instance_id\` text,
+          \`lease_until\` integer,
+          \`created_at\` integer NOT NULL,
+          \`started_at\` integer,
+          \`ended_at\` integer,
+          CONSTRAINT \`fk_coordination_run_instruction_id_coordination_instruction_id_fk\` FOREIGN KEY (\`instruction_id\`) REFERENCES \`coordination_instruction\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_thread\` (
+          \`id\` text PRIMARY KEY,
+          \`project_id\` text NOT NULL,
+          \`session_id\` text NOT NULL,
+          \`worker_id\` text NOT NULL,
+          \`title\` text NOT NULL,
+          \`created_by\` text NOT NULL,
+          \`created_at\` integer NOT NULL,
+          \`activity_seq\` integer NOT NULL,
+          \`request_id\` text NOT NULL,
+          CONSTRAINT \`fk_coordination_thread_project_id_coordination_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`coordination_project\`(\`id\`) ON DELETE CASCADE,
+          CONSTRAINT \`fk_coordination_thread_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE RESTRICT
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_work_card\` (
+          \`thread_id\` text PRIMARY KEY,
+          \`project_id\` text NOT NULL,
+          \`version\` integer NOT NULL,
+          \`source_activity_seq\` integer NOT NULL,
+          \`data\` text NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`credential\` (
           \`id\` text PRIMARY KEY,
           \`integration_id\` text,
@@ -236,6 +354,68 @@ export default {
           CONSTRAINT \`fk_session_share_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
         );
       `)
+      yield* tx.run(
+        `CREATE INDEX \`coordination_approval_thread_idx\` ON \`coordination_approval\` (\`thread_id\`,\`requested_at\`);`,
+      )
+      yield* tx.run(`CREATE INDEX \`coordination_approval_run_idx\` ON \`coordination_approval\` (\`run_id\`);`)
+      yield* tx.run(
+        `CREATE INDEX \`coordination_approval_delivery_idx\` ON \`coordination_approval\` (\`delivery_state\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_approval_decision_id_idx\` ON \`coordination_approval\` (\`decision_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_comment_actor_request_idx\` ON \`coordination_comment\` (\`thread_id\`,\`author_id\`,\`request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`coordination_comment_thread_event_idx\` ON \`coordination_comment\` (\`thread_id\`,\`event_seq\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`coordination_membership_user_idx\` ON \`coordination_membership\` (\`user_id\`,\`project_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_membership_actor_request_idx\` ON \`coordination_membership\` (\`project_id\`,\`added_by\`,\`request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_project_actor_request_idx\` ON \`coordination_project\` (\`created_by\`,\`request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_instruction_request_idx\` ON \`coordination_instruction\` (\`thread_id\`,\`actor_id\`,\`request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_instruction_order_idx\` ON \`coordination_instruction\` (\`thread_id\`,\`queue_seq\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_instruction_run_idx\` ON \`coordination_instruction\` (\`run_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`coordination_instruction_project_idx\` ON \`coordination_instruction\` (\`project_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_run_instruction_idx\` ON \`coordination_run\` (\`instruction_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_run_message_idx\` ON \`coordination_run\` (\`runner_message_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_run_active_thread_idx\` ON \`coordination_run\` (\`thread_id\`) WHERE "coordination_run"."state" IN ('reserved', 'running', 'waiting_approval', 'cancelling', 'recovery_required');`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`coordination_run_thread_state_idx\` ON \`coordination_run\` (\`thread_id\`,\`state\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`coordination_run_owner_idx\` ON \`coordination_run\` (\`execution_owner_worker_id\`,\`execution_owner_instance_id\`,\`state\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_thread_session_idx\` ON \`coordination_thread\` (\`session_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_thread_actor_request_idx\` ON \`coordination_thread\` (\`project_id\`,\`created_by\`,\`request_id\`);`,
+      )
+      yield* tx.run(`CREATE INDEX \`coordination_thread_project_idx\` ON \`coordination_thread\` (\`project_id\`);`)
+      yield* tx.run(
+        `CREATE INDEX \`coordination_work_card_project_idx\` ON \`coordination_work_card\` (\`project_id\`);`,
+      )
       yield* tx.run(`CREATE UNIQUE INDEX \`event_aggregate_seq_idx\` ON \`event\` (\`aggregate_id\`,\`seq\`);`)
       yield* tx.run(`CREATE INDEX \`event_aggregate_type_seq_idx\` ON \`event\` (\`aggregate_id\`,\`type\`,\`seq\`);`)
       yield* tx.run(
