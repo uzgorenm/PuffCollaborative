@@ -149,7 +149,7 @@ Build:
 - Stop and approval controls that bypass the instruction queue.
 Boundary: Decides what runs next, but does not implement agent execution or summaries.
 Demo test: Two teammates submit to the same thread. Both see the same queue, the second turn waits, and another thread continues independently.
-### — OpenCode execution and workspaces
+### Talha Aydn — OpenCode execution and workspaces
 Owns turning an authorized run into actual coding work.
 Build:
 - The adapter connecting each shared thread to its OpenCode session.
@@ -159,7 +159,7 @@ Build:
 - Cancellation and approval handling connected to the server’s controls.
 Boundary: Executes the server’s assignments; does not create a separate queue or independently decide execution order.
 Demo test: Two threads edit the same filename in separate workspaces without overwriting one another. Both expose their progress and diffs.
-### Talha — Multiplayer interface and activity dashboard
+###       — Multiplayer interface and activity dashboard
 Owns everything teammates see and interact with.
 Build:
 - A project view showing everyone’s shared threads.
