@@ -18,8 +18,6 @@
 .overview-heading h1 { margin: 0; font-size: clamp(25px, 2.4vw, 31px); font-weight: 520; line-height: 1.25; letter-spacing: -.9px; }
 .overview-goal { max-width: 580px; margin: 12px 0 0; color: #a0a09d; line-height: 1.7; font-size: 12px; }
 .overview-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 19px; flex-shrink: 0; padding-top: 2px; }
-.overview-demo-badge { display: inline-flex; align-items: center; gap: 6px; width: fit-content; color: #9caba0; font-size: 10px; }
-.overview-demo-badge > span { width: 5px; height: 5px; border-radius: 50%; background: #91ac95; }
 .overview-action-buttons { display: flex; align-items: center; gap: 8px; }
 .overview-settings, .overview-new-session { min-height: 33px; border-radius: 6px; padding: 7px 11px; font-size: 11px; white-space: nowrap; transition: background .15s, border-color .15s; }
 .overview-settings { border: 1px solid #383838; color: #b2b2ae; }
@@ -128,7 +126,6 @@
   .overview-project-name { margin-bottom: 8px; font-size: 10px; }
   .overview-heading h1 { font-size: 26px; }
   .overview-goal { font-size: 11px; margin-top: 10px; }
-  .overview-demo-badge { font-size: 9px; }
   .overview-action-buttons { gap: 6px; }
   .overview-settings, .overview-new-session { font-size: 10px; padding: 7px 9px; }
   .overview-workflows { margin-bottom: 23px; }
@@ -152,3 +149,7 @@
   .overview-workflows { gap: 7px 15px; }
   .overview-filter > span { display: none; }
 }
+
+.overview-reset-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+.overview-reset-actions button { color: #8e958a; font-size: 10px; padding: 3px 0; }
+.overview-reset-actions button:hover { color: #d4ddcd; }

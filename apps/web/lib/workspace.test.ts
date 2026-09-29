@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createDemoWorkspace, createTaskSession, findRelatedWork, findSolvedProblem } from "./workspace.ts"
+import { createDemoWorkspace, createTaskSession, findRelatedWork, findSolvedProblem, refreshWorkspacePresentation } from "./workspace.ts"
 
 test("setup preserves supplied project details and gives each person parallel sessions", () => {
   const workspace = createDemoWorkspace("  Launchpad  ", "  Ship a collaborative workspace  ")
@@ -110,7 +110,9 @@ test("an independent task preserves its prompt and supports an unknown team memb
   assert.equal(task.messages[0].text, "Draft release notes")
   assert.equal(task.status, "waiting")
   assert.equal(task.scope, "project")
-  assert.match(task.messages[1].text, /demo/i)
+  assert.match(task.messages[1].text, /^Plan for Puff:/)
+  assert.doesNotMatch(task.messages[1].text, /demo|walkthrough|does not (?:run|execute)/i)
+  assert.doesNotMatch(task.summary, /demo/i)
   assert.equal(task.relation, undefined)
   assert.deepEqual(workspace, before)
 })
@@ -133,7 +135,9 @@ test("complementary work adds a separate scoped plan and keeps the source conver
   assert.match(task.messages[1].text, /accessibility/i)
   assert.match(task.messages[1].text, /test/i)
   assert.match(task.messages[1].text, /Sam · Build project navigation/)
-  assert.match(task.messages[1].text, /demo/i)
+  assert.match(task.messages[1].text, /^Plan for Puff:/)
+  assert.match(task.messages[1].text, /proposed complementary scope/)
+  assert.doesNotMatch(task.messages[1].text, /demo|walkthrough|does not (?:run|execute)/i)
   assert.deepEqual(workspace, before)
 })
 
@@ -157,4 +161,116 @@ test("complementary backend work proposes API and access checks instead of navig
   assert.equal(task.messages[1].text.includes("project-switching"), false)
   assert.match(task.summary, /API contract tests/)
   assert.deepEqual(workspace, before)
+})
+
+test("the seeded startup finding uses startup copy and keeps its attribution", () => {
+  const source = createDemoWorkspace().sessions.find((session) => session.id === "demo-alice-server")!
+  assert.match(source.messages[1].text, /^The startup error was a port conflict:/)
+  assert.doesNotMatch(source.messages[1].text, /scenario/i)
+  assert.equal(source.findings?.[0].source, "Alice · Fix the failing development server · message 2")
+})
+
+test("saved workspace presentation refreshes known plans without changing user content or session identity", () => {
+  const workspace = createDemoWorkspace("demo-marker project", "Keep the demo-marker goal")
+  const task = createTaskSession("Keep the demo-marker task", "You", workspace.project)
+  task.id = "demo-task-saved"
+  task.title = "Keep the demo-marker title"
+  task.scope = "private"
+  task.relation = "Independent alongside demo-marker source"
+  task.relatedSessionId = "demo-source-marker"
+  task.summary = "Task assigned in this demo; the first step is ready to review."
+  task.messages = [
+    { role: "user", text: "Keep the demo-marker task\nDemo plan: this literal user note must stay." },
+    { role: "assistant", text: "Demo plan for demo-marker project: clarify the outcome for “Keep the demo-marker task”, inspect the relevant project context, and propose a small first step. This creates a local demo session; it does not run an agent or change another session." },
+    { role: "assistant", text: "Discuss the demo-marker with the team; this local demo should stay in my notes." },
+  ]
+  workspace.sessions.push(task)
+  const before = structuredClone(workspace)
+  const refreshed = refreshWorkspacePresentation(workspace)
+  const saved = refreshed.sessions.find((session) => session.id === "demo-task-saved")!
+
+  assert.equal(saved.messages[1].text, "Plan for demo-marker project: clarify the outcome for “Keep the demo-marker task”, inspect the relevant project context, and propose a small first step.")
+  assert.equal(saved.summary, "The first step is ready to review.")
+  assert.equal(saved.messages[0], task.messages[0])
+  assert.equal(saved.messages[2], task.messages[2])
+  assert.equal(saved.task, "Keep the demo-marker task")
+  assert.equal(saved.title, "Keep the demo-marker title")
+  assert.equal(saved.scope, "private")
+  assert.equal(saved.relation, "Independent alongside demo-marker source")
+  assert.equal(saved.relatedSessionId, "demo-source-marker")
+  assert.equal(saved.updatedAt, task.updatedAt)
+  assert.equal(refreshed.project, workspace.project)
+  assert.deepEqual(workspace, before)
+  assert.deepEqual(refreshWorkspacePresentation(refreshed), refreshed)
+})
+
+test("saved related task plans retain source references and proposed complementary scope", () => {
+  const workspace = createDemoWorkspace("demo-marker project")
+  const source = workspace.sessions.find((session) => session.id === "demo-sam-frontend")!
+  source.title = "Build the demo-marker navigation"
+  const independent = createTaskSession("Review the demo-marker navigation", "You", workspace.project, "independent", source)
+  independent.messages[1].text = "Demo plan for demo-marker project: clarify the outcome for “Review the demo-marker navigation”, inspect the relevant project context, and propose a small first step. Sam · Build the demo-marker navigation is related work; keep this task independent and compare scope before implementing. This creates a local demo session; it does not run an agent or change another session."
+  const complementary = createTaskSession("Build navigation", "You", workspace.project, "complementary", source)
+  complementary.messages[1].text = "Demo plan for demo-marker project: review Sam · Build the demo-marker navigation as source context, then take a complementary scope: keyboard accessibility checks and project-switching tests. Keep a separate approach and record your own findings. This creates a local demo session; it does not run an agent, copy the source implementation, or stop the source session."
+  workspace.sessions.push(independent, complementary)
+  const refreshed = refreshWorkspacePresentation(workspace)
+  const savedIndependent = refreshed.sessions.find((session) => session.id === independent.id)!
+  const savedComplementary = refreshed.sessions.find((session) => session.id === complementary.id)!
+
+  assert.equal(savedIndependent.messages[1].text, "Plan for demo-marker project: clarify the outcome for “Review the demo-marker navigation”, inspect the relevant project context, and propose a small first step. Sam · Build the demo-marker navigation is related work; keep this task independent and compare scope before implementing.")
+  assert.equal(savedComplementary.messages[1].text, "Plan for demo-marker project: review Sam · Build the demo-marker navigation as source context, then consider this proposed complementary scope: keyboard accessibility checks and project-switching tests. Keep a separate approach and record your own findings.")
+  assert.equal(savedIndependent.relatedSessionId, source.id)
+  assert.equal(savedComplementary.relatedSessionId, source.id)
+  assert.equal(savedComplementary.relation, "Complements Sam · Build the demo-marker navigation")
+  assert.equal(savedComplementary.summary, "Proposed complementary scope: keyboard accessibility checks and project-switching tests.")
+})
+
+test("saved finding context refreshes generated guidance while retaining source and deduplication identity", () => {
+  const workspace = createDemoWorkspace()
+  const source = workspace.sessions.find((session) => session.id === "demo-alice-server")!
+  source.messages[1].text = "The scenario's error was a port conflict: another process owned port 3000. Identify its owner first. This project uses development port 3005, so use its configured dev command. Reusing 3000 requires a deliberate restart after confirming the process belongs to this project. This finding is specific to that startup error; compare your error before applying it."
+  const target = workspace.sessions[0]
+  const finding = source.findings![0]
+  finding.solution += "\nKeep the demo-marker note attached to this source."
+  target.receivedFindings = ["demo-alice-server:server-port"]
+  target.messages.push(
+    { role: "assistant", text: `Context from ${finding.source}\n\nProblem: ${finding.problem}\n\nFinding: ${finding.solution}\n\nDemo adaptation for “${target.task}”:\n1. Check which process owns port 3000.\n2. Preserve that session and use this project's configured port, 3005.\n3. Verify this session's server starts on that port before resuming the original task.\n\nThis is a walkthrough plan, not a live execution result.` },
+    { role: "assistant", text: `Demo context check: Alice's port-conflict finding is already in this session. Reuse that attributed context: check who owns port 3000, preserve that process, use this project's port 3005, and verify this server before continuing “${target.task}”. The finding has not been added a second time.` },
+    { role: "assistant", text: `Demo next step: keep “${target.task}” as this session's task, inspect the relevant context for “Keep the demo-marker”, and propose a small check. This walkthrough does not execute an agent or modify project files.` },
+    { role: "assistant", text: `Demo plan: continue investigating this server error independently. Compare the error, inspect which process owns the port, and record the next check in this session. Keep the original task, “${target.task}”, in scope. No finding has been copied or execution performed.` },
+  )
+  const refreshed = refreshWorkspacePresentation(workspace)
+  const savedSource = refreshed.sessions.find((session) => session.id === "demo-alice-server")!
+  const savedTarget = refreshed.sessions[0]
+
+  assert.match(savedSource.messages[1].text, /^The startup error was a port conflict:/)
+  assert.equal(savedSource.findings, source.findings)
+  assert.equal(savedSource.findings![0], finding)
+  assert.equal(savedTarget.receivedFindings, target.receivedFindings)
+  assert.match(savedTarget.messages[2].text, /^Context from Alice · Fix the failing development server · message 2\n/)
+  assert.ok(savedTarget.messages[2].text.includes(`Problem: ${finding.problem}\n\nFinding: ${finding.solution}`))
+  assert.ok(savedTarget.messages[2].text.includes(`Suggested steps for “${target.task}”:`))
+  assert.doesNotMatch(savedTarget.messages[2].text, /Demo adaptation|walkthrough plan/)
+  assert.match(savedTarget.messages[3].text, /^Context check: Alice's/)
+  assert.match(savedTarget.messages[3].text, /The finding has not been added a second time\.$/)
+  assert.match(savedTarget.messages[4].text, /^Next step:/)
+  assert.match(savedTarget.messages[4].text, /demo-marker/)
+  assert.doesNotMatch(savedTarget.messages[4].text, /Demo next step|does not execute/)
+  assert.match(savedTarget.messages[5].text, /^Plan: continue investigating/)
+  assert.doesNotMatch(savedTarget.messages[5].text, /execution performed/)
+  assert.equal(findSolvedProblem("EADDRINUSE on port 3000", refreshed.sessions)?.finding, finding)
+})
+
+test("presentation refresh leaves arbitrary assistant copy and exact user quotations untouched", () => {
+  const workspace = createDemoWorkspace()
+  const task = workspace.sessions[0]
+  task.summary = "Task assigned in this demo; keep the supplied custom summary."
+  task.messages.push(
+    { role: "assistant", text: "Demo plan for our meeting: bring the local demo and discuss why it does not execute." },
+    { role: "assistant", text: "Demo next step: discuss a walkthrough plan with Alice." },
+    { role: "assistant", text: "The scenario's error was reported in the demo-marker notes." },
+    { role: "user", text: `Demo next step: keep “${task.task}” as this session's task, inspect the relevant context for “literal demo-marker”, and propose a small check. This walkthrough does not execute an agent or modify project files.` },
+  )
+  const before = structuredClone(workspace)
+  assert.deepEqual(refreshWorkspacePresentation(workspace), before)
 })
