@@ -195,8 +195,11 @@ function fixture(
       Effect.gen(function* () {
         while (received.length < count) yield* Queue.take(signal)
       })
-    const start = () => make(deps).observe({ execution, session, onObservation }).pipe(Effect.forkScoped)
-    return { ready, received, rejected, publish, record, awaitCount, start }
+    const start = (onReady?: Effect.Effect<void>) => {
+      const observation = { execution, session, onObservation, onReady }
+      return make(deps).observe(observation).pipe(Effect.forkScoped)
+    }
+    return { ready, received, rejected, publish, record, awaitCount, start, listenerCount: () => listeners.size }
   })
 }
 
@@ -310,6 +313,26 @@ test("re-observation reconciles durable history and pending native permission wi
             (item) => item.kind === "activity" && item.activity.kind === "run.output" && item.activity.text === "lost",
           ),
         ).toBe(false)
+      }),
+    ),
+  )
+})
+
+test("signals observer readiness after listener registration, history, and pending permissions", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const source = yield* fixture([prompted(0), step(1), tool(2)], [request("per_ready")])
+        const ready = yield* Deferred.make<void>()
+        let atReady: Observation["kind"][] = []
+        yield* source.start(
+          Effect.sync(() => {
+            expect(source.listenerCount()).toBe(1)
+            atReady = source.received.map((item) => item.kind)
+          }).pipe(Effect.andThen(Deferred.succeed(ready, undefined)), Effect.asVoid),
+        )
+        yield* Deferred.await(ready)
+        expect(atReady).toEqual(["promoted", "activity", "permission"])
       }),
     ),
   )

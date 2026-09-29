@@ -22,7 +22,14 @@ export interface Dependencies {
 
 export function make(input: Dependencies): EventIngestion {
   return {
-    observe: ({ execution, session, onObservation }) =>
+    observe: ({
+      execution,
+      session,
+      onObservation,
+      onReady,
+    }: Parameters<EventIngestion["observe"]>[0] & {
+      readonly onReady?: Effect.Effect<void>
+    }) =>
       Effect.scoped(
         Effect.gen(function* () {
           const run = execution.run
@@ -251,6 +258,7 @@ export function make(input: Dependencies): EventIngestion {
             Effect.flatMap(input.permissions.forSession(session.id), (requests) => Effect.forEach(requests, permission))
           yield* history()
           yield* pending()
+          yield* onReady ?? Effect.void
 
           while (true) {
             const event = yield* Queue.take(queue)
