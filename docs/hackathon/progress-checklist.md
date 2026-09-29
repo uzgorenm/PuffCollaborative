@@ -29,7 +29,7 @@ The [backend mock integration receipt](evidence/2026-09-29-coordination-backend-
 
 ## Coordination process checkpoint — September 29
 
-The [process test receipt](evidence/2026-09-29-coordination-process-e2e.md) tests commit `73c521614994ec4e22a0db6716f49e3a5804a315` through real HTTP and SQLite with a separate fake runner process. The smoke test, typecheck, existing mock integration test, fresh initialization and preceding-schema migration passed. The broader suite had eight passing cases and one failing regression: `run.output` commits without advancing `Thread.activitySeq`, preventing a source-cited work card for that output. Seed `12648430` completed 100 accepted instructions across 20 threads, with five queued cancellations and 95 starts.
+The [process test receipt](evidence/2026-09-29-coordination-process-e2e.md) tests commit `e83a0bb71203c14c3ad996ea155187ad5453763d` through real HTTP and SQLite with a separate fake runner process. The smoke test, typecheck, existing mock integration test, fresh initialization and preceding-schema migration passed. The broader suite had eight passing cases and one failing regression: `run.output` commits without advancing `Thread.activitySeq`, preventing a source-cited work card for that output. Seed `12648430` completed 100 accepted instructions across 20 threads, with five queued cancellations and 95 starts.
 
 This is backend integration evidence against external simulators. It does not change the G0 through G7 or WF01 through WF10 statuses. The real OpenCode runner, shared frontend, and Jev/Flower exchange still need live receipts.
 

@@ -1,6 +1,6 @@
 # Coordination backend process test, September 29, 2026
 
-Tested checkout: `73c521614994ec4e22a0db6716f49e3a5804a315`. Bun 1.3.14 on macOS arm64. The test ran the registered HTTP route layer in a coordinator process against disposable SQLite files. A separate fake execution process stayed alive through coordinator `SIGKILL` and restart. HTTP clients used eight distinct roster credentials, including four project members, an outsider, a stale worker instance, and an analysis service. No OpenCode model or tool execution, frontend, Flower job, or paid service was used. The subsequent receipt edit changed documentation only.
+Tested checkout: `e83a0bb71203c14c3ad996ea155187ad5453763d`. Bun 1.3.14 on macOS arm64. The test ran the registered HTTP route layer in a coordinator process against disposable SQLite files. A separate fake execution process stayed alive through coordinator `SIGKILL` and restart. HTTP clients used eight distinct roster credentials, including four project members, an outsider, a stale worker instance, and an analysis service. No OpenCode model or tool execution, frontend, Flower job, or paid service was used. The subsequent receipt edit changed documentation only.
 
 The harness and run instructions are in [coordination-e2e.md](../../coordination-e2e.md). The test entry point uses `createRoutes` with a fake `RunnerPort` and a Session binding adapter that reads real seeded `session` rows. The roster validator, project admission allowlist, route handlers, queue, runner gateway, EventV2 journal, cards, activity service, SQLite engine, and migrations are the backend implementations under test.
 
@@ -15,7 +15,7 @@ Run from `packages/server` with Bun 1.3.14 on `PATH`:
 | `bun test test/coordination-e2e/suite.test.ts`   |    1 | 8 pass, 1 fail, 1,083 assertions. The failing case is the retained runner-output citation regression. |
 | `bun test test/coordination.integration.test.ts` |    0 | Existing in-process mock test: 1 pass, 0 fail, 51 assertions.                                         |
 
-The suite log contains `COORDINATION_STRESS_SEED 12648430` and `COORDINATION_STRESS_RESULT {"seed":12648430,"threads":20,"accepted":100,"starts":95,"events":414}`. Five accepted instructions were cancelled while queued. The remaining 95 started and drained after a simulated worker disconnect was removed. The fake recorded one execution start for each accepted start, and event replay converged with terminal Run snapshots. The suite took 42.99 seconds in this run.
+The suite log contains `COORDINATION_STRESS_SEED 12648430` and `COORDINATION_STRESS_RESULT {"seed":12648430,"threads":20,"accepted":100,"starts":95,"events":414}`. Five accepted instructions were cancelled while queued. The remaining 95 started and drained after a simulated worker disconnect was removed. The fake recorded one execution start for each accepted start, and event replay converged with terminal Run snapshots. The suite took 48.73 seconds in this run.
 
 ## Scenario results
 
@@ -38,7 +38,7 @@ The contract uses numeric project sequences and retains historical events. It de
 
 ## Smoke event trace
 
-The trace below is from the passing smoke run at the tested checkout. Shared thread `thr_ccf3772f-650e-4a00-8aad-74d6459883dd` had Alice's first Run `run_568c4a61-b73f-4bb2-9cb0-2d5d652aa30d` and Bob's queued Run `run_c03f2606-5125-468b-a686-a3bfc8103435`. Dan used independent thread `thr_37c6fac2-abd2-4442-afdd-ff4a4d09dd3f`.
+The trace below is from the passing smoke run at the tested checkout. Shared thread `thr_1fb04840-0006-4b7e-8754-c93835625d8b` had Alice's first Run `run_a6f2d651-4a6e-43ba-a889-1db8425d5f36` and Bob's queued Run `run_dbb96c9b-c1e6-4627-aa87-618c795d5b5d`. Dan used independent thread `thr_8eecaa00-a07b-4105-9bb0-4527e1e82d8c`.
 
 | Project seq | Observed event                                                                           |
 | ----------: | ---------------------------------------------------------------------------------------- |
