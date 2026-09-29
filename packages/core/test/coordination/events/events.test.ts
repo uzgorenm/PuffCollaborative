@@ -42,7 +42,7 @@ const append = (
   projectId: Coordination.ProjectID,
   threadId: Coordination.ThreadID,
   label: string,
-  project: (seq: number) => Effect.Effect<void> = () => Effect.void,
+  project: (seq: number) => Effect.Effect<void, CoordinationContracts.Failure> = () => Effect.void,
   id?: string,
 ) =>
   journal.append(
@@ -144,6 +144,33 @@ describe("coordination event journal", () => {
       ).pipe(Effect.exit)
 
       expect(Exit.isFailure(exit)).toBe(true)
+      expect(yield* db.all(`SELECT marker FROM coordination_event_probe WHERE marker = '${marker}'`)).toEqual([])
+      expect(yield* db.select().from(EventTable).where(eq(EventTable.id, marker)).all()).toEqual([])
+    }),
+  )
+
+  it.effect("returns a typed projection conflict after rolling back both writes", () =>
+    Effect.gen(function* () {
+      const journal = yield* CoordinationEvents.Service
+      const { db } = yield* Database.Service
+      const { projectId, threadId } = ids()
+      const marker = EventV2.ID.create()
+      const conflict = { code: "conflict" as const, message: "Approval version changed" }
+      yield* db.run("CREATE TABLE IF NOT EXISTS coordination_event_probe (marker text PRIMARY KEY)")
+
+      const failure = yield* append(
+        journal,
+        projectId,
+        threadId,
+        "conflicted approval",
+        () =>
+          db
+            .run(`INSERT INTO coordination_event_probe (marker) VALUES ('${marker}')`)
+            .pipe(Effect.orDie, Effect.andThen(Effect.fail(conflict))),
+        marker,
+      ).pipe(Effect.flip)
+
+      expect(failure).toEqual(conflict)
       expect(yield* db.all(`SELECT marker FROM coordination_event_probe WHERE marker = '${marker}'`)).toEqual([])
       expect(yield* db.select().from(EventTable).where(eq(EventTable.id, marker)).all()).toEqual([])
     }),

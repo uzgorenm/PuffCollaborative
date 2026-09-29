@@ -1,6 +1,6 @@
 export * as CoordinationEvents from "./events"
 
-import { Context, Effect, Layer, Queue, Schema, Stream } from "effect"
+import { Cause, Context, Effect, Layer, Queue, Schema, Stream } from "effect"
 import { and, asc, eq, gt, sql } from "drizzle-orm"
 import { CoordinationEvent } from "@opencode-ai/schema/coordination-event"
 import type { Coordination } from "@opencode-ai/schema/coordination"
@@ -14,6 +14,12 @@ const maxPageSize = 256
 const defaultSubscriberCapacity = 256
 const storedType = EventV2.versionedType(CoordinationEvent.Changed.type, 1)
 const decodeData = Schema.decodeUnknownSync(CoordinationEvent.Changed.data)
+
+class ProjectionFailure extends Error {
+  constructor(readonly failure: CoordinationContracts.Failure) {
+    super(failure.message)
+  }
+}
 
 export interface LayerOptions {
   readonly subscriberCapacity?: number
@@ -158,7 +164,15 @@ export const layerWith = (options?: LayerOptions) =>
             const event = yield* events.publish(
               CoordinationEvent.Changed,
               { ...input, aggregateID: aggregateID(input.projectId) },
-              { ...(input.id ? { id: input.id as EventV2.ID } : {}), commit: project },
+              {
+                ...(input.id ? { id: input.id as EventV2.ID } : {}),
+                commit: (seq) => project(seq).pipe(Effect.catch((error) => Effect.die(new ProjectionFailure(error)))),
+              },
+            ).pipe(
+              Effect.catchCause((cause) => {
+                const defect = Cause.squash(cause)
+                return defect instanceof ProjectionFailure ? Effect.fail(defect.failure) : Effect.failCause(cause)
+              }),
             )
             return {
               id: event.id,
