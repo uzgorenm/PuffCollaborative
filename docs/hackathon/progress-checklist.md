@@ -6,6 +6,8 @@
 
 **Main browser sidebar (September 29):** source `790518a2c9688e9fc1d09f3b6b02a29b965c7a03` adds the Stanford Hackathon project tree, personal threads, teammate sections, and rolling 90-minute summaries to `apps/web`; the separate `/puff` overview page is removed. Production builds, app typecheck, 47 browser tests, and desktop/mobile browser inspection passed. [Evidence and limits](evidence/2026-09-29-main-web-sidebar.md). Activity comes from demo or simulator sessions; WF01/WF02 and G5 remain open.
 
+**OpenCode Team Activity panel (September 29):** source `dac982301277871c5371f0e2dda02747bcb7e5ea` mounts coordination API activity beside the standard app content and in the classic project sidebar. App typecheck, production build, and browser rendering passed. The coordination API was unavailable, so sign-in and live activity were not verified. No WF case or gate is closed. [Receipt](evidence/2026-09-29-opencode-team-activity-sidebar.md).
+
 This is the coordinator's working checklist. A feature counts as progress when its behavior can be demonstrated with evidence. Use the [workflow cases](acceptance-workflows.md) to run the checks and the [integration gates](integration-gates.md) to resolve interfaces. Human ownership remains Serhat (server), Talha (OpenCode), Serdar (interface), Ferit (Flower).
 
 ## Current checkpoint
