@@ -51,7 +51,7 @@ test("read API returns coordination-shaped projects, threads, snapshots and repl
   expect(status).toMatchObject({ ready: true, simulated: true, mode: "synthetic" })
   const projects = await (await get("/api/coordination/v1/projects")).json()
   expect(projects.map((project: any) => project.id)).toEqual([
-    "sim-wf01", "sim-wf02", "sim-wf03",
+    "sim-wf04", "sim-wf01", "sim-wf02", "sim-wf03",
   ])
   projects.forEach(assertProject)
   const threads = await (await get("/api/coordination/v1/projects/sim-wf01/threads")).json()
@@ -188,6 +188,7 @@ test("demo identity and project boundaries fail closed", async () => {
   const bobManifest = await (await get("/api/coordination/v1/simulation", "bob")).json()
   expect(bobManifest.scenarios.map((scenario: any) => scenario.projectId)).toEqual(["sim-wf01", "sim-wf02"])
   expect(JSON.stringify(bobManifest)).not.toContain("wf03-overlap")
+  expect(JSON.stringify(bobManifest)).not.toContain("usr_alya")
   const caraManifest = await (await get("/api/coordination/v1/simulation", "cara")).json()
   expect(caraManifest.scenarios).toHaveLength(3)
   const drewManifest = await (await get("/api/coordination/v1/simulation", "drew")).json()
@@ -207,4 +208,136 @@ test("demo identity and project boundaries fail closed", async () => {
   })
   expect(preflight.status).toBe(204)
   expect(preflight.headers.get("access-control-allow-origin")).toBe("*")
+})
+
+test("WF04 presents Alice's matching error, Alya's exact verified fix, and an unrelated error", async () => {
+  const manifest = await (await get("/api/coordination/v1/simulation")).json()
+  expect(manifest.selectedScenarioId).toBe("wf04")
+  expect(manifest.capabilities.fixReuse).toBe(true)
+  const reuse = manifest.fixReuse
+  expect(reuse.projectId).toBe("sim-wf04")
+  const cards = await (await get("/api/coordination/v1/projects/sim-wf04/work-cards")).json()
+  const sourceCard = cards.find((card: any) => card.threadId === reuse.sourceRef.threadId)
+  expect(sourceCard.status).toBe("done")
+  expect(sourceCard.contributors).toContain("usr_alya")
+  expect(sourceCard.recentVerifiedOutcome).toContain("2 pass")
+  expect(sourceCard.evidenceRefs).toContainEqual(reuse.sourceRef)
+  const sourcePage = await (await get(`/api/coordination/v1/projects/sim-wf04/events?after=${reuse.sourceRef.seq - 1}&limit=1`)).json()
+  const source = sourcePage.events[0]
+  expect(source).toMatchObject({ id: reuse.sourceRef.eventId, threadId: reuse.sourceRef.threadId, seq: reuse.sourceRef.seq })
+  expect(source.payload.fix.error).toBe(reuse.error)
+  expect(source.payload.fix.patch).toContain("-export const names = (projects?: string[]) => projects.map")
+  expect(source.payload.fix.verification).toEqual({
+    command: "bun test project-list.test.ts", exitCode: 0, output: "2 pass, 0 fail",
+  })
+  const targetPage = await (await get(`/api/coordination/v1/projects/sim-wf04/events?after=${reuse.targetErrorRef.seq - 1}&limit=1`)).json()
+  expect(targetPage.events[0]).toMatchObject({ id: reuse.targetErrorRef.eventId, kind: "run.failed" })
+  expect(targetPage.events[0].payload.summary).toBe(reuse.error)
+  const unrelated = await (await get("/api/coordination/v1/threads/wf04-unrelated/events?after=0&limit=200")).text()
+  expect(unrelated).toContain("TimeoutError")
+  expect(unrelated).not.toContain(reuse.sourceRef.eventId)
+  expect(unrelated).not.toContain("Default an absent projects")
+  expect(JSON.stringify(manifest)).not.toContain(privateFixtureMarkerForTest())
+  expect((await get("/api/coordination/v1/projects/sim-wf04", "bob")).status).toBe(404)
+})
+
+test("WF04 Apply runs the exact patch in a disposable workspace and exact retry is idempotent", async () => {
+  const local = createSimulationServer({ port: 0 })
+  const base = `http://127.0.0.1:${local.port}/api/coordination/v1`
+  const req = (path: string, init: RequestInit = {}) => fetch(base + path, { ...init, headers: { ...auth(), "Content-Type": "application/json" } })
+  try {
+    const reuse = (await (await req("/simulation")).json()).fixReuse
+    const body = { requestId: "apply-001", text: reuse.approvedInstructionText, sourceRef: reuse.sourceRef, targetErrorRef: reuse.targetErrorRef }
+    const first = await req(`/threads/${reuse.targetThreadId}/instructions`, { method: "POST", body: JSON.stringify(body) })
+    expect(first.status).toBe(200)
+    const applied = await first.json()
+    expect(applied.instruction).toMatchObject({ requestId: "apply-001", threadId: reuse.targetThreadId, text: body.text })
+    expect(applied.run).toMatchObject({ state: "completed", threadId: reuse.targetThreadId })
+    const replay = await (await req(`/threads/${reuse.targetThreadId}/events?after=0&limit=200`)).json()
+    expect(replay.events.map((event: any) => event.kind)).toEqual([
+      "thread.created", "run.failed", "instruction.submitted", "run.started", "run.diff", "run.tool", "run.completed",
+    ])
+    const tool = replay.events.find((event: any) => event.kind === "run.tool")
+    expect(tool.payload.status).toBe("completed")
+    expect(tool.payload.verification.command).toBe("bun test project-list.test.ts")
+    expect(tool.payload.verification.exitCode).toBe(0)
+    expect(tool.payload.verification.output).toContain("2 pass")
+    expect(tool.payload.verification.output).toContain("0 fail")
+    expect(JSON.stringify(replay)).not.toContain("puff-sim-fix-")
+    const snapshot = await (await req(`/threads/${reuse.targetThreadId}`)).json()
+    expect(snapshot.workCard.status).toBe("done")
+    expect(snapshot.instructions).toHaveLength(1)
+    expect(snapshot.runs[0].id).toBe(applied.run.id)
+    const retry = await req(`/threads/${reuse.targetThreadId}/instructions`, { method: "POST", body: JSON.stringify(body) })
+    expect(await retry.json()).toEqual(applied)
+    const replayAgain = await (await req(`/threads/${reuse.targetThreadId}/events?after=0&limit=200`)).json()
+    expect(replayAgain.events).toHaveLength(replay.events.length)
+    const changed = await req(`/threads/${reuse.targetThreadId}/instructions`, { method: "POST", body: JSON.stringify({ ...body, text: body.text + " changed" }) })
+    expect(changed.status).toBe(409)
+    const duplicate = await req(`/threads/${reuse.targetThreadId}/instructions`, { method: "POST", body: JSON.stringify({ ...body, requestId: "apply-002" }) })
+    expect(duplicate.status).toBe(409)
+  } finally {
+    local.stop(true)
+  }
+})
+
+test("WF04 rejects wrong actor, unrelated target, fabricated and stale references before applying", async () => {
+  const local = createSimulationServer({ port: 0 })
+  const base = `http://127.0.0.1:${local.port}/api/coordination/v1`
+  try {
+    const reuse = (await (await fetch(base + "/simulation", { headers: auth() })).json()).fixReuse
+    const body = { requestId: "negative-001", text: reuse.approvedInstructionText, sourceRef: reuse.sourceRef, targetErrorRef: reuse.targetErrorRef }
+    const send = (path: string, value: unknown, name = "alice") => fetch(base + path, {
+      method: "POST", headers: { ...auth(name), "Content-Type": "application/json" }, body: JSON.stringify(value),
+    })
+    const path = `/threads/${reuse.targetThreadId}/instructions`
+    expect((await send(path, body, "bob")).status).toBe(404)
+    expect((await send("/threads/wf04-unrelated/instructions", body)).status).toBe(409)
+    expect((await send(path, { ...body, sourceRef: { ...body.sourceRef, eventId: "invented" } })).status).toBe(409)
+    expect((await send(path, { ...body, targetErrorRef: { ...body.targetErrorRef, seq: 99 } })).status).toBe(409)
+    expect((await send(path, { ...body, text: body.text.replace(reuse.sourceRef.eventId, "invented") })).status).toBe(409)
+    const target = await (await fetch(base + `/threads/${reuse.targetThreadId}`, { headers: auth() })).json()
+    expect(target.instructions).toHaveLength(0)
+  } finally {
+    local.stop(true)
+  }
+  for (const fixtureState of ["stale-source", "stale-target"] as const) {
+    const stale = createSimulationServer({ port: 0, fixtureState })
+    try {
+      const base = `http://127.0.0.1:${stale.port}/api/coordination/v1`
+      const reuse = (await (await fetch(base + "/simulation", { headers: auth() })).json()).fixReuse
+      const response = await fetch(base + `/threads/${reuse.targetThreadId}/instructions`, {
+        method: "POST", headers: { ...auth(), "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: "stale-001", text: reuse.approvedInstructionText, sourceRef: reuse.sourceRef, targetErrorRef: reuse.targetErrorRef }),
+      })
+      expect(response.status).toBe(409)
+    } finally {
+      stale.stop(true)
+    }
+  }
+})
+
+test("WF04 failing verification records run.failed and no completed work card", async () => {
+  const local = createSimulationServer({ port: 0, forcePostTestFailure: true })
+  const base = `http://127.0.0.1:${local.port}/api/coordination/v1`
+  try {
+    const reuse = (await (await fetch(base + "/simulation", { headers: auth() })).json()).fixReuse
+    const response = await fetch(base + `/threads/${reuse.targetThreadId}/instructions`, {
+      method: "POST", headers: { ...auth(), "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId: "failed-001", text: reuse.approvedInstructionText, sourceRef: reuse.sourceRef, targetErrorRef: reuse.targetErrorRef }),
+    })
+    expect(response.status).toBe(200)
+    expect((await response.json()).run.state).toBe("failed")
+    const replay = await (await fetch(base + `/threads/${reuse.targetThreadId}/events?after=0&limit=200`, { headers: auth() })).json()
+    expect(replay.events.at(-1).kind).toBe("run.failed")
+    const tool = replay.events.find((event: any) => event.kind === "run.tool")
+    expect(tool.payload.status).toBe("failed")
+    expect(tool.payload.verification.exitCode).not.toBe(0)
+    expect(JSON.stringify(replay)).not.toContain("puff-sim-fix-")
+    const snapshot = await (await fetch(base + `/threads/${reuse.targetThreadId}`, { headers: auth() })).json()
+    expect(snapshot.workCard.status).toBe("blocked")
+    expect(snapshot.workCard.recentVerifiedOutcome).toBeNull()
+  } finally {
+    local.stop(true)
+  }
 })
