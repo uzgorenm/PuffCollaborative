@@ -275,14 +275,14 @@ describe("coordination runner with mocked access, queue and approval storage", (
     expect(test.getRun().state).toBe("completed")
   })
 
-  test("retains a reservation after a disconnected start and recovers the same command", async () => {
+  test("retains a reservation after a disconnected start and recovers it on the next claim", async () => {
     const test = setup(() => [{ kind: "complete" }])
     test.mock.setConnected(false)
     const first = await Effect.runPromise(result(test.adapter.claim(runner, thread.id, owner)))
     expect(first.ok).toBe(false)
     expect(test.getRun().state).toBe("reserved")
     test.mock.setConnected(true)
-    await Effect.runPromise(test.adapter.recoverPending(owner))
+    expect(await Effect.runPromise(test.adapter.claim(runner, thread.id, owner))).toBeUndefined()
     await test.mock.wait(initialRun.id)
     expect(test.mock.starts).toHaveLength(1)
     expect(test.mock.starts[0]?.runnerMessageId).toBe(initialRun.runnerMessageId)
