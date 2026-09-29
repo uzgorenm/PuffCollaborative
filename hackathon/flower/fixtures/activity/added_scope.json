@@ -1,0 +1,75 @@
+{
+  "synthetic": true,
+  "name": "added_scope",
+  "projectId": "synthetic-puff",
+  "sessions": [
+    {
+      "workerId": "worker-compact",
+      "sessionId": "compact",
+      "ownerId": "demo-owner",
+      "title": "compact experiment",
+      "featureTopic": "navigation",
+      "relationship": "alternative",
+      "shared": true
+    }
+  ],
+  "events": [
+    {
+      "eventId": "compact-1",
+      "projectId": "synthetic-puff",
+      "workerId": "worker-compact",
+      "sessionId": "compact",
+      "revision": 1,
+      "kind": "status",
+      "occurredAt": "2026-09-29T18:00:01Z",
+      "content": {
+        "transition": "started",
+        "actorId": "demo-owner",
+        "instructionId": "nav",
+        "objective": "Explore navigation",
+        "approach": "Compact navigation",
+        "currentStep": "Build compact menu"
+      }
+    },
+    {
+      "eventId": "compact-2",
+      "projectId": "synthetic-puff",
+      "workerId": "worker-compact",
+      "sessionId": "compact",
+      "revision": 2,
+      "kind": "status",
+      "occurredAt": "2026-09-29T18:00:02Z",
+      "content": {
+        "transition": "progress",
+        "actorId": "demo-owner",
+        "objective": "Explore navigation and add settings access",
+        "currentStep": "Add settings entry"
+      }
+    }
+  ],
+  "expectedCards": {
+    "compact": {
+      "objective": "Explore navigation and add settings access",
+      "revision": 2,
+      "status": "running"
+    }
+  },
+  "classifications": [
+    "meaningful_progress",
+    "added_scope"
+  ],
+  "expectedRefresh": [
+    true,
+    true
+  ],
+  "expectedRelation": "single_session",
+  "workers": [
+    {
+      "workerId": "worker-compact",
+      "projectId": "synthetic-puff",
+      "ownerId": "demo-owner",
+      "lastSeenAt": "2026-09-29T18:00:00Z",
+      "state": "online"
+    }
+  ]
+}
