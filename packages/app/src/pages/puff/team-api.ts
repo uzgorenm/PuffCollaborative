@@ -28,6 +28,7 @@ export const TeamThread = Schema.Struct({
 })
 export type TeamThread = typeof TeamThread.Type
 const Replay = Schema.Struct({ events: Schema.Array(Coordination.Event), cursor: Schema.Int, hasMore: Schema.Boolean })
+const Status = Schema.Struct({ ready: Schema.Boolean, simulated: Schema.optional(Schema.Boolean) })
 
 export function createTeamApi(config: {
   baseUrl: string
@@ -90,6 +91,9 @@ export function createTeamApi(config: {
   }
   return {
     async simulation(signal?: AbortSignal) {
+      const status = await request("/status", Status, undefined, signal)
+      if (!status.ready) throw new ProjectApiError("unavailable")
+      if (status.simulated !== true) return undefined
       try {
         return await manifest("/simulation", undefined, signal)
       } catch (error) {

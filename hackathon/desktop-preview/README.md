@@ -1,0 +1,7 @@
+# Desktop preview with the coordination backend
+
+From the repository root, install the pinned dependencies and run `bun hackathon/desktop-preview/run.ts`. The launcher starts an isolated loopback OpenCode server, seeds two shared coding Sessions through its registered APIs, and opens the Electron desktop against that server. It uses the coordination mock runner; no model or Flower job runs. The project and summary copy identify the data as simulated.
+
+Open **Project overview → Connect team** in the desktop. The service URL is already selected. Read the username and password from the local `member.json` path printed by the launcher, then sign in. The overview shows two same-owner navigation experiments, four members, source-linked comments, WorkCards, and completed mock runs. Open either thread to inspect its event history, submit a comment, or submit an instruction. The launcher reserves new instructions for the registered mock runner once per second, so the thread updates through the real queue, event store, HTTP API, and desktop client.
+
+Use `bun hackathon/desktop-preview/run.ts --server-only` to exercise the same backend without launching Electron. The default server, renderer, and debugging ports are 4467, 5184, and 9230; override them with `PUFF_PREVIEW_SERVER_PORT`, `PUFF_PREVIEW_RENDERER_PORT`, and `PUFF_PREVIEW_DEBUG_PORT`. The launcher refuses occupied ports and creates a fresh temporary data directory each run. Credentials stay in that directory with mode 0600 and are never committed.

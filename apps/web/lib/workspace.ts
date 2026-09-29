@@ -1,0 +1,211 @@
+import type { Session } from "./sessions"
+
+export type WorkspaceSession = Session & {
+  task: string
+  scope: "project" | "private"
+  topic: string
+  findings?: { id: string; title: string; problem: string; solution: string; source: string }[]
+  relation?: string
+  relatedSessionId?: string
+  receivedFindings?: string[]
+}
+
+export type WorkspaceProject = {
+  name: string
+  goal: string
+  members: { name: string; initials: string; color: Session["color"]; focus: string }[]
+}
+
+export type WorkspaceState = { project: WorkspaceProject; sessions: WorkspaceSession[] }
+
+export function createDemoWorkspace(projectName = "Puff", goal = "Build a collaborative workspace"): WorkspaceState {
+  return {
+    project: {
+      name: projectName.trim() || "Puff",
+      goal: goal.trim() || "Build a collaborative workspace",
+      members: [
+        { name: "You", initials: "Y", color: "green", focus: "Building the project API and reviewing access rules in parallel." },
+        { name: "Sam", initials: "S", color: "purple", focus: "Building frontend project navigation and checking its mobile layout." },
+        { name: "Alice", initials: "A", color: "blue", focus: "Resolved the development server startup problem; now checking regressions." },
+      ],
+    },
+    // Each call owns its fixture objects. These conversations illustrate a scenario.
+    sessions: [
+      {
+        id: "demo-you-api",
+        title: "Build the project API",
+        owner: "You",
+        initials: "Y",
+        color: "green",
+        status: "running",
+        summary: "Planning project membership endpoints and the data the frontend needs.",
+        updatedAt: "2026-09-29T19:06:00.000Z",
+        task: "Build the backend API for projects and project membership.",
+        scope: "project",
+        topic: "backend",
+        messages: [
+          { role: "user", text: "Build the backend API for projects and project membership." },
+          { role: "assistant", text: "The API work covers listing projects and their members. Your access review is a separate parallel session; its decisions will inform the membership contract. Sam is handling the frontend navigation." },
+        ],
+      },
+      {
+        id: "demo-you-auth",
+        title: "Review project access rules",
+        owner: "You",
+        initials: "Y",
+        color: "green",
+        status: "waiting",
+        summary: "Reviewing who can see a project's shared sessions before connecting access rules to the API.",
+        updatedAt: "2026-09-29T19:04:00.000Z",
+        task: "Review project access rules alongside the API implementation.",
+        scope: "project",
+        topic: "backend",
+        relation: "Parallel to You · Build the project API",
+        relatedSessionId: "demo-you-api",
+        messages: [
+          { role: "user", text: "Review project access rules alongside the API implementation." },
+          { role: "assistant", text: "This session reviews project membership and shared-session visibility. The API implementation stays in your other session, so both workstreams retain their own task and conversation." },
+        ],
+      },
+      {
+        id: "demo-sam-frontend",
+        title: "Build project navigation",
+        owner: "Sam",
+        initials: "S",
+        color: "purple",
+        status: "running",
+        summary: "Building the frontend sidebar, project switcher, and session list.",
+        updatedAt: "2026-09-29T19:05:00.000Z",
+        task: "Build frontend project navigation with a sidebar and project switcher.",
+        scope: "project",
+        topic: "navigation",
+        messages: [
+          { role: "user", text: "Build frontend project navigation with a sidebar and project switcher." },
+          { role: "assistant", text: "My scope is the sidebar, project switcher, and session list. A teammate could independently check keyboard accessibility or test project switching. They can reference this scope while keeping their own approach and session." },
+        ],
+      },
+      {
+        id: "demo-sam-mobile",
+        title: "Check navigation on mobile",
+        owner: "Sam",
+        initials: "S",
+        color: "purple",
+        status: "waiting",
+        summary: "Checking drawer behavior and session navigation at smaller screen sizes.",
+        updatedAt: "2026-09-29T19:03:00.000Z",
+        task: "Check the frontend navigation layout on mobile while the main navigation is built.",
+        scope: "project",
+        topic: "navigation",
+        relation: "Parallel to Sam · Build project navigation",
+        relatedSessionId: "demo-sam-frontend",
+        messages: [
+          { role: "user", text: "Check the frontend navigation layout on mobile while the main navigation is built." },
+          { role: "assistant", text: "This is Sam's second session: it checks mobile drawer behavior, readable labels, and switching between sessions. The main frontend implementation remains in Build project navigation." },
+        ],
+      },
+      {
+        id: "demo-alice-server",
+        title: "Fix the failing development server",
+        owner: "Alice",
+        initials: "A",
+        color: "blue",
+        status: "complete",
+        summary: "Found a port 3000 conflict and documented the project's development port, 3005.",
+        updatedAt: "2026-09-29T18:58:00.000Z",
+        task: "Investigate why the development server fails to start with EADDRINUSE.",
+        scope: "project",
+        topic: "dev-server",
+        findings: [
+          {
+            id: "server-port",
+            title: "Development server port conflict",
+            problem: "The development server could not bind to port 3000 because another process already owned it (EADDRINUSE).",
+            solution: "Identify the process that owns port 3000 before changing anything. Use this project's configured development port, 3005. If port 3000 must be reused, deliberately restart only after checking the process owner and confirming that process belongs to this project.",
+            source: "Alice · Fix the failing development server · message 2",
+          },
+        ],
+        messages: [
+          { role: "user", text: "Investigate why the development server fails to start with EADDRINUSE." },
+          { role: "assistant", text: "The scenario's error was a port conflict: another process owned port 3000. Identify its owner first. This project uses development port 3005, so use its configured dev command. Reusing 3000 requires a deliberate restart after confirming the process belongs to this project. This finding is specific to that startup error; compare your error before applying it." },
+        ],
+      },
+      {
+        id: "demo-alice-tests",
+        title: "Check the server regression",
+        owner: "Alice",
+        initials: "A",
+        color: "blue",
+        status: "running",
+        summary: "Checking that the configured development port is reflected in startup guidance and regression checks.",
+        updatedAt: "2026-09-29T19:02:00.000Z",
+        task: "Review regression coverage after resolving the development server startup problem.",
+        scope: "project",
+        topic: "testing",
+        relation: "Follows Alice · Fix the failing development server",
+        relatedSessionId: "demo-alice-server",
+        messages: [
+          { role: "user", text: "Review regression coverage after resolving the development server startup problem." },
+          { role: "assistant", text: "The port finding remains in my completed server session. This separate session checks startup guidance and regression coverage, preserving the original source for teammates who encounter the same error." },
+        ],
+      },
+    ],
+  }
+}
+
+export function findRelatedWork(prompt: string, sessions: WorkspaceSession[]): WorkspaceSession[] {
+  const topic = taskTopic(prompt)
+  return topic === "general" ? [] : sessions.filter((session) => session.topic === topic)
+}
+
+export function findSolvedProblem(prompt: string, sessions: WorkspaceSession[]): { session: WorkspaceSession; finding: NonNullable<WorkspaceSession["findings"]>[number] } | undefined {
+  const text = prompt.toLowerCase().replace(/[’‘]/g, "'")
+  const portFailure = /\beaddrinuse\b/.test(text) || /\b(?:port(?:\s+\d+)?\s+(?:(?:is|was|already|still|has|a)\s+)*(?:in use|busy|occupied|conflict|collision)|(?:conflict|collision)\s+(?:on|with)\s+(?:the\s+)?port)\b/.test(text)
+  // A generic startup phrase can suggest reviewing this source. A named, different
+  // server failure must not become a claimed match to the fixture's port conflict.
+  const serverStartupFailure = /\b(?:server\s+(?:(?:keeps|is|still|just)\s+)*(?:fails?|failing|won't start|can't start|cannot start|doesn't start|does not start|failed to start|fails to start|not starting)|(?:failing|failed)\s+(?:(?:dev|development)\s+)?server)\s*[.!?]?\s*$/.test(text)
+  if (!portFailure && !serverStartupFailure) return undefined
+  const session = sessions.find((session) => session.topic === "dev-server" && session.status === "complete" && session.findings?.some((finding) => finding.id === "server-port"))
+  const finding = session?.findings?.find((finding) => finding.id === "server-port")
+  return session && finding ? { session, finding } : undefined
+}
+
+export function createTaskSession(prompt: string, owner: string, project: WorkspaceProject, mode: "independent" | "complementary" = "independent", related?: WorkspaceSession): WorkspaceSession {
+  const requested = prompt.trim() || "Describe the next project task"
+  const name = owner.trim() || "You"
+  const member = project.members.find((member) => member.name === name)
+  const reference = related ? `${related.owner} · ${related.title}` : undefined
+  const complementary = mode === "complementary" && related
+  const complementaryScope = related?.topic === "navigation"
+    ? { task: "Check navigation accessibility and project switching", detail: "keyboard accessibility checks and project-switching tests" }
+    : related?.topic === "backend"
+      ? { task: "Check API contracts and access rules", detail: "API contract tests and access-rule review" }
+      : related?.topic === "dev-server"
+        ? { task: "Verify server startup configuration and reproduction", detail: "startup configuration review and reproduction verification" }
+        : { task: "Review independent edge cases", detail: "independent edge-case checks and review" }
+  const task = complementary ? complementaryScope.task : requested
+  const plan = complementary
+    ? `Demo plan for ${project.name}: review ${reference} as source context, then take a complementary scope: ${complementaryScope.detail}. Keep a separate approach and record your own findings. This creates a local demo session; it does not run an agent, copy the source implementation, or stop the source session.`
+    : `Demo plan for ${project.name}: clarify the outcome for “${task}”, inspect the relevant project context, and propose a small first step.${reference ? ` ${reference} is related work; keep this task independent and compare scope before implementing.` : ""} This creates a local demo session; it does not run an agent or change another session.`
+  return {
+    id: `demo-task-${crypto.randomUUID()}`,
+    title: task.length > 72 ? `${task.slice(0, 69)}…` : task,
+    owner: name,
+    initials: member?.initials ?? name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(),
+    color: member?.color ?? "orange",
+    status: "waiting",
+    summary: complementary ? `Proposed complementary scope: ${complementaryScope.detail}.` : "Task assigned in this demo; the first step is ready to review.",
+    updatedAt: new Date().toISOString(),
+    messages: [{ role: "user", text: requested }, { role: "assistant", text: plan }],
+    task,
+    scope: "project",
+    topic: complementary ? related.topic : taskTopic(task),
+    ...(related ? { relation: `${complementary ? "Complements" : "Independent alongside"} ${reference}`, relatedSessionId: related.id } : {}),
+  }
+}
+
+function taskTopic(prompt: string): string {
+  if (/\b(?:server|eaddrinuse|port)\b/i.test(prompt)) return "dev-server"
+  if (/\b(?:navigation|front[ -]?end|sidebar|drawer|project switcher)\b/i.test(prompt)) return "navigation"
+  if (/\b(?:back[ -]?end|apis?|auth|authentication)\b/i.test(prompt)) return "backend"
+  return "general"
+}

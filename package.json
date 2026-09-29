@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "bun run --cwd packages/opencode src/index.ts",
     "dev:desktop": "bun --cwd packages/desktop dev",
+    "demo:desktop": "bun hackathon/desktop-preview/run.ts",
     "dev:web": "bun --cwd packages/app dev",
     "lint": "oxlint",
     "typecheck": "bun turbo typecheck",

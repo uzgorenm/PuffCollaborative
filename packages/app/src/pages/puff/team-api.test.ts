@@ -153,17 +153,28 @@ const simulated = {
 
 test("simulation_probe_requires_an_explicit_marker_and_keeps_a_missing_route_live", async () => {
   const config = { baseUrl: "http://127.0.0.1:4187", username: "alice", password: "demo-alice" }
-  const demo = createTeamApi({ ...config, transport: async () => Response.json(simulated) })
+  const preview = (manifest: unknown) => createTeamApi({ ...config, transport: async (url) =>
+    String(url).endsWith("/status")
+      ? Response.json({ ready: true, simulated: true })
+      : Response.json(manifest),
+  })
+  const demo = preview(simulated)
   expect(validSimulationManifest((await demo.simulation())!)).toBe(true)
-  const live = createTeamApi({ ...config, transport: async () => new Response(null, { status: 404 }) })
+  const calls: string[] = []
+  const live = createTeamApi({ ...config, transport: async (url) => {
+    calls.push(new URL(url).pathname)
+    if (String(url).endsWith("/status")) return Response.json({ ready: true })
+    return new Response("<html>app fallback</html>", { headers: { "Content-Type": "text/html" } })
+  } })
   expect(await live.simulation()).toBeUndefined()
-  const malformed = createTeamApi({ ...config, transport: async () => Response.json({ ...simulated, simulated: false }) })
+  expect(calls).toEqual(["/api/coordination/v1/status"])
+  const malformed = preview({ ...simulated, simulated: false })
   await expect(malformed.simulation()).rejects.toMatchObject({ code: "invalid" })
-  const premature = createTeamApi({ ...config, transport: async () => Response.json({
+  const premature = preview({
     ...simulated,
     wf02: { ...simulated.wf02, milestones: simulated.wf02.milestones.map((item, index) =>
       index === 2 ? { ...item, observedAt: "2026-09-29T19:00:00Z" } : item) },
-  }) })
+  })
   await expect(premature.simulation()).rejects.toMatchObject({ code: "invalid" })
 })
 

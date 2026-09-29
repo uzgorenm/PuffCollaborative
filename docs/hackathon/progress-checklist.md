@@ -1,5 +1,11 @@
 # Puff progress and verification
 
+**Compact React sidebar:** source `1497e7cbbf` removes visible status words while retaining colored dots, tooltips, and accessible labels. Fourteen tests, typecheck, production build, and sidebar navigation pass. [Backend handoff receipt](evidence/2026-09-29-compact-web-sidebar.md). The interface remains a local demo pending backend wiring.
+
+**Browser UI workflows (September 29):** Next.js/React source `0c002da6c9` adds person → total summary → sessions, project setup/task assignment, overlap choices, attributed finding reuse, and private local sessions at `apps/web`. Fourteen tests, package typecheck, production build, browser persistence/source-deduplication checks, and a 2:26 cursor walkthrough passed. [Evidence and limitations](evidence/2026-09-29-react-web-workflows.md). The interface is explicitly an interactive demo; no live-awareness, real-presence, or execution gate is closed by these checks.
+
+**Main browser sidebar (September 29):** source `790518a2c9688e9fc1d09f3b6b02a29b965c7a03` adds the Stanford Hackathon project tree, personal threads, teammate sections, and rolling 90-minute summaries to `apps/web`; the separate `/puff` overview page is removed. Production builds, app typecheck, 47 browser tests, and desktop/mobile browser inspection passed. [Evidence and limits](evidence/2026-09-29-main-web-sidebar.md). Activity comes from demo or simulator sessions; WF01/WF02 and G5 remain open.
+
 This is the coordinator's working checklist. A feature counts as progress when its behavior can be demonstrated with evidence. Use the [workflow cases](acceptance-workflows.md) to run the checks and the [integration gates](integration-gates.md) to resolve interfaces. Human ownership remains Serhat (server), Talha (OpenCode), Serdar (interface), Ferit (Flower).
 
 ## Current checkpoint
@@ -64,6 +70,8 @@ These checkpoints do not close G0 through G7 or WF01 through WF10. Selected acti
 **Later backend quality checkpoint:** [receipt at `dec2fb31c0`](evidence/2026-09-29-backend-quality.md) records 17 passing local integration tests, 177 assertions, core typecheck and independent source review for atomic activity revisions and overlapping comment retry. The same checks passed again in a clean publication checkout. This is partial implementation evidence for G4/F2; live gates remain open, and `run.output` inclusion in the separate activity feed is a follow-up.
 
 **Later source-inspection checkpoint:** [receipt at `e332cbf539`](evidence/2026-09-29-source-inspection.md) records exact inline citation lookup, original-attempt tool-decision retry and real Session identity. Coordinator checks passed 67 focused tests, 46 browser tests, app/desktop typechecks and app build. Native N1/N2/N3 acceptance and live WF02/WF10 remain open; a synthetic HTTP response is not a Flower delivery receipt.
+
+**Native backend preview:** [receipt at `3147b79f2f`](evidence/2026-09-29-desktop-backend-preview.md) records the Electron desktop connected to the registered coordination service. Two shared Session records appeared separately; an instruction submitted from the desktop queued and completed through the mock runner, and its exact source event was inspected. App, desktop and server typechecks passed; 56 focused app tests and the 51-assertion server integration passed. This preview does not close WF01–WF10 or G0–G7. Live awareness and Flower exchange remain open.
 
 **Flower checkpoint — September 29:** Agent 1's
 [receipt](evidence/2026-09-29-flower-chain.md) records two separate AgentApp builds,
