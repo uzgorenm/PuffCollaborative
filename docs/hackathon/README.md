@@ -2,7 +2,7 @@
 
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
 
-**React browser preview:** [`apps/web`](../../apps/web/README.md) adds the requested Codex-style Next.js interface, collaborator avatars, and bottom session summaries. Source `b23f29418d` passes production build and browser navigation/draft checks; [receipt](evidence/2026-09-29-react-web-preview.md). It reads synthetic simulator data and saves local drafts. Real presence and execution remain unconnected; this does not close the live workflow gates.
+**React browser workflows:** [`apps/web`](../../apps/web/README.md) now groups each person's total work above their individual sessions, with guided setup/task assignment, overlap choices, source review/reuse, private sessions, and an original Puff logo. Source `0c002da6c9` passes 14 tests, package typecheck, production build, and observed browser workflows; [receipt and 2:26 video details](evidence/2026-09-29-react-web-workflows.md). The interactive state and responses are explicitly local demo examples. Real presence and execution remain unconnected; this does not close the live workflow gates.
 
 **Desktop unblock:** the [startup integration receipt](evidence/2026-09-29-desktop-startup-integration.md) records the retained-host repair and independent checks. Follow [desktop access ownership](desktop-coordination.md) so simultaneous chats do not control the same app or push conflicting changes.
 
