@@ -4,10 +4,11 @@ This is the team's shared task board and feature-status page. Detailed implement
 
 ## Our tasks
 
-**Ownership check pending:** The latest root README assigns Serhat to the shared
-server and leaves the OpenCode role unnamed. The earlier assignments below and in
-the detailed plan have Serhat on OpenCode and Ferit on the server. Confirm this
-possible swap before starting either workstream; Serdar and Talha are unchanged.
+**Ownership check pending:** Teammates are updating assignments in the root README.
+Its latest edit assigns Serhat to the shared server, Talha to OpenCode execution,
+and Serdar to Flower; the interface role is unnamed. The earlier assignments below
+and in the detailed plan are awaiting reconciliation with those edits. Check the
+[latest README delegation](../../README.md#task-delegation) before starting work.
 
 | Task | Owner | Deliverable | Status | Verified commit / blocker |
 | --- | --- | --- | --- | --- |
