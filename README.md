@@ -84,7 +84,7 @@ Use the [team board](docs/hackathon/README.md) for ownership and status, and the
 [MVP spec](docs/hackathon/mvp-spec.md) for the scoped acceptance criteria. The
 workstream descriptions below are preserved as the team's implementation direction.
 
-### Ferit — Shared server and request coordination
+### Serhat — Shared server and request coordination
 Owns the source of truth: projects, threads, messages, request ordering, and execution state.
 Build:
 - Shared projects and threads, with contributor attribution and basic access control.
@@ -93,7 +93,7 @@ Build:
 - Stop and approval controls that bypass the instruction queue.
 Boundary: Decides what runs next, but does not implement agent execution or summaries.
 Demo test: Two teammates submit to the same thread. Both see the same queue, the second turn waits, and another thread continues independently.
-### Serhat — OpenCode execution and workspaces
+### — OpenCode execution and workspaces
 Owns turning an authorized run into actual coding work.
 Build:
 - The adapter connecting each shared thread to its OpenCode session.
