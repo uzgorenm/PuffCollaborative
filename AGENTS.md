@@ -1,8 +1,9 @@
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
-- The default branch in this repo is `dev`.
-- Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
+- The inherited OpenCode default branch is `dev`. Hackathon work is delivered to `main`.
+- Serdar's instruction: commit and push completed work to `origin/main` each time. Verify the relevant changes first, fetch the current remote state, and preserve teammates' commits. Never force-push or reset away another person's work.
+- Use `main` or `origin/main` for hackathon diffs. `main` was created from the latest `dev` to preserve the upstream code and Serhat's README.
 
 ## Branch Names
 
