@@ -2,6 +2,8 @@
 
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
 
+**React backend handoff:** the compact sidebar uses colored status dots with hover/accessibility labels. Source `1497e7cbbf` preserves incoming main and passes 14 tests, typecheck, build, and browser interaction checks. [Receipt and backend integration boundary](evidence/2026-09-29-compact-web-sidebar.md). The React workspace is ready for teammates to connect its local demo actions to the authoritative backend; live gates remain open.
+
 **React browser workflows:** [`apps/web`](../../apps/web/README.md) now groups each person's total work above their individual sessions, with guided setup/task assignment, overlap choices, source review/reuse, private sessions, and an original Puff logo. Source `0c002da6c9` passes 14 tests, package typecheck, production build, and observed browser workflows; [receipt and 2:26 video details](evidence/2026-09-29-react-web-workflows.md). The interactive state and responses are explicitly local demo examples. Real presence and execution remain unconnected; this does not close the live workflow gates.
 
 **Main web sidebar update:** source `790518a2c9688e9fc1d09f3b6b02a29b965c7a03` groups personal threads and each teammate's recent work under the Stanford Hackathon project in the main browser app. The separate `/puff` overview page was removed. [Verification receipt](evidence/2026-09-29-main-web-sidebar.md). The activity remains demo or simulator data; live workflow gates are unchanged.
