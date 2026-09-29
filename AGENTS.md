@@ -1,15 +1,15 @@
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
-- `main` is the default and only shared development branch for this hackathon.
-- Serdar's instruction: no pull requests and no feature branches. Commit and push completed work directly to `origin/main` each time. Verify the relevant changes first, fetch the current remote state, and integrate teammates' commits. Never force-push or reset away another person's work.
-- Use `main` or `origin/main` for hackathon diffs. This workflow overrides the inherited upstream contribution/PR workflow.
+- `main` is the default hackathon integration branch. For every Codex chat in this project, commit and push completed, verified work to the feature branch `serhat` (`origin/serhat`). Leave `main` untouched until the user explicitly asks to merge or push.
+- For Codex chats, this branch instruction takes priority over the direct `main` workflow in the hackathon planning docs. Keep the no-PR policy unless the user changes it.
+- Use `main` or `origin/main` for hackathon diffs. Never force-push or reset away another person's work.
 - Find team assignments and feature status in `docs/hackathon/README.md`; detailed task checklists are in `docs/hackathon/team-plan.md`, and feature acceptance criteria are in `docs/hackathon/mvp-spec.md`. Update the board when taking a task, becoming blocked, or completing verified work.
 - Before claiming a hackathon feature works, use `docs/hackathon/progress-checklist.md` and the named cases in `acceptance-workflows.md`; attach an evidence receipt at the actual tested commit. Keep source/unit/fixture/integration/live evidence distinct. Resolve shared wire/API decisions through `docs/coordination-contract.md` and `docs/hackathon/integration-gates.md`; the old `/puff/v1` design is not the implemented backend. Respect the four human owners and preserve concurrent local work.
 
-## Shared Branch Workflow
+## Codex Branch Workflow
 
-Each teammate uses a separate local clone checked out on `main`. Keep changes within the assigned file areas. Commit verified work, fetch `origin/main`, merge incoming commits if needed, rerun affected checks, and push normally. If a push is rejected because another teammate pushed first, repeat the fetch/integration step; do not force-push.
+Keep changes within the assigned file areas. Before pushing `serhat`, fetch `origin/main` and `origin/serhat`, integrate incoming commits when present, and rerun affected checks. Push normally to `origin/serhat`. If another contributor pushes to `serhat` first, repeat the fetch/integration step; do not force-push. Preserve concurrent local work.
 
 ## Commit Messages
 
