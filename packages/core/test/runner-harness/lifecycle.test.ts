@@ -78,6 +78,8 @@ function setup(db: Database.Interface["db"]) {
     artifactActivities: [] as Coordination.RunnerActivity[],
     runtimeId: undefined as string | undefined,
     authorizedAttempt: 1,
+    coordinatorState: "reserved" as Coordination.RunState,
+    stopBeforePrompt: false,
   }
   const sessions = new Map<string, Session.Info>()
   const principal: Extract<Coordination.AuthContext, { kind: "runner" }> = {
@@ -116,6 +118,20 @@ function setup(db: Database.Interface["db"]) {
           session: bound,
         })
       },
+      currentRun: (value) =>
+        Effect.succeed(
+          Coordination.Run.make({
+            id: value.runId,
+            threadId: value.threadId,
+            instructionId: Coordination.InstructionID.make(`ins_${value.runId}`),
+            state: state.coordinatorState,
+            attempt: state.authorizedAttempt,
+            runnerMessageId: value.runnerMessageId,
+            executionOwner: value.executionOwner,
+            leaseUntil: "2099-01-01T00:00:00.000Z",
+            createdAt: "2026-09-29T00:00:00.000Z",
+          }),
+        ),
       attach: ({ run }) => Effect.succeed(run.session),
       coordinator: {
         resolve: () =>
@@ -224,6 +240,7 @@ function setup(db: Database.Interface["db"]) {
       baseline: (execution) =>
         Effect.sync(() => {
           calls.order.push("baseline")
+          if (state.stopBeforePrompt) state.coordinatorState = "cancelling"
           return artifactBaseline(execution)
         }),
       collect: ({ execution }) =>
@@ -392,6 +409,34 @@ test("records a deterministic preparation failure before prompt side effects", (
         expectedState: "reserved",
         nextState: "failed",
       })
+    }),
+  ))
+
+test("rejects a coordinator Run that is no longer reserved before acceptance", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("terminal-coordinator")
+      harness.state.coordinatorState = "completed"
+      const rejected = yield* harness.service.start(first).pipe(Effect.flip)
+      expect(rejected.code).toBe("conflict")
+      expect(yield* harness.service.get(first.runId)).toBeUndefined()
+      expect(harness.calls.workspaces).toBe(0)
+      expect(harness.calls.prompts).toBe(0)
+    }),
+  ))
+
+test("rechecks coordinator reservation before submitting a prepared prompt", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("cancel-before-prompt")
+      harness.state.stopBeforePrompt = true
+      const rejected = yield* harness.service.start(first).pipe(Effect.flip)
+      expect(rejected.code).toBe("conflict")
+      expect((yield* harness.service.get(first.runId))?.phase).toBe("prepared")
+      expect(harness.calls.prompts).toBe(0)
+      expect((yield* harness.service.cancellationRequested(first.runId)).phase).toBe("cancelling")
     }),
   ))
 
