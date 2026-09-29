@@ -9,6 +9,7 @@ import { EventV2 } from "../../event"
 import { EventTable } from "../../event/sql"
 import { makeGlobalNode } from "../../effect/app-node"
 import { CoordinationContracts } from "../contracts"
+import { ThreadTable } from "../threads/sql"
 
 const maxPageSize = 256
 const defaultSubscriberCapacity = 256
@@ -83,7 +84,18 @@ export const layerWith = (options?: LayerOptions) =>
       })
       const resolveThreadProject =
         options?.resolveThreadProject ??
-        (() => Effect.fail(failure("unavailable", "Thread project lookup is not configured")))
+        ((threadId: Coordination.ThreadID) =>
+          db
+            .select({ projectId: ThreadTable.project_id })
+            .from(ThreadTable)
+            .where(eq(ThreadTable.id, threadId))
+            .get()
+            .pipe(
+              Effect.orDie,
+              Effect.flatMap((row) =>
+                row ? Effect.succeed(row.projectId) : Effect.fail(failure("not_found", "Thread not found")),
+              ),
+            ))
 
       const latestSequence = (projectId: Coordination.ProjectID) =>
         EventV2.latestSequence(db, aggregateID(projectId))
