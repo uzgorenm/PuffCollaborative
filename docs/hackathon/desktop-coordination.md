@@ -4,10 +4,12 @@ Serdar authorized the coordinator chat, **Set up Flower development**, to direct
 
 ## Resource ownership
 
+**Next round:** [current development assignments](next-development.md) give new implementation work the main-integration checkout. The native QA checkout stays frozen, preventing hot reload from interrupting QA. This supersedes the earlier UI-checkout write ownership for new tasks; historical receipts keep their original source identities.
+
 | Resource | Owner | Other agents can do |
 | --- | --- | --- |
 | Main integration checkout and pushes | Coordinator | Supply exact ready commits and evidence; do not concurrently push main |
-| UI implementation checkout/Git | Review README for task workflow | Edit only explicitly handed-off files |
+| Next UI composition | Review README for task workflow, with coordinator-only Git writes | Edit only the files assigned in next-development.md |
 | Context-panel files | Read the project README | Suggest changes through R2/R3 reports; do not edit the same files |
 | Shared desktop mouse, keyboard and focus | Native QA after the frontend lead's release | Inspect source and existing captures; no native interaction |
 | Native acceptance | Summarize current team work | Continue independent source/tests; do not touch its target window |
