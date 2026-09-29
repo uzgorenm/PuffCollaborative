@@ -10,7 +10,7 @@ The coordinator's `RunnerPort` is already defined in `packages/core/src/coordina
 
 ## File ownership
 
-Runner files live under `packages/core/src/runner-harness/`. R1 owns `docs/runner-contract.md`, `contracts.ts`, `composition.ts`, `sql.ts`, `packages/server/src/runner-harness-composition.ts`, the foundation migration and registration of feature migrations, shared fixture `packages/core/test/runner-harness/fixture.ts`, and integration handoff. The coordinator owner retains `packages/core/src/coordination/**`, `packages/schema/src/coordination.ts`, `packages/protocol/src/groups/coordination.ts`, and `packages/server/src/coordination-*.ts`. Changes to those files require agreement with that owner.
+Runner files live under `packages/core/src/runner-harness/`. R1 owns `docs/runner-contract.md`, `contracts.ts`, `sql.ts`, `packages/server/src/runner-harness-{composition,config,services}.ts`, registration of feature migrations, and the retained-host wiring in `packages/opencode/src/server/routes/instance/httpapi/server.ts`. R1 also owns the foundation migration and integration handoff. The coordinator owner retains `packages/core/src/coordination/**`, `packages/schema/src/coordination.ts`, `packages/protocol/src/groups/coordination.ts`, and `packages/server/src/coordination-*.ts`. Changes to those files require agreement with that owner.
 
 | Runner | Exact write area | Interface responsibility |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ The runner's thread binding stores `threadId`, `projectId`, `sessionId`, `worker
 
 ## Port and module calls
 
-R1's `composition.ts` implements the coordinator's current `RunnerPort` without changing its signature:
+R1's server composition implements the coordinator's current `RunnerPort` without changing its signature:
 
 | Coordinator call | Runner path | Result |
 | --- | --- | --- |
@@ -51,6 +51,12 @@ R1's `composition.ts` implements the coordinator's current `RunnerPort` without 
 | `reconcile(runnerMessageId)` | R10 reads local execution, durable `session_input`, and current runtime observations | Return only `missing`, `admitted`, `running`, or `terminal` when supported by evidence. Unknown execution remains held for reconciliation. |
 
 The in-process callback path calls the coordinator's existing `Runner.report({ principal, runId, callbackId, callback })` through R7, using R12's validated principal. R3 attaches the embedded runtime to a verified workspace, exposes its runtime ID and health, bounds readiness waiting, owns observer fibers and shutdown, and sends process/drain failure evidence to R5. After R10's startup reconciliation, R3 owns a bounded periodic call to R7's `drainDue(limit)` and stops it on shutdown. It does not spawn a second OpenCode server. A separate worker deployment would need authenticated transport, durable worker placement, and a new recovery design; it is outside this MVP.
+
+## Server activation
+
+The retained OpenCode server and the standalone `@opencode-ai/server` route tree use `makeRunnerFactory` when `OPENCODE_RUNNER_CONFIG_PATH` names a readable JSON file. That file specifies `owner` (`workerId`, `instanceId`), `username`, `workspaceRoot`, `projects` (`projectId`, `repositoryRoot`, `baseRevision`), and `toolPath`. Optional fields are `destinations`, `allowedDestinationHosts`, `allowLoopbackDestination`, `deliveryBatchSize`, and `deliveryIntervalMs`. The file contains approved paths and identity labels, never passwords. `OPENCODE_RUNNER_PASSWORD` must authenticate that owner in the coordinator roster; `OPENCODE_SERVER_PASSWORD` is a distinct runtime API secret. The coordinator still requires `OPENCODE_COORDINATION_IDENTITIES_PATH` and `OPENCODE_COORDINATION_ADMISSIONS_PATH`. Missing or invalid credentials, paths, admission, or factory readiness leave coordination routes unavailable. Do not enable the mock runner alongside the factory.
+
+The current `createThread(sessionId)` contract adopts an existing OpenCode Session. Provision an approved Git worktree and create the Session in that worktree with its workspace ID before sharing it as a coordinator Thread. R2 adopts and verifies that directory on the first Run. Automatic worktree creation before Session creation needs a future stable Thread reservation; it is not available through the current command contract. Programmatic verification can pass `makeRunnerFactory(config)` to `createRoutes(undefined, { runnerFactory })`; the retained server selects `configuredRunnerFactory()` from the same configuration.
 
 ## Local phases and persistence
 
