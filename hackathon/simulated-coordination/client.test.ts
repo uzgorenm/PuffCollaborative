@@ -39,6 +39,9 @@ test("approved fix crosses the real HTTP adapter and proves application with act
     const runId = team.state.fixAttempts["wf04-alice"]?.runId
     expect(runId).toBeDefined()
     expect(fixApplicationState(runId!, team.state.events)).toBe("applied")
+    const updated = team.state.overview?.cards.find((card) => card.threadId === "wf04-alice")
+    expect(updated?.sourceActivitySeq).toBe(team.state.snapshot?.thread.activitySeq)
+    expect(updated?.status).toBe("done")
     expect(team.state.snapshot?.runs).toHaveLength(1)
     await team.applyFix(); await team.refresh()
     expect(team.state.snapshot?.runs).toHaveLength(1)
