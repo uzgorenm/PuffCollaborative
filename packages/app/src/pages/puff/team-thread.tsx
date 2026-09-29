@@ -6,6 +6,7 @@ import { useTeam } from "./team-context"
 import { ContextPanel } from "@/components/puff/context-panel"
 import { SessionIdentity, type SessionIdentityProps } from "@/components/puff/session-identity"
 import { teamEventText } from "./team-state"
+import { FixSuggestion } from "./fix-suggestion"
 
 export default function TeamThreadPage() {
   const params = useParams<{ threadId: string }>()
@@ -264,6 +265,7 @@ export default function TeamThreadPage() {
                 </article>
               )}
             </For>
+            <FixSuggestion />
           </div>
           <Show when={active().length}>
             <div class="team-run-strip" aria-live="polite">

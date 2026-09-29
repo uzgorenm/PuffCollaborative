@@ -1,9 +1,11 @@
 import { overviewEnglish } from "@/pages/puff/project-overview/overview-copy"
 import { simulationEnglish } from "@/pages/puff/project-overview/simulation-copy"
+import { fixReuseEnglish } from "@/pages/puff/fix-reuse-copy"
 
 export const puff = {
   ...overviewEnglish,
   ...simulationEnglish,
+  ...fixReuseEnglish,
   "puff.team.sourceMissing": "This source event is unavailable in the permitted conversation history.",
   "puff.team.sourceLoading": "Loading source event…",
   "puff.team.sourceNoAccess": "You do not have access to this source event.",

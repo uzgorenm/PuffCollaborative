@@ -1,0 +1,23 @@
+export const fixReuseEnglish = {
+  "puff.fix.title": "{{person}} already solved this error",
+  "puff.fix.question": "Apply the fix to this session?",
+  "puff.fix.inspect": "Inspect fix",
+  "puff.fix.apply": "Apply fix",
+  "puff.fix.decline": "No thanks",
+  "puff.fix.source": "Open the original session",
+  "puff.fix.patch": "Changes to review",
+  "puff.fix.check": "Passing check in the original session",
+  "puff.fix.targetCheck": "Check in this session",
+  "puff.fix.checking": "Puff is checking shared sessions for this error…",
+  "puff.fix.failedLookup": "Puff could not check the original fix. Refresh to try again.",
+  "puff.fix.refresh": "Check again",
+  "puff.fix.applying": "Sending the reviewed fix to your agent…",
+  "puff.fix.uncertain": "The request outcome is unknown. Retry the same request to avoid duplicate work.",
+  "puff.fix.retry": "Retry same request",
+  "puff.fix.running": "Your agent has the fix request. Waiting for changes and checks.",
+  "puff.fix.applied": "The fix was applied and its checks passed in this session.",
+  "puff.fix.verification": "The run finished. Verified application has not been reported yet.",
+  "puff.fix.failed": "The apply run failed. Check the conversation for details.",
+  "puff.fix.actionFailed":
+    "The fix could not be applied. The source or session may have changed; refresh and inspect it again.",
+} as const
