@@ -40,7 +40,7 @@ const applicationServices = LayerNode.group([
   LocationServiceMap.node,
 ])
 
-export function createRoutes(password?: string, coordinationPorts: CoordinationPorts = {}) {
+export function createRoutes<R = never>(password?: string, coordinationPorts: CoordinationPorts<R> = {}) {
   return makeRoutes(
     password
       ? ServerAuth.Config.configLayer({ username: "opencode", password: Option.some(password) })
@@ -49,13 +49,13 @@ export function createRoutes(password?: string, coordinationPorts: CoordinationP
   )
 }
 
-export function createEmbeddedRoutes(coordinationPorts: CoordinationPorts = {}) {
+export function createEmbeddedRoutes<R = never>(coordinationPorts: CoordinationPorts<R> = {}) {
   return makeRoutes(ServerAuth.Config.configLayer({ username: "opencode", password: Option.none() }), coordinationPorts)
 }
 
-function makeRoutes<AuthError, AuthServices>(
+function makeRoutes<AuthError, AuthServices, R>(
   auth: Layer.Layer<ServerAuth.Config, AuthError, AuthServices>,
-  coordinationPorts: CoordinationPorts,
+  coordinationPorts: CoordinationPorts<R>,
 ) {
   const serviceLayer = AppNodeBuilder.build(applicationServices, [[SessionExecution.node, SessionExecutionLocal.node]])
 
