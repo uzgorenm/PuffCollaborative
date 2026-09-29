@@ -8,6 +8,7 @@ import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionExecution } from "@opencode-ai/core/session/execution"
 import { SessionRunner } from "@opencode-ai/core/session/runner"
 import { PermissionV2 } from "@opencode-ai/core/permission"
+import { PluginV2 } from "@opencode-ai/core/plugin"
 import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
 import { EffectFlock } from "@opencode-ai/core/util/effect-flock"
 import { RunnerWorkspaces } from "@opencode-ai/core/runner-harness/workspace"
@@ -221,6 +222,8 @@ export function makeRunnerFactory(config: Config) {
         execution,
         locationReady: (session) =>
           Effect.gen(function* () {
+            const plugin = yield* PluginV2.Service
+            yield* plugin.wait(PluginV2.ID.make("config-provider"))
             yield* PermissionV2.Service
             yield* SessionRunner.Service
           }).pipe(

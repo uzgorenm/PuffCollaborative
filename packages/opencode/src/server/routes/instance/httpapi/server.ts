@@ -107,6 +107,7 @@ import { configuredRunnerFactory } from "@opencode-ai/server/runner-harness-comp
 import { RunnerHarnessConfig } from "@opencode-ai/server/runner-harness-config"
 import { runnerHarnessServices } from "@opencode-ai/server/runner-harness-services"
 import { runnerHarnessAuthorizationLayer } from "@opencode-ai/server/runner-harness-authorization"
+import { runnerHarnessBoundaryLayer } from "@opencode-ai/server/runner-harness-boundary"
 import { buildLocationServiceMap, LocationServiceMap } from "@opencode-ai/core/location-services"
 import { layer as locationLayer } from "@opencode-ai/server/location"
 import { sessionLocationLayer } from "@opencode-ai/server/middleware/session-location"
@@ -302,6 +303,7 @@ export function createRoutes(
       corsVaryFix,
       fenceLayer,
       cors(corsOptions),
+      runnerHarnessBoundaryLayer,
       AppNodeBuilderV1.build(MoveSession.node, [[LocationServiceMap.node, locationServiceMapV2]]),
       HttpServer.layerServices,
     ]),
