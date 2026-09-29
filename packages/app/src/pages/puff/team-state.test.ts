@@ -81,7 +81,7 @@ function service(
     if (response !== undefined) return response
     if (path === "/projects")
       return Response.json([{ id: "prj_test", name: "Project", createdBy: "alice", createdAt: "2026-09-29T19:00:00Z" }])
-    if (path === "/simulation") return new Response(null, { status: 404 })
+    if (path === "/status") return Response.json({ ready: true })
     if (path === "/projects/prj_test/threads") return Response.json([thread()])
     if (path.startsWith("/threads/") && path.includes("/events?"))
       return Response.json({ events: [], cursor: 0, hasMore: false })
@@ -260,7 +260,11 @@ test("overview_inspects_an_exact_non_conversation_source_without_changing_the_ta
 })
 
 test("simulated_connection_is_explicit_and_disables_real_instruction_controls", async () => {
-  const team = await connected(service((path) => path === "/simulation" ? Response.json(demoManifest()) : undefined))
+  const team = await connected(service((path) => {
+    if (path === "/status") return Response.json({ ready: true, simulated: true })
+    if (path === "/simulation") return Response.json(demoManifest())
+    return
+  }))
   expect(team.state.simulation?.label).toBe("SIMULATED")
   team.selectThread("a")
   await settle()
@@ -272,6 +276,7 @@ test("simulation_stage_and_reset_controls_refresh_only_the_declared_demo", async
   let stage = 0
   const calls: string[] = []
   const team = await connected(service((path) => {
+    if (path === "/status") return Response.json({ ready: true, simulated: true })
     if (path === "/simulation") return Response.json(demoManifest(stage))
     if (path === "/simulation/wf02/advance") { calls.push(path); return Response.json(demoManifest(++stage)) }
     if (path === "/simulation/reset") { calls.push(path); stage = 0; return Response.json(demoManifest()) }
@@ -292,6 +297,7 @@ test("a_nonoperator_can_switch_between_authorized_simulated_projects_without_dem
     if (path === "/projects") return Response.json(manifest.scenarios.map((scenario) => ({
       id: scenario.projectId, name: scenario.title, createdBy: "alice", createdAt: "2026-09-29T19:00:00Z",
     })))
+    if (path === "/status") return Response.json({ ready: true, simulated: true })
     if (path === "/simulation") return Response.json(manifest)
     if (path === "/projects/sim-wf01/threads" || path === "/projects/sim-wf02/threads") return Response.json([])
     if (path.startsWith("/simulation/")) { calls.push(path); return Response.json(manifest) }
