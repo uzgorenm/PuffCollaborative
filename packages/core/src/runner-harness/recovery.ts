@@ -1,6 +1,6 @@
 export * as RunnerRecovery from "./recovery"
 
-import { asc } from "drizzle-orm"
+import { asc, eq } from "drizzle-orm"
 import { Effect } from "effect"
 import type { Database } from "../database/database"
 import { SessionInput } from "../session/input"
@@ -19,8 +19,8 @@ import { ExecutionTable } from "./sql"
 
 export interface Dependencies {
   readonly db: Database.Interface["db"]
-  readonly lifecycle: Pick<Lifecycle, "start" | "transition" | "get" | "byMessageId">
-  readonly binding: Pick<SessionBinding, "authorize" | "attach">
+  readonly lifecycle: Pick<Lifecycle, "start" | "transition" | "get" | "byMessageId" | "reattach">
+  readonly binding: Pick<SessionBinding, "authorize" | "currentRun" | "attach">
   readonly runtimes: Pick<Runtimes, "inspect" | "wake">
   readonly reports: Pick<ReportDelivery, "pending" | "flush">
   readonly cancellations: Cancellations
@@ -42,6 +42,17 @@ export function make(input: Dependencies): Recovery {
     if (!execution) {
       if (!admitted) return { kind: "missing" as const }
       return { kind: "uncertain" as const, reason: "Session input exists without a local Run record" }
+    }
+
+    if (!terminal.has(execution.phase)) {
+      const cancellation = yield* input.db
+        .select({ checkedAt: ExecutionTable.interrupt_checked_at })
+        .from(ExecutionTable)
+        .where(eq(ExecutionTable.run_id, execution.run.command.runId))
+        .get()
+        .pipe(Effect.orDie)
+      if (cancellation?.checkedAt !== null && cancellation?.checkedAt !== undefined)
+        return { kind: "uncertain" as const, execution, reason: "Cancellation outcome is not independently verified" }
     }
 
     const command = execution.run.command
@@ -191,7 +202,31 @@ export function make(input: Dependencies): Recovery {
         return { kind: "admitted" as const, execution, unpromoted: false }
       return { kind: "uncertain" as const, execution, reason: "Runtime cannot establish whether scoped work is active" }
     }
-    if (admitted.promotedSeq === undefined) return { kind: "admitted" as const, execution, unpromoted: true }
+    if (admitted.promotedSeq === undefined) {
+      if (inspection.state.state === "idle" && inspection.state.activeTools !== 0)
+        return { kind: "uncertain" as const, execution, reason: "Scoped tools have not been proved idle before wake" }
+      const current = yield* input.binding.currentRun(command).pipe(
+        Effect.map((run) => ({ run }) as const),
+        Effect.catch((error) => Effect.succeed({ error } as const)),
+      )
+      if ("error" in current)
+        return {
+          kind: "uncertain" as const,
+          execution,
+          reason: `Coordinator reservation cannot be verified (${current.error.code})`,
+        }
+      if (
+        current.run.id !== command.runId ||
+        current.run.threadId !== command.threadId ||
+        current.run.runnerMessageId !== messageId ||
+        current.run.attempt !== execution.run.attempt ||
+        current.run.executionOwner?.workerId !== command.executionOwner.workerId ||
+        current.run.executionOwner?.instanceId !== command.executionOwner.instanceId ||
+        (current.run.state !== "reserved" && current.run.state !== "running")
+      )
+        return { kind: "uncertain" as const, execution, reason: "Coordinator no longer reserves this execution" }
+      return { kind: "admitted" as const, execution, unpromoted: true }
+    }
     if (
       inspection.state.state === "active" &&
       (execution.phase === "running" || execution.phase === "waiting_approval" || execution.phase === "cancelling")
@@ -241,6 +276,7 @@ export function make(input: Dependencies): Recovery {
   const recoverOne = Effect.fn("RunnerRecovery.recoverOne")(function* (row: {
     readonly runId: typeof ExecutionTable.$inferSelect.run_id
     readonly messageId: string
+    readonly interruptCheckedAt: number | null
   }) {
     const execution = yield* input.lifecycle.get(row.runId)
     if (!execution)
@@ -250,6 +286,32 @@ export function make(input: Dependencies): Recovery {
       } satisfies Failure)
     const pending = yield* input.reports.pending(row.runId)
     if (terminal.has(execution.phase) && pending.length === 0) return
+
+    if (!terminal.has(execution.phase) && row.interruptCheckedAt !== null) {
+      const reason = "Recorded cancellation remains uncertain after restart"
+      yield* hold({ kind: "uncertain", execution, reason })
+      yield* Effect.logWarning("Runner recovery requires reconciliation", { runId: row.runId, reason })
+      return
+    }
+
+    if (!terminal.has(execution.phase) && execution.workspace && execution.runtime) {
+      const rebound = yield* input.lifecycle.reattach(row.runId).pipe(
+        Effect.map((execution) => ({ execution }) as const),
+        Effect.catch((error) => Effect.succeed({ error } as const)),
+      )
+      if ("error" in rebound) {
+        const reason = `Runtime could not be reattached (${rebound.error.code})`
+        yield* hold({ kind: "uncertain", execution, reason })
+        yield* Effect.logWarning("Runner recovery requires reconciliation", { runId: row.runId, reason })
+        return
+      }
+      if (rebound.execution.run.command.runId !== row.runId) {
+        const reason = "Runtime reattachment changed Run identity"
+        yield* hold({ kind: "uncertain", execution, reason })
+        yield* Effect.logWarning("Runner recovery requires reconciliation", { runId: row.runId, reason })
+        return
+      }
+    }
 
     const assessment = yield* assess(row.messageId)
     if (assessment.kind === "uncertain") {
@@ -303,7 +365,11 @@ export function make(input: Dependencies): Recovery {
 
   const recover: Recovery["recover"] = Effect.gen(function* () {
     const rows = yield* input.db
-      .select({ runId: ExecutionTable.run_id, messageId: ExecutionTable.runner_message_id })
+      .select({
+        runId: ExecutionTable.run_id,
+        messageId: ExecutionTable.runner_message_id,
+        interruptCheckedAt: ExecutionTable.interrupt_checked_at,
+      })
       .from(ExecutionTable)
       .orderBy(asc(ExecutionTable.created_at), asc(ExecutionTable.run_id))
       .all()

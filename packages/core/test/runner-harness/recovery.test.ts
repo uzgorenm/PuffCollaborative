@@ -98,9 +98,24 @@ const fixture = (phase: LocalExecution["phase"]) =>
     const state = {
       execution,
       authorized,
+      coordinatorRun: {
+        id: runId,
+        threadId,
+        instructionId: Coordination.InstructionID.make("ins_recovery"),
+        state: "reserved",
+        attempt: 1,
+        runnerMessageId: command.runnerMessageId,
+        executionOwner: command.executionOwner,
+        createdAt: "2026-09-29T00:00:00.000Z",
+      } as Coordination.Run,
+      coordinatorAvailable: true,
+      reservationChecks: 0,
       inspection: "idle" as RuntimeInspection["state"],
       activeTools: 0 as RuntimeInspection["activeTools"],
       runtimeAvailable: true,
+      reattachAvailable: true,
+      reboundRuntime: undefined as LocalExecution["runtime"],
+      inspectionRuntime: runtime,
       reportAvailable: true,
       startUnavailable: false,
       pending: [] as CallbackIntent[],
@@ -109,6 +124,8 @@ const fixture = (phase: LocalExecution["phase"]) =>
       interrupts: 0,
       flushes: [] as string[],
       transitions: [] as string[],
+      reattachments: [] as string[],
+      order: [] as string[],
     }
     const make = (runtimes?: Pick<Runtimes, "inspect" | "wake">) =>
       RunnerRecovery.make({
@@ -138,22 +155,51 @@ const fixture = (phase: LocalExecution["phase"]) =>
             }),
           get: (received) => Effect.succeed(received === runId ? state.execution : undefined),
           byMessageId: (received) => Effect.succeed(received === command.runnerMessageId ? state.execution : undefined),
+          reattach: (received) =>
+            Effect.gen(function* () {
+              state.reattachments.push(received)
+              state.order.push("reattach")
+              if (!state.reattachAvailable)
+                return yield* Effect.fail({ code: "unavailable" as const, message: "Runtime reattachment failed" })
+              if (state.reboundRuntime) {
+                state.execution = { ...state.execution, runtime: state.reboundRuntime }
+                yield* db
+                  .update(ExecutionTable)
+                  .set({ runtime_id: state.reboundRuntime.id })
+                  .where(eq(ExecutionTable.run_id, received))
+                  .run()
+                  .pipe(Effect.orDie)
+              }
+              return state.execution
+            }),
         },
         binding: {
           authorize: () => Effect.succeed(state.authorized),
+          currentRun: () =>
+            Effect.sync(() => {
+              state.reservationChecks += 1
+            }).pipe(
+              Effect.flatMap(() =>
+                state.coordinatorAvailable
+                  ? Effect.succeed(state.coordinatorRun)
+                  : Effect.fail({ code: "unavailable" as const, message: "Coordinator is offline" }),
+              ),
+            ),
           attach: () => Effect.succeed(state.authorized.session),
         },
         runtimes: runtimes ?? {
-          inspect: () =>
-            state.runtimeAvailable
+          inspect: () => {
+            state.order.push("inspect")
+            return state.runtimeAvailable
               ? Effect.succeed({
-                  runtime,
+                  runtime: state.inspectionRuntime,
                   sessionId,
                   state: state.inspection,
                   activeTools: state.activeTools,
                   checkedAt: 1,
                 })
-              : Effect.fail({ code: "unavailable" as const, message: "Runtime could not be found" }),
+              : Effect.fail({ code: "unavailable" as const, message: "Runtime could not be found" })
+          },
           wake: () =>
             Effect.sync(() => {
               state.wakes += 1
@@ -211,10 +257,65 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
       yield* setup.make().recover
       expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
       expect(setup.state.wakes).toBe(0)
+      expect(setup.state.reattachments).toHaveLength(0)
     }),
   )
 
-  it.effect("reconciles lost submission acknowledgment and wakes only unpromoted input", () =>
+  it.effect("reattaches a persisted runtime before inspecting and waking a reserved unpromoted input", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.reboundRuntime = { ...runtime, id: "runtime_after_restart" }
+      setup.state.inspectionRuntime = setup.state.reboundRuntime
+      yield* setup.make().recover
+      expect(setup.state.order[0]).toBe("reattach")
+      expect(setup.state.order).toContain("inspect")
+      expect(setup.state.reattachments).toEqual([runId])
+      expect(setup.state.execution.runtime?.id).toBe("runtime_after_restart")
+      expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
+      expect(setup.state.wakes).toBe(1)
+      expect(setup.state.reservationChecks).toBeGreaterThan(0)
+    }),
+  )
+
+  it.effect("holds a Run when its persisted runtime cannot be reattached", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.reattachAvailable = false
+      yield* setup.make().recover
+      expect(setup.state.reattachments).toEqual([runId])
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.starts).toHaveLength(0)
+      expect(setup.state.wakes).toBe(0)
+      expect(setup.state.order).not.toContain("inspect")
+    }),
+  )
+
+  it.effect("keeps a recorded uncertain cancellation held across restart and explicit reconciliation", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("cancelling")
+      yield* setup.admit(2)
+      yield* (yield* Database.Service).db
+        .update(ExecutionTable)
+        .set({ interrupt_abort: "unknown", interrupt_state: "uncertain", interrupt_checked_at: 2 })
+        .where(eq(ExecutionTable.run_id, runId))
+        .run()
+      yield* setup.make().recover
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.reattachments).toHaveLength(0)
+      expect(setup.state.interrupts).toBe(0)
+      expect(setup.state.starts).toHaveLength(0)
+      expect(setup.state.wakes).toBe(0)
+      const unknown = yield* setup
+        .make()
+        .reconcile(setup.command.runnerMessageId)
+        .pipe(Effect.catch((error) => Effect.succeed(error)))
+      expect(unknown).toMatchObject({ code: "unavailable" })
+    }),
+  )
+
+  it.effect("reconciles lost submission acknowledgment and wakes only a reserved unpromoted input", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("admitted")
       yield* setup.admit()
@@ -222,6 +323,58 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
       yield* setup.make().recover
       expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
       expect(setup.state.wakes).toBe(1)
+    }),
+  )
+
+  it.effect("holds an unpromoted input after the coordinator marks its Run terminal", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "completed" }
+      yield* setup.make().recover
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.starts).toHaveLength(0)
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("holds an unpromoted input when the coordinator attempt changed", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, attempt: 2 }
+      yield* setup.make().recover
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("holds an unpromoted input when the coordinator owner changed", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.coordinatorRun = {
+        ...setup.state.coordinatorRun,
+        executionOwner: { workerId, instanceId: "replacement_instance" },
+      }
+      yield* setup.make().recover
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("holds an unpromoted input while scoped tool cleanup is unknown", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.activeTools = "unknown"
+      const unknown = yield* setup
+        .make()
+        .reconcile(setup.command.runnerMessageId)
+        .pipe(Effect.catch((error) => Effect.succeed(error)))
+      expect(unknown).toMatchObject({ code: "unavailable" })
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.wakes).toBe(0)
     }),
   )
 
@@ -240,15 +393,20 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
     }),
   )
 
-  it.effect("reattaches observation for a held unpromoted input before waking", () =>
+  it.effect("keeps a held unpromoted input unavailable without reservation proof", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("recovery_required")
       yield* setup.admit()
       setup.state.startUnavailable = true
-      expect(yield* setup.make().reconcile(setup.command.runnerMessageId)).toBe("admitted")
+      setup.state.coordinatorAvailable = false
+      const uncertain = yield* setup
+        .make()
+        .reconcile(setup.command.runnerMessageId)
+        .pipe(Effect.catch((error) => Effect.succeed(error)))
+      expect(uncertain).toMatchObject({ code: "unavailable" })
       yield* setup.make().recover
-      expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
-      expect(setup.state.wakes).toBe(1)
+      expect(setup.state.starts).toHaveLength(0)
+      expect(setup.state.wakes).toBe(0)
       expect(setup.state.execution.phase).toBe("recovery_required")
     }),
   )
