@@ -1,6 +1,6 @@
 # Project overview integration handoff
 
-This is the expanded solo-to-team product slice requested after the hackathon MVP. It is separate from the current WF02/WF10 live-awareness gates. Source in this checkout starts at `origin/main` `bb5ebb2b3b`; work here must be rebased by the coordinator before integration.
+This is the expanded solo-to-team product slice requested after the hackathon MVP. It is separate from the current WF02/WF10 live-awareness gates. The isolated app checkpoint `2a7d8bba76` is based on `d1ec774099`; the coordinator integrated it with the published ownership-label correction as `6aadf49887`. See the [publication receipt](evidence/2026-09-29-project-overview.md).
 
 ## Exclusive UI boundary
 

@@ -27,10 +27,13 @@ The lead/panel/controller/identity/focus slice is committed as `e332cbf539` afte
 | --- | --- | --- |
 | Build Puff project overview and coordination | Freeze a tested, mounted overview for Serdar's hands-on preview | App overview modules plus host/client/controller/i18n/route integration in `PuffCollaborative-project-overview`; preserve R1 files |
 | Check Puff project overview and coordination | Verify the changed exact-source path and report remaining release blockers | Source/tests review only; no native input or implementation edits |
-| Complete R1 collaborative review | Authenticated versioned brief and self-authored focus service | New core overview files/tests and backend handoff in the overview checkout; shared registrations remain unassigned |
+| Complete R1 collaborative review | Authenticated versioned brief and self-authored focus service and route contract | New core overview files/tests/migration plus narrow schema, core contracts, protocol and `handlers/coordination-data.ts` changes in the overview checkout; final runtime/composition/generated registration stays with backend integration |
 | Set up Flower development (2) | Produce one combined, tested backend candidate using main, current Serhat, sharing guard, active-Session adapter and full Flower ancestry | Separate backend candidate checkout; one Git/source writer; no main push or native use |
 | Summarize current team work | Finish frozen native pass, then prepare the stable overview preview and hand input to Serdar | Exact instances and conditions in [desktop coordination](desktop-coordination.md); no product/Git edits |
 | Root coordinator | Review actual integrated source and publish normal commits to main | Clean publication checkout and resource ownership records |
+| Complete Serdar’s R3 review | Reproduce whether unchanged overview polling disconnects the Inspect focus target | New `packages/app/test-browser/puff-overview-focus.test.ts` only; no app edits, native interaction or Git writes during the frozen preview |
+
+The mounted overview was integrated as `6aadf49887` after focused tests, browser regressions, typecheck and build. See the [overview publication receipt](evidence/2026-09-29-project-overview.md). The native preview remains on its original isolated app commit `2a7d8bba76`; do not hot-reload it while Serdar tests.
 
 The accepted brief field `suggestedAwarenessMode` is nonauthoritative starter guidance. It cannot replace an owner-selected, versioned policy for a particular target Session/Thread. Every redirection still needs its exact target owner's approval. Trusted owner binding, selection/export, revocation, admission and observed-use gates remain separate.
 
