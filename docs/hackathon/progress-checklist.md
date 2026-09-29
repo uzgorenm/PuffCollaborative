@@ -23,6 +23,10 @@ Serdar's [UI receipt](evidence/2026-09-29-serdar-ui.md) records source/unit/fixt
 
 This adds implementation evidence to T3; it closes no live gate or WF01–WF07 case. G0 still needs the shared snapshot/actions/identity mapping, and G3/G5 need actual admission, promotion and agent-use receipts. The default connection checks the registered Basic-auth status route; the provisional API is development-only. A second teammate has not yet reproduced this receipt.
 
+## Coordination backend checkpoint — September 29, 12:44 PDT
+
+The [backend mock integration receipt](evidence/2026-09-29-coordination-backend-mock.md) is tied to pushed commit [`4124e1a`](https://github.com/uzgorenm/PuffCollaborative/commit/4124e1a). It records the registered `/api/coordination/v1` handlers, individual Basic identities, real SQLite/EventV2 persistence, a two-client HTTP flow, restart reads, migrations, generated client and the explicit mock runner. The core coordination suite passed 39 tests; the server integration passed seven consecutive 51-assertion runs after an ordering assumption was fixed. This is an integrated multiplayer backend result with a mock execution port. It does not close G0 or a WF01–WF07 case because the Puff awareness contract, real OpenCode execution and Flower pipeline have not been exercised together.
+
 ## Rules for checking a box
 
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.
