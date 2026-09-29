@@ -2036,7 +2036,7 @@ describe("SessionRunnerLLM", () => {
         title: "Compact navigation experiment",
         createdBy: owner,
         createdAt: new Date(0).toISOString(),
-        activitySeq: 7,
+        activitySeq: 3,
       }
       const targetThread: Coordination.Thread = {
         ...sourceThread,
@@ -2106,6 +2106,7 @@ describe("SessionRunnerLLM", () => {
       expect(requests).toHaveLength(2)
       expect(userTexts(requests[1]!).at(0)).toBe("Continue expanded navigation")
       expect(userTexts(requests[1]!).at(-1)).toContain("evt_focus_742")
+      expect(userTexts(requests[1]!).at(-1)).toContain("Source revision: 3")
       expect(userTexts(requests[1]!).at(-1)).toContain("expanded-navigation trigger")
       expect(userTexts(requests[1]!).at(-1)).toContain("flower_report_742")
       expect((yield* delivery.deliver(input)).admittedSeq).toBe(admitted.admittedSeq)

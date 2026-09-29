@@ -67,7 +67,7 @@ export function make(deps: Dependencies) {
         !Number.isSafeInteger(input.source.eventSeq) ||
         input.source.eventSeq < 0 ||
         !Number.isSafeInteger(input.source.activitySeq) ||
-        input.source.activitySeq < input.source.eventSeq
+        input.source.activitySeq < 0
       )
         return yield* Effect.fail(invalid)
 
