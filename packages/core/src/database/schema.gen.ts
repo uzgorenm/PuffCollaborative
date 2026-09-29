@@ -259,6 +259,9 @@ export default {
           \`runtime_id\` text,
           \`admitted_message_id\` text,
           \`last_session_seq\` integer,
+          \`interrupt_abort\` text,
+          \`interrupt_state\` text,
+          \`interrupt_checked_at\` integer,
           \`created_at\` integer NOT NULL,
           \`updated_at\` integer NOT NULL,
           \`terminal_at\` integer

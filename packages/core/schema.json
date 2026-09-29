@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "27c225d9-8325-4c8c-8f2b-01fb69e55be8",
+  "id": "57170f7e-b734-4fb2-98d1-c1ce1b7713c0",
   "prevIds": [
-    "2749491b-dd20-4127-94cf-a89fd0f5ff10"
+    "27c225d9-8325-4c8c-8f2b-01fb69e55be8"
   ],
   "ddl": [
     {
@@ -1703,6 +1703,36 @@
       "default": null,
       "generated": null,
       "name": "last_session_seq",
+      "entityType": "columns",
+      "table": "runner_harness_execution"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "interrupt_abort",
+      "entityType": "columns",
+      "table": "runner_harness_execution"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "interrupt_state",
+      "entityType": "columns",
+      "table": "runner_harness_execution"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "interrupt_checked_at",
       "entityType": "columns",
       "table": "runner_harness_execution"
     },
