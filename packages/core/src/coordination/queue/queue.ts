@@ -7,6 +7,7 @@ import { Coordination } from "@opencode-ai/schema/coordination"
 import { Database } from "../../database/database"
 import { SessionMessage } from "../../session/message"
 import type { CoordinationContracts } from "../contracts"
+import { ThreadTable } from "../threads/sql"
 import { InstructionTable, RunCallbackTable, RunTable } from "./sql"
 
 type Queue = CoordinationContracts.Queue
@@ -472,7 +473,15 @@ export function make(input: Dependencies): Queue {
                 .values({ callback_id: callbackId, run_id: runId, callback, recorded_at: timestamp })
                 .run()
                 .pipe(Effect.orDie)
-              if (callback.kind !== "state") return undefined
+              if (callback.kind === "activity") {
+                yield* db
+                  .update(ThreadTable)
+                  .set({ activity_seq: seq })
+                  .where(eq(ThreadTable.id, current.thread_id))
+                  .run()
+                  .pipe(Effect.orDie)
+                return undefined
+              }
               if (callback.nextState === "waiting_approval") yield* commitApproval!(seq)
               yield* db
                 .update(RunTable)
