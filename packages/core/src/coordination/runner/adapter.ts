@@ -153,7 +153,10 @@ export function make(input: Dependencies): CoordinationContracts.Runner {
         const reservationError = validateDelivery(item, item.thread, executionOwner)
         if (reservationError) return yield* Effect.fail(reservationError)
         const status = yield* input.port.reconcile(item.run.runnerMessageId)
-        if (item.run.state === "reserved" && status === "missing")
+        if (
+          status === "missing" &&
+          (item.run.state === "reserved" || (item.run.state === "recovery_required" && !item.run.startedAt))
+        )
           yield* deliver(input.port, {
             runId: item.run.id,
             threadId: item.thread.id,
