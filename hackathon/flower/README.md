@@ -17,6 +17,10 @@ three terminal runs and a source-linked result. See the
 [live receipt](../../docs/hackathon/evidence/codex-flower-live.md). Real Puff
 session export, receiving-agent use and Flower Hub publication remain unverified.
 The earlier authentication failure is recorded in [verification.md](verification.md).
+The Activity/Jev producer-to-chain adapter is also locally connected. Its
+separate synthetic adapter checkpoint could not reach SuperLink and started no
+new hosted run; see the [bridge receipt](../../docs/hackathon/evidence/2026-09-29-ferit-activity-flower-bridge.md).
+Local adapter output does not establish a model response or live Puff delivery.
 
 ## Setup and checks
 
@@ -48,7 +52,7 @@ The code follows the official [first-AgentApp tutorial](https://flower.ai/docs/a
 and [application event output sequence](https://flower.ai/docs/agent/how-to-guides/use-openai-sdk.html#publish-agentapp-generated-text).
 Runtime model credentials are injected by Flower; they are never copied from
 the host or placed in manifests. Both apps make one model call, with no tools,
-45-second SDK timeouts, no SDK retries and bounded output tokens.
+120-second SDK timeouts, no SDK retries and bounded output tokens.
 
 ## Handoff and output channel
 
@@ -76,33 +80,113 @@ match that source session's captured `revision`. If A has a later correction
 and a finding cites A's older event, report assembly fails instead of labeling
 the note with a newer `sourceRevision`. A retained B event may be cited without
 claiming B is still current; the server must recheck B's state at delivery.
-This rule uses the **provisional per-session revision** input, not backend
-project `Event.seq` or `Thread.activitySeq`; those need a separate mapping.
+For the Activity bridge, Flower's `revision` carries each exact project
+`Event.seq`; captured `Thread.activitySeq` and `WorkCard.version` remain
+separate server values. The synthetic low-level smoke fixture retains its
+provisional revision values. Both apps use the configured
+`openai/gpt-5.6-sol` model; execution, credentials and result transport run
+through Flower.
 
-## Input Agent 2 supplies
+## Activity/Jev handoff
 
-Call `coordinate(request, snapshot, state_dir=...)` from an asynchronous hub job.
-The return value matches the spec's `CoordinationReport`; failures raise
-`CoordinationFailure` with a structured `.outcome`. For non-Python callers,
-spawn `uv run python coordinator.py --state-dir <private-runtime-directory>`
-with an argument array and write `{"request": ..., "snapshot": ...}` to stdin.
-Exit 0 yields the report, 1 a job failure, and 2 invalid input. Never execute
-report text as a command or use classification to gate coding execution.
+Use `bridge.py` for the producer-to-consumer boundary. `coordinate_activity(...)`
+accepts Agent 2's `{snapshot,warnings}` activity envelope, a request, two trusted
+thread bindings and a source-reference list. It validates the selected evidence,
+calls the existing three-run Flower chain, and maps the result back to server-
+shaped work-card updates and pending note/proposal candidates.
 
-The repository had no `hackathon/contracts/` schema at the inspected base commit.
-`contracts.py` is a small explicit implementation of the names in
-the requested `mvp-spec.md` at `5c8e111931`, pending Serhat's integration mapping.
-Incoming main `f9035487d` supersedes that provisional wire design with
-[`docs/coordination-contract.md`](../../docs/coordination-contract.md).
-The backend now has `Event.id/seq`, `Thread.activitySeq` and
-`WorkCard.version/sourceActivitySeq`; these are **not interchangeable with a
-per-session revision**. Its `WorkCards.update` is a storage port, not a complete
-Flower job/report API. C3/C8 in the integration gates remain open. Agent 2 must
-provide the explicit permitted-evidence adapter or use the synthetic envelope
-until Serhat freezes that mapping. No backend route, identity or sequence mapping
-is invented here. This module does not edit or replace his shared contracts.
-The temporary snapshot field names are **sharedSessions**
-and **events**; translate them at the caller if the shared schema chooses others.
+A non-Python background worker can call
+`uv run python bridge.py --state-dir <private-runtime-directory>` from this
+directory. Send one JSON object on stdin with exactly these keys:
+
+```json
+{
+  "request": {
+    "requestId": "stable-job-id",
+    "projectId": "puff-demo",
+    "targetThreadId": "thread-B",
+    "question": "Which finding from A is useful to B?",
+    "evidenceRefs": [
+      {"threadId":"thread-A","eventId":"event-A","seq":4},
+      {"threadId":"thread-B","eventId":"event-B","seq":7}
+    ],
+    "createdAt": "2026-09-29T19:00:00Z"
+  },
+  "activitySnapshot": {"snapshot": {}, "warnings": []},
+  "bindings": [],
+  "sourceRefs": []
+}
+```
+
+`activitySnapshot` is the selected output of `Activity.snapshot()`. Each of the
+two `bindings` must include the authoritative project/thread/worker/session and
+owner identities, title/topic/relationship, `shared: true`, captured
+`activitySeq`, expected `WorkCard.version`, deterministic WorkCard status and
+contributors. The current `Thread` schema does not provide all session-sharing
+metadata; the caller must not infer consent, topic, relationship or owner from a
+title or project membership.
+
+`sourceRefs` is a JSON list pairing Flower's internal citation with the exact
+backend event reference:
+`{"flowerRef":{"workerId":"...","sessionId":"...","eventId":"...","revision":4},"sourceRef":{"threadId":"thread-A","eventId":"event-A","seq":4}}`.
+The bridge keeps this mapping outside model input and rejects missing, mismatched
+or stale citations. Event `seq` is a project-wide sequence, sparse within each
+thread, and may start at 0; selected events cannot reuse a project sequence. It
+becomes Flower's evidence revision. `Thread.activitySeq` is carried separately
+as `sourceActivitySeq`, and `WorkCard.version` stays separate as
+`expectedVersion`.
+
+The session analysis returns objective (`task`), current step (`progress`),
+blockers, evidence-backed `recentOutcome` or null, and approach. The bridge maps
+the outcome to the backend's `recentVerifiedOutcome`; an unverified requirement
+or plan stays null. Contributors and factual status come from trusted bindings,
+not model output.
+
+After the chain returns successfully, stdout includes the three completed
+Flower run IDs, two `workCardUpdates`, source-linked
+`awarenessNoteCandidates` marked pending/not attempted, approval-required
+`proposalCandidates`, and both producer and Flower warnings. The CLI does not
+write work cards, persist awareness notes, or deliver context into OpenCode.
+For each work-card candidate, use `threadId` as the endpoint path parameter and
+send only `expectedVersion`, `sourceActivitySeq`, and `card` as the request
+payload. `analysisMetadata` is a diagnostic sidecar, not a server field. A
+successful chain state means Flower completed and candidates were mapped; it
+does not mean the server persisted them or OpenCode delivered them.
+The current server has no published session-level sharing/topic controls or
+awareness delivery/admission API, so those remain server/OpenCode integration
+gates (C2/C4/C8). A returned candidate is never evidence of delivery or use.
+
+Run `python bridge_demo.py` from this directory for the local producer-to-
+consumer walkthrough. It uses the checked-in synthetic navigation history and a
+synthetic structured Flower report to show field and citation mapping. It does
+not call Flower, write through the backend, or send a message to OpenCode.
+
+`coordinator.py` remains the lower-level interface for an already normalized
+Flower request/snapshot; `smoke.py` supplies synthetic inputs for that path.
+Do not pass work cards in place of bounded source events. The server must still
+enforce consent, authorization and a fresh `activitySeq`/version CAS before
+accepting any update or note.
+
+## Low-level normalized chain input
+
+Call `coordinate(request, snapshot, state_dir=...)` only when the caller has
+already produced the normalized input below. The higher-level producer should
+use `bridge.py`. Failures raise `CoordinationFailure` with a structured
+`.outcome`. For non-Python callers of this lower-level entry point, spawn
+`uv run python coordinator.py --state-dir <private-runtime-directory>` with an
+argument array and write `{"request": ..., "snapshot": ...}` to stdin. Exit 0
+yields the report, 1 a job failure, and 2 invalid input. Never execute report
+text as a command or use classification to gate coding execution.
+
+`contracts.py` describes the normalized input used inside the Flower chain; it is
+not a replacement for the current server contract in
+[`docs/coordination-contract.md`](../../docs/coordination-contract.md). The
+server distinguishes `Event.seq`, `Thread.activitySeq`, and `WorkCard.version`;
+the bridge keeps them separate. The current server can compare-and-swap WorkCard
+updates, but it does not expose a complete Flower job/result or awareness-note
+delivery API. Session consent/topic/relationship metadata is also missing from
+the published `Thread` schema. C2/C4/C8 therefore remain open; this bridge does
+not edit or replace shared backend schemas.
 
 **Selected export remains unimplemented.** `prepare` validates the envelope it
 receives but cannot authenticate an owner or prove that `sharedSessions` came
@@ -149,19 +233,24 @@ synthetic envelope (do not write it inside an AgentApp project).
 
 - `workers`: matching `workerId`, `projectId`, `ownerId`; extra server fields are
   not forwarded.
-- `sharedSessions`: only opted-in sessions, with `workerId`, `sessionId`,
+- `sharedSessions`: exactly the selected sessions, with `workerId`, `sessionId`,
   `ownerId`, `title`, `featureTopic`, `relationship` (`alternative` or
-  `unspecified`), authoritative `revision` and `status`.
+  `unspecified`), latest selected evidence `revision`, and deterministic `status`.
 - `events`: `eventId`, `projectId`, `workerId`, `sessionId`, `revision`, `kind`,
-  `occurredAt`, `content`. Message content allows only `role` (`user` or
-  `assistant`) and `text`; activity only `toolName`/`status`; status only `status`.
+  `occurredAt`, `content`. Message content allows `role` (`user` or `assistant`)
+  and `text`; activity allows `toolName`/`toolStatus`; status allows `transition`,
+  optional `instructionId`, `objective`, `approach`, `currentStep`, `blocker`,
+  and `recentOutcome`. Attributed `actorId` is stripped before Flower sees input.
 - References select exactly two sessions, including the target. Each event and
   reference must match the authoritative worker/session/project mapping.
 - At most 20 recent events per selected session, with a truncation warning.
   Individual content strings are capped at 8,000 characters; total prepared
   input at 350 KB. A reference outside the selected window fails explicitly.
+- Flower `revision` carries the original sparse, nonnegative `Event.seq`, not a
+  dense per-session counter. It is evidence identity only; captured
+  `Thread.activitySeq` and `WorkCard.version` remain separate server CAS values.
 - Do not pass Agent 2's work cards in place of evidence. The session AgentApp
-  needs the bounded permitted events; Agent 2 determines when refresh is useful.
+  needs bounded permitted events; Jev determines when a refresh is useful.
 
 The current slice omits accepted-decision lookup (F5). It drops UI state,
 delivery/approval machinery and unrelated history. It rejects extra event
@@ -170,7 +259,8 @@ worker/server must still enforce consent, authorization and permitted export.
 
 ## Failure and authority boundaries
 
-The host allows 150 seconds for the two sequential model stages, then kills
+The host allows 300 seconds for the two sequential model stages, each with a
+120-second SDK timeout plus remote startup overhead, then kills
 its local network process and spends up to four seconds requesting
 cancellation/observing remote states.
 An unobserved terminal state stays unresolved. Run IDs are journaled immediately

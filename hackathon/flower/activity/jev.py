@@ -16,9 +16,23 @@ CRITERIA = {
 }
 
 
+def _dotenv_key():
+    """Read TYPESAFE_API_KEY from the git-ignored hackathon/flower/.env, if present."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    try:
+        with open(path, encoding="utf-8") as env:
+            for line in env:
+                name, _, value = line.strip().partition("=")
+                if name == "TYPESAFE_API_KEY" and value:
+                    return value.strip().strip('"')
+    except OSError:
+        return None
+    return None
+
+
 class TypeSafeClient:
     def __init__(self, api_key=None, timeout=5):
-        self._key = api_key or os.environ.get("TYPESAFE_API_KEY")
+        self._key = api_key or os.environ.get("TYPESAFE_API_KEY") or _dotenv_key()
         self.timeout = timeout
 
     async def __call__(self, payload):
@@ -79,9 +93,9 @@ class Refresh:
         self.states = {}
 
     def observe(self, key, revision, now):
-        if type(revision) is not int or revision < 1 or not math.isfinite(now):
+        if type(revision) is not int or revision < 0 or not math.isfinite(now):
             raise ValueError("Invalid revision/time")
-        state = self.states.setdefault(key, {"revision": 0, "emitted": 0, "first": None,
+        state = self.states.setdefault(key, {"revision": -1, "emitted": -1, "first": None,
                                             "last": now, "classification": None, "meaningful": False})
         if revision <= state["revision"]:
             return False

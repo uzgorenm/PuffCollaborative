@@ -19,7 +19,7 @@ from contracts import prepare
 from journal import journal_events
 from private_state import open_private_file, secure_directory, secure_state_tree
 
-CHAIN_DEADLINE_SECONDS = 150
+CHAIN_DEADLINE_SECONDS = 300
 
 
 class CoordinationFailure(RuntimeError):

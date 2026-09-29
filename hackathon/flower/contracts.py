@@ -1,8 +1,8 @@
-"""Explicit provisional adapter for mvp-spec.md Shared contract v1 at 5c8e111931.
+"""Strict Flower wire contracts for the activity bridge.
 
-The current backend's Event.seq and Thread.activitySeq need an agreed mapping;
-they are not automatically per-session revisions. See README's C3/C8 limits.
-Nothing here changes or owns the shared server contract.
+The bridge translates the producer's selected-event projection into this
+bounded input. Project event sequence, thread activity sequence, and work-card
+version remain separate values; this module does not change the backend schema.
 """
 
 import json
@@ -15,6 +15,13 @@ from pydantic import BaseModel, ConfigDict, Field
 Text = Annotated[str, Field(min_length=1, max_length=2000)]
 ID = Annotated[str, Field(min_length=1, max_length=160)]
 Revision = Annotated[int, Field(strict=True, ge=0)]
+TEXT_FIELDS = ("objective", "approach", "currentStep", "blocker", "recentOutcome")
+TRANSITIONS = {"queued", "started", "progress", "blocked", "completed", "failed", "stopped"}
+CONTENT = {
+    "message": {"role", "text"},
+    "activity": {"toolName", "toolStatus"},
+    "status": {"transition", "instructionId", *TEXT_FIELDS},
+}
 
 
 class Strict(BaseModel):
@@ -66,6 +73,7 @@ class Analysis(Strict):
     workState: Literal["planned", "ongoing", "completed", "unknown"]
     progress: Text
     blockers: list[Text] = Field(max_length=10)
+    recentOutcome: Text | None
     evidenceRefs: list[EvidenceRef] = Field(min_length=1, max_length=20)
     warnings: list[Text] = Field(max_length=10)
 
@@ -169,23 +177,35 @@ def prepare(request, snapshot):
             if event["eventId"] in seen:
                 raise ValueError("Duplicate event ID")
             seen.add(event["eventId"])
-            fields = {
-                "message": {"role", "text"},
-                "activity": {"toolName", "status"},
-                "status": {"status"},
-            }[event["kind"]]
-            if set(event["content"]) - fields:
+            fields = CONTENT[event["kind"]]
+            content = event["content"]
+            # Actor identity is trusted provenance, not model context. The
+            # bridge retains contributor identity out-of-band for WorkCards.
+            if set(content) - fields - {"actorId"}:
                 raise ValueError("Unpermitted event content fields")
-            if not event["content"] or any(
-                not isinstance(v, str) or len(v) > 8000 for v in event["content"].values()
+            if "actorId" in content and (not isinstance(content["actorId"], str) or not content["actorId"]):
+                raise ValueError("Invalid event actor identity")
+            content = {key: value for key, value in content.items() if key != "actorId"}
+            if not content or any(
+                not isinstance(v, str) or len(v) > 8000 for v in content.values()
             ):
                 raise ValueError("Event content must contain bounded strings")
-            if event["kind"] == "message" and event["content"].get("role") not in {
-                "user",
-                "assistant",
-            }:
-                raise ValueError("Only selected user/assistant messages are permitted")
-            reject_secrets(event["content"])
+            if event["kind"] == "message" and (
+                content.get("role") not in {"user", "assistant"} or not content.get("text")
+            ):
+                raise ValueError("Selected messages require a user/assistant role and text")
+            if event["kind"] == "activity" and not all(
+                content.get(field) for field in ("toolName", "toolStatus")
+            ):
+                raise ValueError("Selected activity requires toolName and toolStatus")
+            if event["kind"] == "status":
+                transition = content.get("transition")
+                if transition not in TRANSITIONS:
+                    raise ValueError("Unknown status transition")
+                if transition in {"queued", "started"} and not content.get("instructionId"):
+                    raise ValueError("Queued and started status require an instruction ID")
+            reject_secrets(content)
+            event["content"] = content
             events.append(event)
         events.sort(key=lambda e: (e["revision"], e["eventId"]))
         if len(events) > 20:
@@ -196,7 +216,9 @@ def prepare(request, snapshot):
             {
                 "schemaVersion": 1,
                 "projectId": request["projectId"],
-                "session": session,
+                # Owner identity was already checked against the trusted worker
+                # roster; Flower only needs session metadata for comparison.
+                "session": {key: value for key, value in session.items() if key != "ownerId"},
                 "events": events[-20:],
             }
         )

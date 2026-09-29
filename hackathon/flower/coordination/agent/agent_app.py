@@ -28,6 +28,14 @@ human approval. No useful finding is a valid answer; do not force a note.
 """
 
 
+def parse_json(text: str) -> dict:
+    """Accept a bare JSON object, tolerating markdown fences or surrounding prose."""
+    start, end = (text or "").find("{"), (text or "").rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("Model returned no JSON object")
+    return json.loads(text[start : end + 1])
+
+
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     if len(agent.prompt.encode("utf-8")) > 50_000:
@@ -39,18 +47,18 @@ def main(agent: AgentSession, context: Context) -> None:
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
         max_retries=0,
-        timeout=45,
+        timeout=120,
     ) as client:
         response = client.responses.create(
             model=context.run_config["model"],
             instructions=INSTRUCTIONS,
             input=json.dumps(payload),
-            max_output_tokens=1800,
+            max_output_tokens=6000,
             reasoning={"effort": "low"},
         )
     if response.status != "completed":
         raise RuntimeError("Model task did not complete")
-    result = json.loads(response.output_text)
+    result = parse_json(response.output_text)
     text = json.dumps({"schemaVersion": 1, "runId": str(context.run_id), "result": result})
     agent.events.emit({"type": "response.output_text.delta", "delta": text})
     agent.events.emit({"type": "response.completed"})

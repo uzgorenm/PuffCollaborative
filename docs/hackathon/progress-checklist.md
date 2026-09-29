@@ -8,6 +8,20 @@ This is the coordinator's working checklist. A feature counts as progress when i
 
 ## Current checkpoint
 
+**Ferit — local producer/consumer checkpoint, September 29:** the Activity
+producer now feeds the Flower chain adapter through one validated handoff, and
+`python bridge_demo.py` walks a two-session, four-event synthetic history
+through source-reference mapping into server-shaped WorkCard and awareness-note
+candidates. This is a local adapter demonstration with a synthetic Flower
+report. No test suite or live Flower run was performed for this checkpoint;
+SuperLink was unreachable from the current environment. No backend write or
+OpenCode delivery occurred. See
+[`evidence/2026-09-29-ferit-activity-flower-bridge.md`](evidence/2026-09-29-ferit-activity-flower-bridge.md).
+
+Earlier Activity/Jev component tests and eight synthetic histories are recorded
+in [`evidence/2026-09-29-activity-intelligence.md`](evidence/2026-09-29-activity-intelligence.md).
+C2/C3/C4/C8 and live workflow gates remain open.
+
 Baseline reviewed on September 29 at source commit `e42a799cf6aefe1cc6d6907310b3ff8bf467ed43`, with incoming-source updates through `5c8e111931`. The [baseline receipt](evidence/2026-09-29-coordinator-baseline.md) distinguishes those inspections. Later changes need their own evidence.
 
 | Area | Evidence available at the baseline | Next demonstrable result |

@@ -29,6 +29,7 @@ def analysis_for(item, run_id):
             "workState": "ongoing",
             "progress": "Keyboard focus constraint found",
             "blockers": [],
+            "recentOutcome": None,
             "warnings": [],
             "evidenceRefs": [
                 {key: event[key] for key in ("workerId", "sessionId", "eventId", "revision")}
@@ -284,8 +285,8 @@ class LifecycleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
             coordinate(*example("two-stage-budget"), state_dir=directory, runner=runner)
         # Session agents overlap, but coordination begins only after both finish.
-        # Each stage has a 45-second SDK timeout plus remote startup overhead.
-        self.assertGreater(observed[0], 120)
+        # Each stage has a 120-second SDK timeout plus remote startup overhead.
+        self.assertGreater(observed[0], 240)
 
     def test_new_id_cannot_replace_unresolved_remote_run(self):
         calls = []
