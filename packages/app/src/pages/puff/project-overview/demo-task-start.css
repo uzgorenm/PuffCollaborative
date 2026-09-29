@@ -1,0 +1,56 @@
+.puff-demo-task {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px clamp(18px, 3vw, 42px) 20px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text-base) 14%, transparent);
+  background: var(--background-base);
+}
+.puff-demo-task > header,
+.puff-demo-task > form,
+.puff-demo-task > article,
+.puff-demo-task > div,
+.puff-demo-task > p { max-width: 950px; margin-inline: auto; }
+.puff-demo-task > header { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+.puff-demo-task h2 { margin: 6px 0 0; color: var(--text-strong); font-size: 20px; }
+.puff-demo-task h3 { margin: 3px 0 0; color: var(--text-strong); font-size: 16px; }
+.puff-demo-task h4 { margin: 0; color: var(--text-strong); font-size: 13px; }
+.puff-demo-task p { margin: 6px 0 0; color: var(--text-base); font-size: 12px; line-height: 1.5; }
+.puff-demo-task-tag,
+.puff-demo-task-kicker { color: #b8894d; font-size: 10px; font-weight: 750; letter-spacing: .06em; }
+.puff-demo-task form { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.puff-demo-task label { color: var(--text-strong); font-size: 12px; font-weight: 600; }
+.puff-demo-task textarea {
+  width: 100%; min-height: 64px; resize: vertical; padding: 10px 12px;
+  color: var(--text-strong); background: var(--surface-base);
+  border: 1px solid color-mix(in srgb, var(--text-base) 25%, transparent); border-radius: 9px;
+  font-size: 13px; line-height: 1.45;
+}
+.puff-demo-task button {
+  min-height: 34px; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--text-base) 26%, transparent);
+  border-radius: 7px; color: var(--text-base); font-size: 11px;
+}
+.puff-demo-task button:hover { background: var(--surface-raised-base-hover); }
+.puff-demo-task button:disabled { opacity: .5; cursor: not-allowed; }
+.puff-demo-task-form-actions,
+.puff-demo-task-choices,
+.puff-demo-task-suggestions article > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.puff-demo-task-form-actions button:first-child,
+.puff-demo-task-suggestions article button:first-child { background: var(--surface-raised-base); color: var(--text-strong); }
+.puff-demo-task-result,
+.puff-demo-task-suggestions article {
+  border: 1px solid color-mix(in srgb, var(--text-base) 16%, transparent);
+  border-radius: 11px; background: var(--surface-base);
+}
+.puff-demo-task-result { margin-top: 16px; padding: 15px; }
+.puff-demo-task-source { color: var(--text-weak) !important; }
+.puff-demo-task-result details { margin: 12px 0; font-size: 11px; color: var(--text-weak); }
+.puff-demo-task-result summary { cursor: pointer; }
+.puff-demo-task-result code { display: block; margin-top: 7px; overflow-wrap: anywhere; }
+.puff-demo-task-remaining { margin-top: 18px; }
+.puff-demo-task-suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.puff-demo-task-suggestions article { min-width: 0; padding: 12px; }
+.puff-demo-task-suggestions article > div { margin-top: 10px; }
+@media (max-width: 800px) {
+  .puff-demo-task-suggestions { grid-template-columns: 1fr; }
+}

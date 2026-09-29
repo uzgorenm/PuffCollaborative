@@ -1,4 +1,4 @@
-import { For, Show, createMemo, createEffect, type ParentProps } from "solid-js"
+import { For, Show, createMemo, createEffect, onCleanup, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { A, useLocation, useNavigate } from "@solidjs/router"
 import { QueryClientProvider, useQuery } from "@tanstack/solid-query"
@@ -14,6 +14,7 @@ import { loadHomeSessionIndex, type HomeSessionEvents } from "@/context/global-s
 import { sessionHref } from "@/utils/session-route"
 import { ContextPanel } from "./context-panel"
 import { SessionIdentity, sessionIdentityView, type SessionIdentityProps } from "./session-identity"
+import { projectRail } from "./project-rail-model"
 import "./team.css"
 
 export function TeamShell(props: ParentProps) {
@@ -25,14 +26,46 @@ export function TeamShell(props: ParentProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const dialog = useDialog()
-  const [filter, setFilter] = createStore({ text: "" })
+  const [filter, setFilter] = createStore({ text: "", personId: "" })
   const openConnection = () => void dialog.show(() => <TeamConnection team={team} />)
-  const matches = (title: string) => title.toLowerCase().includes(filter.text.toLowerCase())
   const identityLabels = (): SessionIdentityProps["labels"] => ({
     session: language.t("puff.session"),
     worker: language.t("puff.worker"),
     owner: language.t("puff.owner"),
     runState: (state) => language.t(`puff.team.run.${state}`),
+  })
+  const rail = createMemo(() => projectRail({
+    projectId: team.state.projectId,
+    threads: team.state.threads,
+    overview: team.state.overview,
+    simulation: team.state.simulation,
+    missing: language.t("puff.team.rail.noReport"),
+    stale: language.t("puff.team.rail.staleReport"),
+    loading: language.t("puff.team.rail.loadingReport"),
+    loadingReport: team.state.overviewLoading,
+    t: (key) => language.t(key as keyof typeof import("@/i18n/puff-en").puff),
+  }))
+  const personName = (id: string) => {
+    const actor = team.state.simulation?.actors.find((item) => item.userId === id)
+    if (actor) return actor.displayName
+    const name = id.replace(/^usr_/, "").replace(/[_-]+/g, " ").trim()
+    if (/^[a-z][a-z0-9 ]{0,30}$/i.test(name)) return name.replace(/\b\w/g, (letter) => letter.toUpperCase())
+    const index = rail().members.findIndex((item) => item.userId === id)
+    return index < 0 ? language.t("puff.team.rail.unknownPerson") : language.t("puff.team.rail.memberFallback", { number: index + 1 })
+  }
+  const visibleRows = createMemo(() => rail().rows.filter((row) =>
+    (!filter.personId || row.thread.createdBy === filter.personId) &&
+    (!filter.text || `${row.thread.title} ${row.summary} ${personName(row.thread.createdBy)}`.toLowerCase().includes(filter.text.toLowerCase())),
+  ))
+  createEffect(() => {
+    if (team.state.connected && team.state.projectId) void team.refreshOverview()
+  })
+  const overviewPoll = setInterval(() => {
+    if (team.state.connected && team.state.projectId) void team.refreshOverview()
+  }, 12_000)
+  onCleanup(() => clearInterval(overviewPoll))
+  createEffect(() => {
+    if (filter.personId && !rail().members.some((member) => member.userId === filter.personId)) setFilter("personId", "")
   })
   const createSession = () => {
     const conn = server.current
@@ -96,33 +129,37 @@ export function TeamShell(props: ParentProps) {
             <span>{language.t("puff.team.newSession")}</span>
           </button>
         </Show>
+        <Show when={team.state.simulation?.taskStart}>
+          {(start) => <button type="button" class="team-new" onClick={async () => {
+            if (team.state.projectId !== start().projectId) await team.chooseProject(start().projectId)
+            navigate("/puff?new-task=1")
+          }}>
+            <span aria-hidden="true">＋</span>
+            <span>{language.t("puff.simulation.taskStart.newTask")}</span>
+          </button>}
+        </Show>
         <div class="team-rail-body" inert={!team.state.sidebar}>
-          <label class="team-search">
-            <span aria-hidden="true">⌕</span>
-            <input
-              aria-label={language.t("puff.team.search")}
-              placeholder={language.t("puff.team.search")}
-              value={filter.text}
-              onInput={(event) => setFilter("text", event.currentTarget.value)}
-            />
-          </label>
-          <Show when={!team.state.simulation}>
-            <div class="team-section-heading">{language.t("puff.team.yours")}</div>
-            <For each={global.servers.list()}>
-              {(conn) => {
-                const ctx = global.ensureServerCtx(conn)
-                return (
-                  <QueryClientProvider client={ctx.queryClient}>
-                    <PersonalSessions ctx={ctx} conn={conn} filter={filter.text} labels={identityLabels()} />
-                  </QueryClientProvider>
-                )
-              }}
-            </For>
+          <div class="team-section-heading team-projects-heading">{language.t("puff.team.rail.projects")}</div>
+          <Show when={team.state.connected}>
+            <label class="team-project-select">
+              <span class="team-project-icon" aria-hidden="true">▱</span>
+              <span class="team-sr-only">{language.t("puff.team.project")}</span>
+              <select
+                value={team.state.projectId}
+                title={team.state.projects.find((project) => project.id === team.state.projectId)?.name}
+                onChange={(event) => {
+                  void team.chooseProject(event.currentTarget.value)
+                  if (team.state.simulation) navigate("/puff")
+                }}
+              >
+                <For each={team.state.projects}>{(project) => <option value={project.id}>{
+                  team.state.simulation?.scenarios.find((scenario) => scenario.projectId === project.id)
+                    ? language.t(`puff.simulation.${team.state.simulation.scenarios.find((scenario) => scenario.projectId === project.id)!.id}`)
+                    : project.name
+                }</option>}</For>
+              </select>
+            </label>
           </Show>
-          <div class="team-section-heading team-shared-heading">
-            <span>{language.t("puff.team.shared")}</span>
-            <span class="team-mini-count">{team.state.threads.length || "—"}</span>
-          </div>
           <A href="/puff" class="team-overview-link" activeClass="team-overview-active">
             <span aria-hidden="true">◈</span>{language.t("puff.team.overview")}
           </A>
@@ -139,66 +176,84 @@ export function TeamShell(props: ParentProps) {
               </div>
             }
           >
-            <label class="team-project-select">
-              <span class="team-sr-only">{language.t("puff.team.project")}</span>
-              <select
-                value={team.state.projectId}
-                onChange={(event) => {
-                  void team.chooseProject(event.currentTarget.value)
-                  if (team.state.simulation) navigate("/puff")
-                }}
-              >
-                <For each={team.state.projects}>{(project) => <option value={project.id}>{project.name}</option>}</For>
-              </select>
+            <div class="team-section-heading team-people-heading">{language.t("puff.team.rail.people")}</div>
+            <Show when={rail().members.length} fallback={
+              <p class="team-empty-text">{language.t(team.state.overviewLoading ? "puff.team.rail.loadingPeople" : "puff.team.rail.noPeople")}</p>
+            }>
+              <div class="team-people-list" role="group" aria-label={language.t("puff.team.rail.people")}>
+                <button type="button" aria-pressed={!filter.personId} onClick={() => setFilter("personId", "")}>{language.t("puff.team.rail.allPeople")}</button>
+                <For each={rail().members}>
+                  {(member) => <button
+                    type="button"
+                    aria-pressed={filter.personId === member.userId}
+                    aria-label={language.t("puff.team.rail.filterPerson", { person: personName(member.userId) })}
+                    onClick={() => setFilter("personId", member.userId)}
+                  >
+                    <span class="team-person-avatar" aria-hidden="true">{personName(member.userId).slice(0, 2).toUpperCase()}</span>
+                    <span>{personName(member.userId)}</span>
+                    <small>{rail().rows.filter((row) => row.thread.createdBy === member.userId).length}</small>
+                  </button>}
+                </For>
+              </div>
+            </Show>
+            <div class="team-section-heading team-shared-heading">
+              <span>{language.t("puff.team.rail.sessions")}</span>
+              <span class="team-mini-count">{visibleRows().length}</span>
+            </div>
+            <label class="team-search">
+              <span aria-hidden="true">⌕</span>
+              <input
+                aria-label={language.t("puff.team.search")}
+                placeholder={language.t("puff.team.search")}
+                value={filter.text}
+                onInput={(event) => setFilter("text", event.currentTarget.value)}
+              />
             </label>
             <Show
               when={team.state.threads.length}
               fallback={<p class="team-empty-text">{language.t("puff.team.noShared")}</p>}
             >
-              <For each={team.state.threads.filter((thread) => matches(thread.title))}>
-                {(thread) => {
-                  const identity = (): SessionIdentityProps => ({
-                    title: thread.title,
-                    sessionId: thread.sessionId,
-                    workerId: thread.workerId,
-                    threadId: thread.id,
-                    run:
-                      team.writable() && team.state.snapshot?.thread.id === thread.id
-                        ? team.state.snapshot.runs.find(
-                            (run) =>
-                              run.threadId === thread.id && !["completed", "failed", "cancelled"].includes(run.state),
-                          )
-                        : undefined,
-                    labels: identityLabels(),
-                  })
-                  return (
+              <Show when={visibleRows().length} fallback={<p class="team-empty-text">{language.t("puff.team.noMatches")}</p>}>
+                <For each={visibleRows()}>
+                  {(row) => (
                     <A
                       class="team-session-item"
                       activeClass="team-session-active"
-                      href={`/puff/thread/${encodeURIComponent(thread.id)}`}
-                      aria-label={sessionIdentityView(identity()).accessibleLabel}
+                      href={`/puff/thread/${encodeURIComponent(row.thread.id)}`}
                     >
                       <span class="team-avatar" aria-hidden="true">
-                        {thread.createdBy.replace(/^usr_/, "").slice(0, 2).toUpperCase()}
+                        {personName(row.thread.createdBy).slice(0, 2).toUpperCase()}
                       </span>
                       <span class="team-session-copy">
-                        <SessionIdentity {...identity()} density="rail" />
-                        <small class="team-session-summary">
-                          {(() => {
-                            const card = team.state.overview?.project.id === team.state.projectId
-                              ? team.state.overview.cards.find((value) => value.threadId === thread.id)
-                              : undefined
-                            return card?.sourceActivitySeq === thread.activitySeq
-                              ? card.currentTask
-                              : language.t("puff.overview.noCurrentReport")
-                          })()}
-                        </small>
+                        <span class="team-session-topline">
+                          <span class="team-session-person" title={row.creatorIsMember
+                            ? language.t("puff.team.rail.startedBy", { person: personName(row.thread.createdBy) })
+                            : language.t("puff.team.rail.unknownCreator")}>{row.creatorIsMember
+                            ? personName(row.thread.createdBy)
+                            : language.t("puff.team.rail.unknownCreator")}</span>
+                          <strong title={row.thread.title}>{row.thread.title}</strong>
+                          <Show when={row.runState}>{(state) => <span class="team-session-run" data-state={state()}>{language.t(`puff.team.rail.run.${state()}`)}</span>}</Show>
+                        </span>
+                        <span class="team-session-summary">{row.summary}</span>
                       </span>
                     </A>
-                  )
-                }}
-              </For>
+                  )}
+                </For>
+              </Show>
             </Show>
+          </Show>
+          <Show when={!team.state.simulation}>
+            <div class="team-section-heading team-private-heading">{language.t("puff.team.yours")}</div>
+            <For each={global.servers.list()}>
+              {(conn) => {
+                const ctx = global.ensureServerCtx(conn)
+                return (
+                  <QueryClientProvider client={ctx.queryClient}>
+                    <PersonalSessions ctx={ctx} conn={conn} filter={filter.text} labels={identityLabels()} />
+                  </QueryClientProvider>
+                )
+              }}
+            </For>
           </Show>
           <Show when={team.state.error}>
             <div role="status" class="team-sidebar-error">
@@ -251,7 +306,8 @@ export function TeamShell(props: ParentProps) {
         <Show when={team.state.simulation}>
           <div class="team-simulation-banner" role="status">
             <strong>{language.t("puff.simulation.banner")}</strong>
-            <span>{language.t("puff.simulation.bannerDetail")}</span>
+            <span>{language.t("puff.simulation.rail.localDemo")}</span>
+            <details><summary>{language.t("puff.simulation.rail.about")}</summary><p>{language.t("puff.simulation.bannerDetail")}</p></details>
           </div>
         </Show>
         <Show when={localTarget()}>

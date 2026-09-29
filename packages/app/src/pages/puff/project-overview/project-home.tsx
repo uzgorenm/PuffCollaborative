@@ -1,6 +1,6 @@
 import { Show, createEffect, createMemo, createResource, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
-import { useNavigate } from "@solidjs/router"
+import { useLocation, useNavigate } from "@solidjs/router"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
 import { useGlobal } from "@/context/global"
@@ -16,6 +16,7 @@ import { buildProjectOverview } from "./overview-model"
 import { ProjectOverviewView, type OverviewCopyKey, type PrivateSession, type SourceRef } from "./overview-view"
 import { SimulationGuide } from "./simulation-guide"
 import { scenarioForProject } from "./simulation-contract"
+import { DemoTaskStart } from "./demo-task-start"
 
 type OtherSession = PrivateSession & { serverKey: ReturnType<typeof ServerConnection.key>; directory: string }
 
@@ -25,6 +26,7 @@ export function ProjectHome() {
   const tabs = useTabs()
   const language = useLanguage()
   const navigate = useNavigate()
+  const location = useLocation()
   const dialog = useDialog()
   const [peekView, setPeekView] = createStore<{ source: SourcePeekState }>({ source: { status: "closed" } })
   const peek = createSourcePeek((source) => setPeekView("source", source))
@@ -92,6 +94,8 @@ export function ProjectHome() {
   })
   const t = (key: OverviewCopyKey, values?: Record<string, string | number>) =>
     language.t(`puff.overview.${key}`, values)
+  const newTask = createMemo(() => new URLSearchParams(location.search).has("new-task"))
+  const taskStartOpen = createMemo(() => newTask() && !!team.state.simulation?.taskStart)
   let closeSourceButton: HTMLButtonElement | undefined
   const openOther = (session: PrivateSession) => {
     const entry = other().find((item) => item.id === session.id && item.href === session.href)
@@ -127,7 +131,15 @@ export function ProjectHome() {
       </main>
     }>
       <Show when={team.state.projectId} fallback={<main class="team-conversation-empty team-welcome"><h1>{t("title")}</h1><p>{t("noProject")}</p></main>}>
-        <Show when={team.state.simulation}>
+        <Show when={newTask() ? team.state.simulation?.taskStart : undefined}>
+          {(start) => <DemoTaskStart
+            start={start()}
+            onInspect={inspect}
+            onContinue={(id) => navigate(`/puff/thread/${encodeURIComponent(id)}`)}
+            onClose={() => navigate("/puff")}
+          />}
+        </Show>
+        <Show when={!taskStartOpen() ? team.state.simulation : undefined}>
           {(manifest) => <SimulationGuide
             manifest={manifest()}
             projectId={team.state.projectId}
@@ -149,18 +161,20 @@ export function ProjectHome() {
           </main>
         }>
           {(value) => <>
-            <ProjectOverviewView
-              view={value()}
-              privateSessions={team.state.simulation ? [] : other()}
-              related={[]}
-              t={t}
-              onInspect={inspect}
-              onOpenShared={(id) => navigate(`/puff/thread/${encodeURIComponent(id)}`)}
-              onOpenPrivate={openOther}
-              actorLabel={team.state.simulation ? (id) =>
-                team.state.simulation?.actors.find((actor) => actor.userId === id)?.displayName ?? language.t("puff.simulation.unknownActor")
-              : undefined}
-            />
+            <Show when={!taskStartOpen()}>
+              <ProjectOverviewView
+                view={value()}
+                privateSessions={team.state.simulation ? [] : other()}
+                related={[]}
+                t={t}
+                onInspect={inspect}
+                onOpenShared={(id) => navigate(`/puff/thread/${encodeURIComponent(id)}`)}
+                onOpenPrivate={openOther}
+                actorLabel={team.state.simulation ? (id) =>
+                  team.state.simulation?.actors.find((actor) => actor.userId === id)?.displayName ?? language.t("puff.simulation.unknownActor")
+                : undefined}
+              />
+            </Show>
             <Show when={peekView.source.status !== "closed"}>
               <aside class="puff-overview-peek" role="region" aria-label={language.t("puff.team.sourceEvent")} onKeyDown={(event) => {
                 if (event.key === "Escape") { event.stopPropagation(); peek.close(true) }
