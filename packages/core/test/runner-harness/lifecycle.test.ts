@@ -305,6 +305,9 @@ test("deduplicates exact starts and rejects changed Run payloads", () =>
       expect(harness.calls.order.slice(0, 4)).toEqual(["baseline", "watch", "ready", "prompt"])
       const conflict = yield* harness.service.start({ ...first, text: "Changed text" }).pipe(Effect.flip)
       expect(conflict.code).toBe("conflict")
+      harness.state.authorizedAttempt = 2
+      const changedAttempt = yield* harness.service.start(first).pipe(Effect.flip)
+      expect(changedAttempt.code).toBe("conflict")
       expect(harness.calls.prompts).toBe(1)
     }),
   ))

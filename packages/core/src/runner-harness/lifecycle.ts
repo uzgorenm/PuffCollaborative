@@ -175,8 +175,12 @@ export function make(input: Dependencies): Lifecycle {
         .get()
         .pipe(Effect.orDie)
       if (existing) {
-        if (!sameCommand(existing.command, run.command) || existing.project_id !== trusted.projectId)
-          return yield* Effect.fail(failure("conflict", "Run ID was reused with a different command"))
+        if (
+          !sameCommand(existing.command, run.command) ||
+          existing.project_id !== trusted.projectId ||
+          existing.attempt !== trusted.attempt
+        )
+          return yield* Effect.fail(failure("conflict", "Run ID was reused with a different command or attempt"))
         return yield* load(existing)
       }
       yield* requireReservation(trusted)
@@ -216,8 +220,12 @@ export function make(input: Dependencies): Lifecycle {
           ),
         )
       if (!row) return yield* Effect.fail(failure("conflict", "Thread already has an active local execution"))
-      if (!sameCommand(row.command, run.command) || row.project_id !== trusted.projectId)
-        return yield* Effect.fail(failure("conflict", "Run ID was reused with a different command"))
+      if (
+        !sameCommand(row.command, run.command) ||
+        row.project_id !== trusted.projectId ||
+        row.attempt !== trusted.attempt
+      )
+        return yield* Effect.fail(failure("conflict", "Run ID was reused with a different command or attempt"))
       return yield* load(row)
     })
 
