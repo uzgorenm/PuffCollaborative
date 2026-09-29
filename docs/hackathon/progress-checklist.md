@@ -161,3 +161,7 @@ Next action and owner if not PASS:
 ```
 
 For a source/unit-only gate, mark irrelevant runtime fields `not exercised`; do not fill them with example IDs. A fixture containing `example-flower-042` is never a live run receipt.
+
+## Serdar desktop checkpoint — September 29
+
+Native/UI code `f4c8ad9ee4f9c9e411e161e6ea6980099ecc85c0` on serdar/ui: session rail, original coding composer/tools/inline diff, exact-bound panel and motion; focused checks/builds/production comparison recorded in [native receipt](evidence/2026-09-29-serdar-native.md). Full app suite retains one known Punjabi locale failure. Actual native rendering uses synthetic fixtures plus external mock-backed coordination service. Final independent D01–D06 retest remains in the QA receipt; this does not close live WF02/WF10 or sharing/export/awareness contract gates. No main integration by the UI lead.

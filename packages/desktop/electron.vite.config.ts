@@ -13,6 +13,9 @@ const channel = (() => {
 })()
 
 const nodePtyPkg = `@lydell/node-pty-${process.platform}-${process.arch}`
+const rendererPort = process.env.OPENCODE_DESKTOP_RENDERER_PORT
+if (rendererPort && (!/^\d+$/.test(rendererPort) || Number(rendererPort) < 1 || Number(rendererPort) > 65535))
+  throw new TypeError("OPENCODE_DESKTOP_RENDERER_PORT must be a TCP port between 1 and 65535")
 
 const sentry =
   process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
@@ -91,6 +94,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
     },
   },
   renderer: {
+    ...(rendererPort ? { server: { host: "127.0.0.1", port: Number(rendererPort), strictPort: true } } : {}),
     plugins: [appPlugin, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
