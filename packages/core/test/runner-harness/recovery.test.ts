@@ -307,7 +307,8 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
         yield* runtimes.watch({
           execution: setup.state.execution,
           session: setup.state.authorized.session,
-          observe: Effect.never,
+          readinessTimeoutMs: 100,
+          observe: (onReady) => onReady.pipe(Effect.andThen(Effect.never)),
         })
         yield* runtimes.wake(setup.state.execution)
 
