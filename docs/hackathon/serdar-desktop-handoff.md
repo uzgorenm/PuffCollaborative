@@ -4,6 +4,8 @@
 
 # Desktop lead handoff — September 29, 2026
 
+**Publication update:** the coordinator integrated UI source `f4c8ad9ee4` onto the newer main backend as `beab6436ea`, after publishing startup fix `e13a0da154`. See the [combined verification](evidence/2026-09-29-main-desktop-checkpoint.md). The branch-specific backend limits below describe the earlier UI-branch checkpoint. The [central access record](desktop-coordination.md) supersedes the historical window-ownership table: final native input has been released to QA.
+
 Target: `/Users/mac/Desktop/Coding/Hackathon/Puff/PuffCollaborative-serdar-ui`, branch `serdar/ui`. Sole Git writer: Agent 1. Original checkout remains on main with every unfinished file preserved. A byte-verified backup and manifest live at `/tmp/puff-desktop-handoff-20260929`.
 
 15 owned app/desktop/plan files were copied after verifying each existing destination matched the original UI base `3f75718234`. The newer backend was **not** copied or merged. The original helper's legacy-host wiring patch and regression test are preserved in that backup and original checkout.

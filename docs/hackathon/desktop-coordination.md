@@ -9,8 +9,8 @@ Serdar authorized the coordinator chat, **Set up Flower development**, to direct
 | Main integration checkout and pushes | Coordinator | Supply exact ready commits and evidence; do not concurrently push main |
 | UI implementation checkout/Git | Review README for task workflow | Edit only explicitly handed-off files |
 | Context-panel files | Read the project README | Suggest changes through R2/R3 reports; do not edit the same files |
-| Shared desktop mouse, keyboard and focus | Frontend lead until explicit release to native QA | Inspect source and existing captures; no native interaction |
-| Native acceptance after release | Summarize current team work | Continue independent source/tests; do not touch its target window |
+| Shared desktop mouse, keyboard and focus | Native QA after the frontend lead's release | Inspect source and existing captures; no native interaction |
+| Native acceptance | Summarize current team work | Continue independent source/tests; do not touch its target window |
 | Consumer integration test | Complete R1 collaborative review | Use own fixture identities/request IDs; do not mutate another test's sessions |
 | R2–R6 review outputs | Each named role owns `reviews/r2.md` through `reviews/r6.md` | Read completed reports; no duplicate implementation or desktop access |
 
@@ -18,11 +18,12 @@ This is a coordination protocol, not an operating-system lock. The coordinator i
 
 ## Active access record
 
-- **Interactive desktop owner:** frontend lead, `Review README for task workflow`.
-- **Next owner:** native QA, `Summarize current team work`, only after an explicit release and target confirmation.
+- **Interactive desktop owner:** native QA, `Summarize current team work`. The frontend lead explicitly released the final instance after committing `f4c8ad9ee4`; coordinator confirmed the transfer.
+- **Next owner:** unassigned. The frontend lead and all reviewers stay source-only until QA explicitly releases control and the coordinator assigns the next owner.
 - **Current UI checkout:** `PuffCollaborative-serdar-ui`; integration uses a separate `PuffCollaborative-main-integration` checkout. The original checkout remains untouched.
 - **Known development backend:** `127.0.0.1:4466`, explicitly synthetic/mock fixture. Treat the source/runtime identity from the latest lead handoff as authoritative; never publish credentials here.
-- **Per-window profile, renderer and debugging ports:** lead publishes these in `serdar-desktop-handoff.md` before transfer. An unknown target remains unavailable for interaction.
+- **Final QA target:** profile `/tmp/puff-serdar-ui-desktop`, renderer port 5175, debugging port 9223, source checkpoint `f4c8ad9ee4` on `serdar/ui`. Verify instance identity before any action. This already-running window is not a freshly launched main-integration build.
+- **Original interim instance:** renderer 5173/debugging 9222 remains separate and preserved; do not confuse it with the final QA target. Separate windows are not permission for concurrent OS input.
 - **Independent review work:** source, scoped unit tests and existing evidence can proceed now. No reviewer waits for desktop access to finish its source artifact.
 
 ## Handoff procedure
