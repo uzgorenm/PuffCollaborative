@@ -103,6 +103,11 @@ import { tuiHandlers } from "./handlers/tui"
 import { handlers } from "@opencode-ai/server/handlers"
 import { coordinationLayer } from "@opencode-ai/server/coordination-composition"
 import { coordinationAuthLayer } from "@opencode-ai/server/middleware/coordination-auth"
+import { configuredRunnerFactory } from "@opencode-ai/server/runner-harness-composition"
+import { RunnerHarnessConfig } from "@opencode-ai/server/runner-harness-config"
+import { runnerHarnessServices } from "@opencode-ai/server/runner-harness-services"
+import { runnerHarnessAuthorizationLayer } from "@opencode-ai/server/runner-harness-authorization"
+import { runnerHarnessBoundaryLayer } from "@opencode-ai/server/runner-harness-boundary"
 import { buildLocationServiceMap, LocationServiceMap } from "@opencode-ai/core/location-services"
 import { layer as locationLayer } from "@opencode-ai/server/location"
 import { sessionLocationLayer } from "@opencode-ai/server/middleware/session-location"
@@ -139,7 +144,11 @@ const cors = (corsOptions?: CorsOptions) =>
 const authOnlyRouterLayer = authorizationRouterMiddleware.layer.pipe(Layer.provide(ServerAuth.Config.layer))
 const httpApiAuthLayer = authorizationLayer.pipe(Layer.provide(ServerAuth.Config.layer))
 const ptyConnectHttpApiAuthLayer = ptyConnectAuthorizationLayer.pipe(Layer.provide(ServerAuth.Config.layer))
-const serverHttpApiAuthLayer = serverAuthorizationLayer.pipe(Layer.provide(ServerAuth.Config.layer))
+const serverHttpApiAuthLayer = (RunnerHarnessConfig.path()
+  ? runnerHarnessAuthorizationLayer
+  : serverAuthorizationLayer
+).pipe(Layer.provide(ServerAuth.Config.layer))
+const runnerFactory = configuredRunnerFactory()
 const workspaceRoutingLive = workspaceRoutingLayer.pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal))
 const rootApiRoutes = HttpApiBuilder.layer(RootHttpApi).pipe(
   Layer.provide([controlHandlers, controlPlaneHandlers, globalHandlers]),
@@ -180,7 +189,7 @@ const instanceRoutes = instanceApiRoutes.pipe(
 const serverRoutes = HttpApiBuilder.layer(Api).pipe(
   Layer.provide(handlers),
   Layer.provide(coordinationAuthLayer),
-  Layer.provide(coordinationLayer()),
+  Layer.provide(coordinationLayer(runnerFactory ? { runnerFactory } : {})),
   Layer.provide(CoordinationEvents.layer),
   Layer.provide(PluginPtyEnvironment.layer),
   Layer.provide([serverHttpApiAuthLayer, v2SchemaErrorLayer]),
@@ -294,6 +303,7 @@ export function createRoutes(
       corsVaryFix,
       fenceLayer,
       cors(corsOptions),
+      runnerHarnessBoundaryLayer,
       AppNodeBuilderV1.build(MoveSession.node, [[LocationServiceMap.node, locationServiceMapV2]]),
       HttpServer.layerServices,
     ]),
@@ -302,7 +312,7 @@ export function createRoutes(
     Layer.provide(locationLayer),
     Layer.provide(PtyEnvironment.layer),
     Layer.provide(
-      AppNodeBuilderV1.build(SessionV2.node, [
+      AppNodeBuilderV1.build(LayerNode.group([SessionV2.node, SessionExecution.node, runnerHarnessServices]), [
         [LocationServiceMap.node, locationServiceMapV2],
         [SessionExecution.node, SessionExecutionLocal.node],
       ]),

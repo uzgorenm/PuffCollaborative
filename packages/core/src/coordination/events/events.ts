@@ -13,6 +13,13 @@ import { ThreadTable } from "../threads/sql"
 
 const maxPageSize = 256
 const defaultSubscriberCapacity = 256
+const contentRevisionKinds = new Set<Coordination.EventKind>([
+  "comment.created",
+  "run.tool",
+  "run.output",
+  "run.workspace",
+  "run.diff",
+])
 const storedType = EventV2.versionedType(CoordinationEvent.Changed.type, 1)
 const decodeData = Schema.decodeUnknownSync(CoordinationEvent.Changed.data)
 
@@ -32,7 +39,10 @@ export const authorizedReplayProject = (
   projectId: Coordination.ProjectID,
   after: number,
   limit: number,
-) => access.authorize(auth, projectId, undefined, "read").pipe(Effect.andThen(journal.replayProject(projectId, after, limit)))
+) =>
+  access
+    .authorize(auth, projectId, undefined, "read")
+    .pipe(Effect.andThen(journal.replayProject(projectId, after, limit)))
 
 export const authorizedReplayThread = (
   access: CoordinationContracts.Access,
@@ -53,9 +63,9 @@ export const authorizedSubscribeProject = (
   Effect.gen(function* () {
     yield* access.authorize(auth, projectId, undefined, "read")
     yield* journal.replayProject(projectId, after, 1)
-    return journal.subscribeProject(projectId, after).pipe(
-      Stream.mapEffect((event) => access.authorize(auth, projectId, undefined, "read").pipe(Effect.as(event))),
-    )
+    return journal
+      .subscribeProject(projectId, after)
+      .pipe(Stream.mapEffect((event) => access.authorize(auth, projectId, undefined, "read").pipe(Effect.as(event))))
   })
 
 export const authorizedSubscribeThread = (
@@ -68,9 +78,9 @@ export const authorizedSubscribeThread = (
   Effect.gen(function* () {
     yield* access.getThread(auth, threadId, "read")
     yield* journal.replayThread(threadId, after, 1)
-    return journal.subscribeThread(threadId, after).pipe(
-      Stream.mapEffect((event) => access.getThread(auth, threadId, "read").pipe(Effect.as(event))),
-    )
+    return journal
+      .subscribeThread(threadId, after)
+      .pipe(Stream.mapEffect((event) => access.getThread(auth, threadId, "read").pipe(Effect.as(event))))
   })
 
 export const layerWith = (options?: LayerOptions) =>
@@ -101,8 +111,7 @@ export const layerWith = (options?: LayerOptions) =>
               ),
             ))
 
-      const latestSequence = (projectId: Coordination.ProjectID) =>
-        EventV2.latestSequence(db, aggregateID(projectId))
+      const latestSequence = (projectId: Coordination.ProjectID) => EventV2.latestSequence(db, aggregateID(projectId))
 
       const validate = (after: number, limit: number, latest: number) => {
         if (!Number.isSafeInteger(after) || after < -1 || after > latest)
@@ -112,7 +121,12 @@ export const layerWith = (options?: LayerOptions) =>
         return undefined
       }
 
-      const read = (projectId: Coordination.ProjectID, threadId: Coordination.ThreadID | undefined, after: number, limit: number) =>
+      const read = (
+        projectId: Coordination.ProjectID,
+        threadId: Coordination.ThreadID | undefined,
+        after: number,
+        limit: number,
+      ) =>
         Effect.gen(function* () {
           const latest = yield* latestSequence(projectId)
           const invalid = validate(after, limit, latest)
@@ -155,7 +169,11 @@ export const layerWith = (options?: LayerOptions) =>
           } satisfies CoordinationContracts.ReplayPage
         })
 
-      const subscribe = (projectId: Coordination.ProjectID, threadId: Coordination.ThreadID | undefined, after: number) =>
+      const subscribe = (
+        projectId: Coordination.ProjectID,
+        threadId: Coordination.ThreadID | undefined,
+        after: number,
+      ) =>
         Stream.unwrap(
           Effect.gen(function* () {
             const latest = yield* latestSequence(projectId)
@@ -182,7 +200,10 @@ export const layerWith = (options?: LayerOptions) =>
                         Effect.andThen(
                           Queue.fail(
                             output,
-                            failure("unavailable", "Event subscriber fell behind; reconnect using the last delivered cursor"),
+                            failure(
+                              "unavailable",
+                              "Event subscriber fell behind; reconnect using the last delivered cursor",
+                            ),
                           ),
                         ),
                         Effect.asVoid,
@@ -191,7 +212,11 @@ export const layerWith = (options?: LayerOptions) =>
               )
             })
             yield* Effect.addFinalizer(() =>
-              unsubscribe.pipe(Effect.andThen(Queue.shutdown(wake)), Effect.andThen(Queue.shutdown(output)), Effect.asVoid),
+              unsubscribe.pipe(
+                Effect.andThen(Queue.shutdown(wake)),
+                Effect.andThen(Queue.shutdown(output)),
+                Effect.asVoid,
+              ),
             )
 
             yield* Effect.gen(function* () {
@@ -203,8 +228,10 @@ export const layerWith = (options?: LayerOptions) =>
                 if (page.hasMore) continue
                 yield* Queue.take(wake)
               }
-            })
-              .pipe(Effect.catch((error) => Queue.fail(output, error)), Effect.forkScoped)
+            }).pipe(
+              Effect.catch((error) => Queue.fail(output, error)),
+              Effect.forkScoped,
+            )
 
             return Stream.fromQueue(output)
           }),
@@ -215,22 +242,45 @@ export const layerWith = (options?: LayerOptions) =>
           Effect.gen(function* () {
             if (input.id && !input.id.startsWith("evt_"))
               return yield* Effect.fail(failure("invalid", "Event ID must start with evt_"))
-            const event = yield* events.publish(
-              CoordinationEvent.Changed,
-              { ...input, aggregateID: aggregateID(input.projectId) },
-              {
-                ...(input.id ? { id: input.id as EventV2.ID } : {}),
-                commit: (seq) =>
-                  project(seq).pipe(Effect.catch((error) => Effect.die(new CoordinationContracts.ProjectionFailure(error)))),
-              },
-            ).pipe(
-              Effect.catchCause((cause) => {
-                const defect = Cause.squash(cause)
-                return defect instanceof CoordinationContracts.ProjectionFailure
-                  ? Effect.fail(defect.failure)
-                  : Effect.failCause(cause)
-              }),
-            )
+            const event = yield* events
+              .publish(
+                CoordinationEvent.Changed,
+                { ...input, aggregateID: aggregateID(input.projectId) },
+                {
+                  ...(input.id ? { id: input.id as EventV2.ID } : {}),
+                  commit: (seq) =>
+                    Effect.gen(function* () {
+                      yield* project(seq)
+                      if (!input.threadId) return
+                      if (contentRevisionKinds.has(input.kind)) {
+                        const thread = yield* db
+                          .update(ThreadTable)
+                          .set({ activity_seq: seq })
+                          .where(and(eq(ThreadTable.id, input.threadId), eq(ThreadTable.project_id, input.projectId)))
+                          .returning({ id: ThreadTable.id })
+                          .get()
+                          .pipe(Effect.orDie)
+                        if (thread) return
+                      }
+                      const otherProject = yield* db
+                        .select({ projectId: ThreadTable.project_id })
+                        .from(ThreadTable)
+                        .where(eq(ThreadTable.id, input.threadId))
+                        .get()
+                        .pipe(Effect.orDie)
+                      if (otherProject && otherProject.projectId !== input.projectId)
+                        return yield* Effect.fail(failure("not_found", "Thread not found in project"))
+                    }).pipe(Effect.catch((error) => Effect.die(new CoordinationContracts.ProjectionFailure(error)))),
+                },
+              )
+              .pipe(
+                Effect.catchCause((cause) => {
+                  const defect = Cause.squash(cause)
+                  return defect instanceof CoordinationContracts.ProjectionFailure
+                    ? Effect.fail(defect.failure)
+                    : Effect.failCause(cause)
+                }),
+              )
             return {
               id: event.id,
               projectId: input.projectId,
@@ -250,7 +300,9 @@ export const layerWith = (options?: LayerOptions) =>
           Effect.flatMap(resolveThreadProject(threadId), (projectId) => read(projectId, threadId, after, limit)),
         subscribeProject: (projectId, after) => subscribe(projectId, undefined, after),
         subscribeThread: (threadId, after) =>
-          Stream.unwrap(Effect.map(resolveThreadProject(threadId), (projectId) => subscribe(projectId, threadId, after))),
+          Stream.unwrap(
+            Effect.map(resolveThreadProject(threadId), (projectId) => subscribe(projectId, threadId, after)),
+          ),
       }
       return Service.of(service)
     }),

@@ -24,6 +24,46 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`runner_harness_approval\` (
+          \`approval_id\` text PRIMARY KEY,
+          \`run_id\` text NOT NULL,
+          \`thread_id\` text NOT NULL,
+          \`session_id\` text NOT NULL,
+          \`permission_request_id\` text NOT NULL,
+          \`tool_call_id\` text NOT NULL,
+          \`source_message_id\` text NOT NULL,
+          \`scope_hash\` text NOT NULL,
+          \`tool_name\` text NOT NULL,
+          \`summary\` text NOT NULL,
+          \`decision_id\` text,
+          \`decision\` text,
+          \`delivery\` text NOT NULL,
+          \`invalidated_reason\` text,
+          \`requested_at\` integer NOT NULL,
+          \`updated_at\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`runner_harness_outbox\` (
+          \`callback_id\` text PRIMARY KEY,
+          \`run_id\` text NOT NULL,
+          \`producer_key\` text NOT NULL,
+          \`worker_id\` text NOT NULL,
+          \`instance_id\` text NOT NULL,
+          \`ordinal\` integer NOT NULL,
+          \`callback\` text NOT NULL,
+          \`source_session_seq\` integer,
+          \`terminal\` integer DEFAULT 0 NOT NULL,
+          \`created_at\` integer NOT NULL,
+          \`acknowledged_at\` integer,
+          \`attempt_count\` integer DEFAULT 0 NOT NULL,
+          \`next_attempt_at\` integer NOT NULL,
+          \`permanent_failure_at\` integer,
+          \`last_error\` text,
+          CONSTRAINT \`fk_runner_harness_outbox_run_id_runner_harness_execution_run_id_fk\` FOREIGN KEY (\`run_id\`) REFERENCES \`runner_harness_execution\`(\`run_id\`) ON DELETE RESTRICT
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`account_state\` (
           \`id\` integer PRIMARY KEY,
           \`active_account_id\` text,
@@ -243,6 +283,45 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`runner_harness_execution\` (
+          \`run_id\` text PRIMARY KEY,
+          \`thread_id\` text NOT NULL,
+          \`project_id\` text NOT NULL,
+          \`session_id\` text NOT NULL,
+          \`worker_id\` text NOT NULL,
+          \`instance_id\` text NOT NULL,
+          \`attempt\` integer NOT NULL,
+          \`runner_message_id\` text NOT NULL,
+          \`command\` text NOT NULL,
+          \`phase\` text NOT NULL,
+          \`workspace_id\` text,
+          \`workspace_directory\` text,
+          \`runtime_id\` text,
+          \`admitted_message_id\` text,
+          \`artifact_baseline\` text,
+          \`artifact_report\` text,
+          \`last_session_seq\` integer,
+          \`interrupt_abort\` text,
+          \`interrupt_state\` text,
+          \`interrupt_checked_at\` integer,
+          \`created_at\` integer NOT NULL,
+          \`updated_at\` integer NOT NULL,
+          \`terminal_at\` integer
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`runner_harness_thread\` (
+          \`thread_id\` text PRIMARY KEY,
+          \`project_id\` text NOT NULL,
+          \`session_id\` text NOT NULL,
+          \`worker_id\` text NOT NULL,
+          \`workspace_id\` text NOT NULL,
+          \`directory\` text NOT NULL,
+          \`created_at\` integer NOT NULL,
+          \`updated_at\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`message\` (
           \`id\` text PRIMARY KEY,
           \`session_id\` text NOT NULL,
@@ -355,6 +434,27 @@ export default {
         );
       `)
       yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_approval_permission_idx\` ON \`runner_harness_approval\` (\`permission_request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_approval_decision_idx\` ON \`runner_harness_approval\` (\`decision_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_approval_active_run_idx\` ON \`runner_harness_approval\` (\`run_id\`) WHERE "runner_harness_approval"."delivery" IN ('pending', 'unknown');`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`runner_harness_approval_run_idx\` ON \`runner_harness_approval\` (\`run_id\`,\`requested_at\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_outbox_producer_idx\` ON \`runner_harness_outbox\` (\`run_id\`,\`producer_key\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_outbox_order_idx\` ON \`runner_harness_outbox\` (\`run_id\`,\`ordinal\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`runner_harness_outbox_due_idx\` ON \`runner_harness_outbox\` (\`acknowledged_at\`,\`permanent_failure_at\`,\`next_attempt_at\`);`,
+      )
+      yield* tx.run(
         `CREATE INDEX \`coordination_approval_thread_idx\` ON \`coordination_approval\` (\`thread_id\`,\`requested_at\`);`,
       )
       yield* tx.run(`CREATE INDEX \`coordination_approval_run_idx\` ON \`coordination_approval\` (\`run_id\`);`)
@@ -421,6 +521,25 @@ export default {
       yield* tx.run(
         `CREATE UNIQUE INDEX \`permission_project_action_resource_idx\` ON \`permission\` (\`project_id\`,\`action\`,\`resource\`);`,
       )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_execution_message_idx\` ON \`runner_harness_execution\` (\`runner_message_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_execution_active_thread_idx\` ON \`runner_harness_execution\` (\`thread_id\`) WHERE "runner_harness_execution"."phase" IN ('accepted', 'prepared', 'admitted', 'running', 'waiting_approval', 'cancelling', 'recovery_required');`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`runner_harness_execution_thread_phase_idx\` ON \`runner_harness_execution\` (\`thread_id\`,\`phase\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`runner_harness_execution_owner_idx\` ON \`runner_harness_execution\` (\`worker_id\`,\`instance_id\`,\`phase\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_thread_session_idx\` ON \`runner_harness_thread\` (\`session_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_thread_workspace_idx\` ON \`runner_harness_thread\` (\`workspace_id\`);`,
+      )
+      yield* tx.run(`CREATE INDEX \`runner_harness_thread_project_idx\` ON \`runner_harness_thread\` (\`project_id\`);`)
       yield* tx.run(
         `CREATE INDEX \`message_session_time_created_id_idx\` ON \`message\` (\`session_id\`,\`time_created\`,\`id\`);`,
       )

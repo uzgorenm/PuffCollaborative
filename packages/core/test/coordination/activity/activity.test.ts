@@ -25,7 +25,7 @@ function fixture() {
     createdAt: at(200),
     activitySeq,
   })
-  const long = thread("long", 0)
+  const long = thread("long", 3)
   const queued = thread("queued", 1)
   const approval = thread("approval", 2)
   const blocked = thread("blocked", 3)
@@ -109,19 +109,37 @@ function fixture() {
   const events: Coordination.Event[] = [
     { id: "evt_old", projectId, threadId: long.id, seq: 0, kind: "run.started", occurredAt: at(125), payload: {} },
     {
+      id: "evt_output_expired",
+      projectId,
+      threadId: long.id,
+      seq: 1,
+      kind: "run.output",
+      occurredAt: at(61),
+      payload: { text: "Old output" },
+    },
+    {
       id: "evt_approval",
       projectId,
       threadId: approval.id,
-      seq: 1,
+      seq: 2,
       kind: "run.approval.requested",
       occurredAt: at(4),
       payload: { message: "Approval requested" },
     },
     {
+      id: "evt_output",
+      projectId,
+      threadId: long.id,
+      seq: 3,
+      kind: "run.output",
+      occurredAt: at(3),
+      payload: { text: "x".repeat(8_100) },
+    },
+    {
       id: "evt_failed",
       projectId,
       threadId: blocked.id,
-      seq: 2,
+      seq: 4,
       kind: "run.failed",
       occurredAt: at(2),
       payload: { summary: "Build failed" },
@@ -209,8 +227,10 @@ describe("activity read model with fixture state", () => {
     })
     expect(view.upNext.map((item) => item.sourceThread.threadId)).toEqual([f.queued.id])
     expect(view.upNext[0]).toMatchObject({ status: "queued", text: "Instruction queued" })
-    expect(view.recent.map((item) => item.id)).toEqual(["evt_failed", "evt_approval"])
+    expect(view.recent.map((item) => item.id)).toEqual(["evt_failed", "evt_output", "evt_approval"])
     expect(view.recent[0]?.sourceThread?.href).toContain(f.blocked.id)
+    expect(view.recent[1]).toMatchObject({ kind: "run.output", sourceThread: { threadId: f.long.id } })
+    expect(view.recent[1]?.outcome).toBe("x".repeat(8_000))
     expect(view.workingNow.filter((item) => item.contributors.includes(f.member.userId))).toHaveLength(2)
     expect(new Set(view.workingNow.map((item) => item.id)).size).toBe(view.workingNow.length)
   })

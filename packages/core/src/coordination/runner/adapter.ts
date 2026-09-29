@@ -27,6 +27,7 @@ export interface ApprovalStore {
   ) => Effect.Effect<Coordination.Approval, CoordinationContracts.Failure>
   readonly pendingDecisions: (
     executionOwner: Coordination.ExecutionOwner,
+    threadId?: Coordination.ThreadID,
   ) => Effect.Effect<
     ReadonlyArray<{ readonly thread: Coordination.Thread; readonly approval: Coordination.Approval }>,
     CoordinationContracts.Failure
@@ -53,7 +54,7 @@ export function make(input: Dependencies): CoordinationContracts.Runner {
       const thread = yield* input.access.getThread(principal, threadId, "runner")
       if (thread.workerId !== executionOwner.workerId)
         return yield* Effect.fail(conflict("Thread belongs to another worker"))
-      const recovered = yield* recoverPending(executionOwner)
+      const recovered = yield* recover(executionOwner, threadId)
       if (recovered.some((run) => run.threadId === threadId)) return undefined
       const reserved = yield* input.queue.reserveNext({
         principal,
@@ -148,9 +149,11 @@ export function make(input: Dependencies): CoordinationContracts.Runner {
       return yield* input.approvals.markDelivered(approval.id, request.decisionId)
     })
 
-  const recoverPending: CoordinationContracts.Runner["recoverPending"] = (executionOwner) =>
+  const recover = (executionOwner: Coordination.ExecutionOwner, threadId?: Coordination.ThreadID) =>
     Effect.gen(function* () {
-      const pending = yield* input.queue.pending(executionOwner)
+      const pending = (yield* input.queue.pending(executionOwner)).filter(
+        (item) => !threadId || item.thread.id === threadId || item.run.threadId === threadId,
+      )
       for (const item of pending) {
         const reservationError = validateDelivery(item, item.thread, executionOwner)
         if (reservationError) return yield* Effect.fail(reservationError)
@@ -171,7 +174,7 @@ export function make(input: Dependencies): CoordinationContracts.Runner {
           yield* input.port.interrupt({ runId: item.run.id, sessionId: item.thread.sessionId })
         // Other active states remain occupied. Reconciliation alone cannot prove termination.
       }
-      const approvals = yield* input.approvals.pendingDecisions(executionOwner)
+      const approvals = yield* input.approvals.pendingDecisions(executionOwner, threadId)
       for (const item of approvals) {
         if (!item.approval.decisionId || !item.approval.decision)
           return yield* Effect.fail(conflict("Pending approval has no decision"))
@@ -186,6 +189,8 @@ export function make(input: Dependencies): CoordinationContracts.Runner {
       }
       return pending.map((item) => item.run)
     })
+
+  const recoverPending: CoordinationContracts.Runner["recoverPending"] = (executionOwner) => recover(executionOwner)
 
   return { approvals: input.approvals.list, claim, report, cancel, claimApproval, decideApproval, recoverPending }
 }

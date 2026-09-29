@@ -1,19 +1,41 @@
-import { For, Show, createEffect, createMemo, onCleanup } from "solid-js"
-import { useParams, A } from "@solidjs/router"
+import { For, Show, createEffect, createMemo, onCleanup, on } from "solid-js"
+import { useParams, useLocation } from "@solidjs/router"
 import { Button } from "@opencode-ai/ui/button"
 import { useLanguage } from "@/context/language"
 import { useTeam } from "./team-context"
+import { ContextPanel } from "@/components/puff/context-panel"
+import { SessionIdentity, type SessionIdentityProps } from "@/components/puff/session-identity"
 import { teamEventText } from "./team-state"
+import { ProjectHome } from "./project-overview/project-home"
 
 export default function TeamThreadPage() {
   const params = useParams<{ threadId: string }>()
+  const location = useLocation()
   const team = useTeam()
   const language = useLanguage()
   let viewport: HTMLDivElement | undefined
+  let contextToggle: HTMLButtonElement | undefined
   let nearBottom = true
   let frame = 0
-  createEffect(() => team.selectThread(params.threadId))
+  let restored = ""
+  let revealed = ""
+  const savePosition = (id: string) => {
+    if (viewport && restored === id) team.set("positions", id, { top: viewport.scrollTop, followTail: nearBottom })
+  }
+  createEffect(
+    on(
+      () => params.threadId,
+      (id, previous) => {
+        if (previous) savePosition(previous)
+        nearBottom = team.state.positions[id]?.followTail ?? true
+        restored = ""
+        revealed = ""
+        team.selectThread(id)
+      },
+    ),
+  )
   onCleanup(() => {
+    savePosition(params.threadId)
     cancelAnimationFrame(frame)
     if (team.state.threadId === params.threadId) team.selectThread("")
   })
@@ -22,6 +44,12 @@ export default function TeamThreadPage() {
   const pending = () => team.state.pending[params.threadId]
   const runs = () => snapshot()?.runs ?? []
   const active = () => runs().filter((run) => !["completed", "failed", "cancelled"].includes(run.state))
+  const identityLabels = (): SessionIdentityProps["labels"] => ({
+    session: language.t("puff.session"),
+    worker: language.t("puff.worker"),
+    owner: language.t("puff.owner"),
+    runState: (state) => language.t(`puff.team.run.${state}`),
+  })
   const visible = createMemo(() =>
     team.state.events.filter((event) =>
       [
@@ -36,11 +64,47 @@ export default function TeamThreadPage() {
       ].includes(event.kind),
     ),
   )
+  const sourceId = () => {
+    if (!location.hash.startsWith("#event-")) return ""
+    try {
+      return decodeURIComponent(location.hash.slice(7))
+    } catch {
+      return ""
+    }
+  }
+  const missingSource = () =>
+    !!sourceId() && !team.state.loading && !!snapshot() && !visible().some((event) => event.id === sourceId())
   createEffect(() => {
+    const id = params.threadId
+    const source = sourceId()
     visible().at(-1)?.id
-    if (!nearBottom) return
+    if (team.state.loading || !snapshot()) return
     cancelAnimationFrame(frame)
-    frame = requestAnimationFrame(() => viewport?.scrollTo({ top: viewport.scrollHeight, behavior: "auto" }))
+    frame = requestAnimationFrame(() => {
+      if (!viewport) return
+      if (source) {
+        if (revealed === `${id}:${source}`) return
+        const target = document.getElementById(`event-${source}`)
+        if (target) {
+          revealed = `${id}:${source}`
+          target.scrollIntoView({ block: "center", behavior: "auto" })
+          target.focus({ preventScroll: true })
+          nearBottom = false
+        }
+        restored = id
+        return
+      }
+      if (restored !== id) {
+        const position = team.state.positions[id]
+        viewport.scrollTo({
+          top: position && !position.followTail ? position.top : viewport.scrollHeight,
+          behavior: "auto",
+        })
+        restored = id
+        return
+      }
+      if (nearBottom) viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" })
+    })
   })
   const updateDraft = (text: string, kind = draft().kind) => team.set("drafts", params.threadId, { text, kind })
   return (
@@ -48,19 +112,26 @@ export default function TeamThreadPage() {
       <header class="team-thread-header">
         <div class="team-thread-heading">
           <span class="team-eyebrow">{language.t("puff.team.sharedConversation")}</span>
-          <h1>{snapshot()?.thread.title ?? language.t("puff.team.conversation")}</h1>
-          <Show when={snapshot()}>
+          <Show when={snapshot()} fallback={<h1>{language.t("puff.team.conversation")}</h1>}>
             {(value) => (
-              <p>
-                {value().thread.createdBy}
-                <span>·</span>
-                {value().thread.workerId}
-              </p>
+              <h1>
+                <SessionIdentity
+                  title={value().thread.title}
+                  sessionId={value().thread.sessionId}
+                  workerId={value().thread.workerId}
+                  threadId={value().thread.id}
+                  run={team.writable() ? active().find((run) => run.threadId === value().thread.id) : undefined}
+                  labels={identityLabels()}
+                  density="header"
+                />
+              </h1>
             )}
           </Show>
         </div>
         <button
           class="team-context-toggle"
+          ref={contextToggle}
+          aria-controls="shared-team-context"
           type="button"
           aria-expanded={team.state.context}
           onClick={() => team.set("context", (value) => !value)}
@@ -85,6 +156,7 @@ export default function TeamThreadPage() {
             onScroll={(event) => {
               nearBottom =
                 event.currentTarget.scrollHeight - event.currentTarget.scrollTop - event.currentTarget.clientHeight < 90
+              savePosition(params.threadId)
             }}
             aria-busy={team.state.loading}
           >
@@ -109,9 +181,16 @@ export default function TeamThreadPage() {
                 <p>{language.t("puff.team.startHint")}</p>
               </div>
             </Show>
+            <Show when={missingSource()}>
+              <p role="status" class="team-connection-alert">
+                {language.t("puff.team.sourceMissing")}
+              </p>
+            </Show>
             <For each={visible()}>
               {(event) => (
                 <article
+                  id={`event-${event.id}`}
+                  tabIndex={-1}
                   class="team-message"
                   classList={{
                     "team-human-message": event.kind === "instruction.submitted",
@@ -254,109 +333,43 @@ export default function TeamThreadPage() {
             </div>
           </form>
         </div>
-        <aside class="team-context-panel" inert={!team.state.context} aria-label={language.t("puff.team.context")}>
-          <div class="team-context-inner">
-            <h2>{language.t("puff.team.context")}</h2>
-            <p class="team-caption">{language.t("puff.team.contextHint")}</p>
-            <Show
-              when={snapshot()?.workCard}
-              fallback={
-                <div class="team-context-empty">
-                  <span>✳</span>
-                  <p>{language.t("puff.team.noContext")}</p>
-                </div>
-              }
-            >
-              {(card) => (
-                <>
-                  <section class="team-context-section">
-                    <span class="team-eyebrow">{language.t("puff.team.working")}</span>
-                    <h3>{card().currentTask}</h3>
-                    <p>{card().progress}</p>
-                  </section>
-                  <Show when={card().blockers.length}>
-                    <section class="team-context-section">
-                      <span class="team-eyebrow">{language.t("puff.blocker")}</span>
-                      <For each={card().blockers}>{(blocker) => <p>{blocker}</p>}</For>
-                    </section>
-                  </Show>
-                  <Show when={card().recentVerifiedOutcome}>
-                    <section class="team-context-section">
-                      <span class="team-eyebrow">{language.t("puff.team.latestOutcome")}</span>
-                      <p>{card().recentVerifiedOutcome}</p>
-                    </section>
-                  </Show>
-                  <section class="team-context-section">
-                    <span class="team-eyebrow">{language.t("puff.team.sources")}</span>
-                    <For each={card().evidenceRefs}>
-                      {(ref) => (
-                        <A class="team-evidence-link" href={`/puff/thread/${encodeURIComponent(ref.threadId)}`}>
-                          <span>↗</span>
-                          <code>{ref.eventId}</code>
-                        </A>
-                      )}
-                    </For>
-                    <small class="team-caption">
-                      {language.t("puff.team.sequence", { sequence: card().sourceActivitySeq })}
-                    </small>
-                  </section>
-                </>
-              )}
-            </Show>
-            <Show when={active().length}>
-              <section class="team-context-section">
-                <span class="team-eyebrow">{language.t("puff.team.upNext")}</span>
-                <For each={active()}>
-                  {(run) => (
-                    <div class="team-queue-card">
-                      <span>{language.t(`puff.team.run.${run.state}`)}</span>
-                      <p>
-                        {snapshot()?.instructions.find((instruction) => instruction.id === run.instructionId)?.text}
-                      </p>
-                      <Button
-                        size="small"
-                        variant="ghost"
-                        disabled={!team.writable() || !!team.state.action || run.state === "cancelling"}
-                        onClick={() => void team.control("cancel", run)}
-                      >
-                        {language.t("puff.team.stop")}
-                      </Button>
-                    </div>
-                  )}
-                </For>
-              </section>
-            </Show>
-            <For
-              each={snapshot()?.approvals.filter(
-                (approval) => approval.state === "pending" || approval.state === "claimed",
-              )}
-            >
-              {(approval) => (
-                <section class="team-approval">
-                  <h3>{language.t("puff.team.toolPermission")}</h3>
-                  <code>{approval.toolCallId}</code>
-                  <p>{language.t("puff.team.permissionHint")}</p>
-                  <div>
-                    <Button
-                      size="small"
-                      disabled={!team.writable() || !!team.state.action}
-                      onClick={() => void team.control("reject", approval)}
-                    >
-                      {language.t("puff.reject")}
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="primary"
-                      disabled={!team.writable() || !!team.state.action}
-                      onClick={() => void team.control("approve", approval)}
-                    >
-                      {language.t("puff.team.allow")}
-                    </Button>
-                  </div>
-                </section>
-              )}
-            </For>
-          </div>
+        <aside
+          id="shared-team-context"
+          class="team-context-panel"
+          inert={!team.state.context}
+          aria-label={language.t("puff.team.context")}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation()
+              team.set("context", false)
+              contextToggle?.focus()
+            }
+          }}
+        >
+          <ContextPanel
+            target={
+              snapshot()
+                ? {
+                    sessionId: snapshot()!.thread.sessionId,
+                    workerId: snapshot()!.thread.workerId,
+                    threadId: snapshot()!.thread.id,
+                  }
+                : undefined
+            }
+            snapshot={snapshot()}
+            related={team.state.threads}
+            connected={team.state.connected}
+            loading={team.state.loading}
+            error={team.state.error}
+            writable={team.writable()}
+            busy={!!team.state.action}
+            onCancel={(run) => void team.control("cancel", run)}
+            onReject={(approval) => void team.control("reject", approval)}
+            sourceScope={team.state.sourceScope}
+            resolveSource={team.resolveSource}
+            canRetryDecision={team.canRetryDecision}
+            onRetryDecision={team.retryDecision}
+          />
         </aside>
       </div>
     </section>
@@ -364,13 +377,5 @@ export default function TeamThreadPage() {
 }
 
 export function TeamHome() {
-  const language = useLanguage()
-  return (
-    <div class="team-conversation-empty team-welcome">
-      <span class="team-empty-symbol">✳</span>
-      <h1>{language.t("puff.team.welcome")}</h1>
-      <p>{language.t("puff.team.welcomeHint")}</p>
-      <A href="/">{language.t("puff.team.backToSessions")} ↗</A>
-    </div>
-  )
+  return <ProjectHome />
 }

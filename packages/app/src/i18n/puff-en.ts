@@ -1,4 +1,19 @@
+import { overviewEnglish } from "@/pages/puff/project-overview/overview-copy"
+
 export const puff = {
+  ...overviewEnglish,
+  "puff.team.sourceMissing": "This source event is unavailable in the permitted conversation history.",
+  "puff.team.sourceLoading": "Loading source event…",
+  "puff.team.sourceNoAccess": "You do not have access to this source event.",
+  "puff.team.sourceUnavailable": "Source event is unavailable right now.",
+  "puff.team.sourceClose": "Close source",
+  "puff.team.sourceEvent": "Source event",
+  "puff.team.decisionDelivery": "Tool decision delivery",
+  "puff.team.toolApproved": "Tool decision: allowed",
+  "puff.team.toolRejected": "Tool decision: rejected",
+  "puff.team.retryDecision": "Retry exact decision",
+  "puff.team.retryUnavailable": "Retry requires the original decision attempt.",
+  "puff.team.codingSession": "Coding session",
   "puff.team.sessions": "Project sessions",
   "puff.team.home": "Puff home",
   "puff.team.collapse": "Collapse session sidebar",
@@ -6,7 +21,8 @@ export const puff = {
   "puff.team.newSession": "New session",
   "puff.team.search": "Find a session…",
   "puff.team.yours": "YOUR SESSIONS",
-  "puff.team.shared": "SHARED WITH YOU",
+  "puff.team.shared": "PROJECT WORK",
+  "puff.team.overview": "Project overview",
   "puff.team.workTogether": "Bring your team into the flow",
   "puff.team.connectHint": "Follow shared conversations and contribute without leaving your own work.",
   "puff.team.connect": "Connect team",
@@ -28,7 +44,7 @@ export const puff = {
   "puff.team.connectToRead": "Connect to see this conversation",
   "puff.team.startConversation": "A shared place to build",
   "puff.team.startHint":
-    "Give the agent an instruction, or leave a comment for your teammates. Activity will appear here as it happens.",
+    "Give the agent an instruction, or leave a comment for your teammates. Shared activity appears after refresh.",
   "puff.team.agent": "Agent",
   "puff.team.instruction": "Agent instruction",
   "puff.team.comment": "Team comment",
@@ -41,7 +57,7 @@ export const puff = {
   "puff.team.sequence": "Source sequence {{sequence}}",
   "puff.team.moreQueued": "{{count}} more in queue",
   "puff.team.unconfirmed":
-    "The server has not confirmed this message. Retry sends the same request once; editing and disconnecting stay paused until it is resolved.",
+    "The server has not confirmed this message. Retry keeps the same request identity. You can reconnect to the same service and member account without losing this pending message.",
   "puff.team.message": "Message this shared conversation",
   "puff.team.commentPlaceholder": "Share a finding or leave a note for the team…",
   "puff.team.instructionPlaceholder": "What should the agent work on next?",
@@ -54,13 +70,13 @@ export const puff = {
   "puff.team.contextHint": "Current work and source-linked findings from this shared session.",
   "puff.team.noContext":
     "No generated context yet. The conversation remains available while your team's summaries catch up.",
-  "puff.team.working": "WORKING NOW",
-  "puff.team.latestOutcome": "LATEST VERIFIED OUTCOME",
+  "puff.team.working": "LAST REPORTED WORK",
+  "puff.team.latestOutcome": "REPORTED OUTCOME",
   "puff.team.upNext": "ACTIVE & UP NEXT",
   "puff.team.stop": "Stop request",
   "puff.team.toolPermission": "Tool permission requested",
   "puff.team.permissionHint":
-    "Review this tool request in the owning session before allowing it. This permission is separate from an instruction to change the task.",
+    "Approval is unavailable here because this record has no tool arguments or permission scope. Review it in the owning session. This permission is separate from changing the task.",
   "puff.team.allow": "Allow tool",
   "puff.team.welcome": "Your agents. One shared workspace.",
   "puff.team.welcomeHint":

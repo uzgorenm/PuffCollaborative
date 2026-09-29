@@ -386,9 +386,9 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
       const list: ServerConnection.Any[] = []
       if (data) {
         list.push({
-          displayName: language.t("desktop.server.local"),
-          type: "sidecar",
-          variant: "base",
+          ...(external === data.url
+            ? { type: "http" as const }
+            : { type: "sidecar" as const, variant: "base" as const, displayName: language.t("desktop.server.local") }),
           http: {
             url: data.url,
             username: data.username ?? undefined,

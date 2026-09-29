@@ -3,7 +3,8 @@
 Date/time: September 29, 2026, 12:44 PDT  
 Result: PASS for the multiplayer coordination backend with an explicit mock runner; G0 and WF01–WF07 remain open.  
 Evidence kind: INTEGRATION with real SQLite and `EventV2`, plus focused component tests.  
-Owner: Agent 1 / Serhat backend area. Reviewer: no second-person review recorded.  
+Owner: Agent 1 / Serhat backend area. Agent 5 independently reran the event and HTTP tests; no code review recorded.
+
 Tested and pushed source: [`4124e1a`](https://github.com/uzgorenm/PuffCollaborative/commit/4124e1a). Documentation updates were pending at the test run.
 
 ## Commands and observed results
@@ -13,6 +14,7 @@ Tested and pushed source: [`4124e1a`](https://github.com/uzgorenm/PuffCollaborat
 - From `packages/core`: `bun run script/migration.ts --check` — passed with no incremental schema drift. A copy of a pre-feature SQLite database started through the current server and applied all four coordination migrations, creating the nine coordination tables; `/api/health` returned 200.
 - From `packages/client`: `bun run check:generated` — passed. The generated client matches the registered HttpApi.
 - The required pre-push `bun turbo typecheck` — 20 successful tasks across the workspace.
+- Agent 5 fetched `4124e1a` into a separate worktree and reported a parallel run of the event suite and HTTP integration test: 10 event tests with 33 assertions, and one HTTP test with 51 assertions. Both passed. This is a teammate's independent test report, not a code review.
 
 The integration test uses a local roster of Bun password hashes, a trusted project-admission file, existing Project and Session fixture rows, and `OPENCODE_COORDINATION_MOCK_RUNNER=1`. The mock emits planned tool and output events and waits on approval. Its credentials and SQLite file are temporary and removed at test completion.
 

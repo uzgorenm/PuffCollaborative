@@ -1,4 +1,4 @@
-import { For, Show, createMemo, type ParentProps } from "solid-js"
+import { For, Show, createMemo, createEffect, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { A, useLocation, useNavigate } from "@solidjs/router"
 import { QueryClientProvider, useQuery } from "@tanstack/solid-query"
@@ -12,6 +12,8 @@ import { useTabs } from "@/context/tabs"
 import { useTeam } from "@/pages/puff/team-context"
 import { loadHomeSessionIndex, type HomeSessionEvents } from "@/context/global-sync/home-session-index"
 import { sessionHref } from "@/utils/session-route"
+import { ContextPanel } from "./context-panel"
+import { SessionIdentity, sessionIdentityView, type SessionIdentityProps } from "./session-identity"
 import "./team.css"
 
 export function TeamShell(props: ParentProps) {
@@ -26,6 +28,12 @@ export function TeamShell(props: ParentProps) {
   const [filter, setFilter] = createStore({ text: "" })
   const openConnection = () => void dialog.show(() => <TeamConnection team={team} />)
   const matches = (title: string) => title.toLowerCase().includes(filter.text.toLowerCase())
+  const identityLabels = (): SessionIdentityProps["labels"] => ({
+    session: language.t("puff.session"),
+    worker: language.t("puff.worker"),
+    owner: language.t("puff.owner"),
+    runState: (state) => language.t(`puff.team.run.${state}`),
+  })
   const createSession = () => {
     const conn = server.current
     if (!conn) return
@@ -35,12 +43,42 @@ export function TeamShell(props: ParentProps) {
       directory: projects.last() ?? projects.list()[0]?.worktree ?? "",
     })
   }
+  const localSession = createMemo(() =>
+    tabs.store.find((tab) => tab.type === "session" && sessionHref(tab.server, tab.sessionId) === location.pathname),
+  )
+  const localTarget = createMemo(() => {
+    const tab = localSession()
+    if (!tab || tab.type !== "session") return
+    const conn = global.servers.list().find((item) => ServerConnection.key(item) === tab.server)
+    const sameService = !!team.state.serviceUrl && conn?.http.url.replace(/\/+$/, "") === team.state.serviceUrl
+    const matches = sameService ? team.state.threads.filter((thread) => thread.sessionId === tab.sessionId) : []
+    const thread = matches.length === 1 ? matches[0] : undefined
+    return { sessionId: tab.sessionId, workerId: thread?.workerId, threadId: thread?.id }
+  })
+  createEffect(() => {
+    if (location.pathname.startsWith("/puff/thread/")) return
+    team.selectThread(localTarget()?.threadId ?? "")
+  })
+  const localSnapshot = () => {
+    const target = localTarget()
+    const snapshot = team.state.snapshot
+    return target?.threadId === snapshot?.thread.id &&
+      target?.workerId === snapshot?.thread.workerId &&
+      target?.sessionId === snapshot?.thread.sessionId
+      ? snapshot
+      : undefined
+  }
+  let contextToggle: HTMLButtonElement | undefined
+  const closeContext = () => {
+    team.set("context", false)
+    contextToggle?.focus()
+  }
   return (
     <div class="team-shell" classList={{ "team-collapsed": !team.state.sidebar }}>
       <aside class="team-sidebar" aria-label={language.t("puff.team.sessions")}>
         <div class="team-rail-head">
           <A href="/" class="team-logo" aria-label={language.t("puff.team.home")}>
-            p<span>Puff</span>
+            p<span>{language.t("puff.name")}</span>
           </A>
           <button
             class="team-icon"
@@ -72,7 +110,7 @@ export function TeamShell(props: ParentProps) {
               const ctx = global.ensureServerCtx(conn)
               return (
                 <QueryClientProvider client={ctx.queryClient}>
-                  <PersonalSessions ctx={ctx} conn={conn} filter={filter.text} />
+                  <PersonalSessions ctx={ctx} conn={conn} filter={filter.text} labels={identityLabels()} />
                 </QueryClientProvider>
               )
             }}
@@ -81,6 +119,9 @@ export function TeamShell(props: ParentProps) {
             <span>{language.t("puff.team.shared")}</span>
             <span class="team-mini-count">{team.state.threads.length || "—"}</span>
           </div>
+          <A href="/puff" class="team-overview-link" activeClass="team-overview-active">
+            <span aria-hidden="true">◈</span>{language.t("puff.team.overview")}
+          </A>
           <Show
             when={team.state.connected}
             fallback={
@@ -108,19 +149,47 @@ export function TeamShell(props: ParentProps) {
               fallback={<p class="team-empty-text">{language.t("puff.team.noShared")}</p>}
             >
               <For each={team.state.threads.filter((thread) => matches(thread.title))}>
-                {(thread) => (
-                  <A
-                    class="team-session-item"
-                    activeClass="team-session-active"
-                    href={`/puff/thread/${encodeURIComponent(thread.id)}`}
-                  >
-                    <span class="team-avatar">{thread.createdBy.replace(/^usr_/, "").slice(0, 2).toUpperCase()}</span>
-                    <span class="team-session-copy">
-                      <strong>{thread.title}</strong>
-                      <small>{thread.createdBy}</small>
-                    </span>
-                  </A>
-                )}
+                {(thread) => {
+                  const identity = (): SessionIdentityProps => ({
+                    title: thread.title,
+                    sessionId: thread.sessionId,
+                    workerId: thread.workerId,
+                    threadId: thread.id,
+                    run:
+                      team.writable() && team.state.snapshot?.thread.id === thread.id
+                        ? team.state.snapshot.runs.find(
+                            (run) =>
+                              run.threadId === thread.id && !["completed", "failed", "cancelled"].includes(run.state),
+                          )
+                        : undefined,
+                    labels: identityLabels(),
+                  })
+                  return (
+                    <A
+                      class="team-session-item"
+                      activeClass="team-session-active"
+                      href={`/puff/thread/${encodeURIComponent(thread.id)}`}
+                      aria-label={sessionIdentityView(identity()).accessibleLabel}
+                    >
+                      <span class="team-avatar" aria-hidden="true">
+                        {thread.createdBy.replace(/^usr_/, "").slice(0, 2).toUpperCase()}
+                      </span>
+                      <span class="team-session-copy">
+                        <SessionIdentity {...identity()} density="rail" />
+                        <small class="team-session-summary">
+                          {(() => {
+                            const card = team.state.overview?.project.id === team.state.projectId
+                              ? team.state.overview.cards.find((value) => value.threadId === thread.id)
+                              : undefined
+                            return card?.sourceActivitySeq === thread.activitySeq
+                              ? card.currentTask
+                              : language.t("puff.overview.noCurrentReport")
+                          })()}
+                        </small>
+                      </span>
+                    </A>
+                  )
+                }}
               </For>
             </Show>
           </Show>
@@ -151,7 +220,7 @@ export function TeamShell(props: ParentProps) {
             <button
               class="team-connection-button"
               type="button"
-              disabled={!!team.state.action || Object.values(team.state.pending).some(Boolean)}
+              disabled={!!team.state.action}
               onClick={() => {
                 team.disconnect()
                 if (location.pathname.startsWith("/puff")) navigate("/")
@@ -165,12 +234,72 @@ export function TeamShell(props: ParentProps) {
           </Show>
         </div>
       </aside>
-      <div class="team-main">{props.children}</div>
+      <div
+        class="team-main team-local-host"
+        classList={{
+          "team-local-active": !!localTarget(),
+          "team-local-context-open": !!localTarget() && team.state.context,
+        }}
+      >
+        <Show when={localTarget()}>
+          <div class="team-local-toolbar">
+            <span>{language.t("puff.team.codingSession")}</span>
+            <button
+              ref={contextToggle}
+              type="button"
+              class="team-context-toggle"
+              aria-expanded={team.state.context}
+              aria-controls="local-team-context"
+              onClick={() => team.set("context", (value) => !value)}
+            >
+              {language.t("puff.team.context")}
+              <span aria-hidden="true">◧</span>
+            </button>
+          </div>
+        </Show>
+        <div class="team-local-grid">
+          <div class="team-local-chat">{props.children}</div>
+          <aside
+            id="local-team-context"
+            class="team-context-panel team-local-context"
+            inert={!localTarget() || !team.state.context}
+            aria-label={language.t("puff.team.context")}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation()
+                closeContext()
+              }
+            }}
+          >
+            <ContextPanel
+              target={localTarget()}
+              snapshot={localSnapshot()}
+              related={team.state.threads}
+              connected={team.state.connected}
+              loading={!!localTarget()?.threadId && team.state.loading}
+              error={team.state.error}
+              writable={!!localSnapshot() && team.writable()}
+              busy={!!team.state.action}
+              onCancel={(run) => void team.control("cancel", run)}
+              onReject={(approval) => void team.control("reject", approval)}
+              sourceScope={team.state.sourceScope}
+              resolveSource={team.resolveSource}
+              canRetryDecision={team.canRetryDecision}
+              onRetryDecision={team.retryDecision}
+            />
+          </aside>
+        </div>
+      </div>
     </div>
   )
 }
 
-function PersonalSessions(props: { ctx: ServerCtx; conn: ServerConnection.Any; filter: string }) {
+function PersonalSessions(props: {
+  ctx: ServerCtx
+  conn: ServerConnection.Any
+  filter: string
+  labels: SessionIdentityProps["labels"]
+}) {
   const language = useLanguage()
   const tabs = useTabs()
   const cache = props.ctx.sync.homeSessions
@@ -231,6 +360,9 @@ function PersonalSessions(props: { ctx: ServerCtx; conn: ServerConnection.Any; f
               "team-session-active": location.pathname === sessionHref(ServerConnection.key(props.conn), session.id),
             }}
             type="button"
+            aria-label={
+              sessionIdentityView({ title: session.title, sessionId: session.id, labels: props.labels }).accessibleLabel
+            }
             onClick={() => {
               props.ctx.projects.open(session.directory)
               props.ctx.projects.touch(session.directory)
@@ -241,7 +373,7 @@ function PersonalSessions(props: { ctx: ServerCtx; conn: ServerConnection.Any; f
               ◌
             </span>
             <span class="team-session-copy">
-              <strong>{session.title}</strong>
+              <SessionIdentity title={session.title} sessionId={session.id} labels={props.labels} density="rail" />
               <small>{session.directory.split(/[\\/]/).filter(Boolean).at(-1) || serverName(props.conn)}</small>
             </span>
           </button>
