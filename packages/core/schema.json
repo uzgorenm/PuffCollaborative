@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "57170f7e-b734-4fb2-98d1-c1ce1b7713c0",
+  "id": "ae45e733-d884-432c-8b50-67fc75a50fea",
   "prevIds": [
-    "27c225d9-8325-4c8c-8f2b-01fb69e55be8"
+    "57170f7e-b734-4fb2-98d1-c1ce1b7713c0"
   ],
   "ddl": [
     {
@@ -12,6 +12,10 @@
     },
     {
       "name": "data_migration",
+      "entityType": "tables"
+    },
+    {
+      "name": "runner_harness_outbox",
       "entityType": "tables"
     },
     {
@@ -225,6 +229,156 @@
       "name": "time_completed",
       "entityType": "columns",
       "table": "data_migration"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "callback_id",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "run_id",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "producer_key",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "worker_id",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "instance_id",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "ordinal",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "callback",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "source_session_seq",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "terminal",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "acknowledged_at",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "attempt_count",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "next_attempt_at",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "permanent_failure_at",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "last_error",
+      "entityType": "columns",
+      "table": "runner_harness_outbox"
     },
     {
       "type": "integer",
@@ -2573,6 +2727,21 @@
     },
     {
       "columns": [
+        "run_id"
+      ],
+      "tableTo": "runner_harness_execution",
+      "columnsTo": [
+        "run_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "name": "fk_runner_harness_outbox_run_id_runner_harness_execution_run_id_fk",
+      "entityType": "fks",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "columns": [
         "active_account_id"
       ],
       "tableTo": "account",
@@ -2916,6 +3085,15 @@
     },
     {
       "columns": [
+        "callback_id"
+      ],
+      "nameExplicit": false,
+      "name": "runner_harness_outbox_pk",
+      "table": "runner_harness_outbox",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
         "id"
       ],
       "nameExplicit": false,
@@ -3129,6 +3307,64 @@
       "name": "session_share_pk",
       "table": "session_share",
       "entityType": "pks"
+    },
+    {
+      "columns": [
+        {
+          "value": "run_id",
+          "isExpression": false
+        },
+        {
+          "value": "producer_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "runner_harness_outbox_producer_idx",
+      "entityType": "indexes",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "columns": [
+        {
+          "value": "run_id",
+          "isExpression": false
+        },
+        {
+          "value": "ordinal",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "runner_harness_outbox_order_idx",
+      "entityType": "indexes",
+      "table": "runner_harness_outbox"
+    },
+    {
+      "columns": [
+        {
+          "value": "acknowledged_at",
+          "isExpression": false
+        },
+        {
+          "value": "permanent_failure_at",
+          "isExpression": false
+        },
+        {
+          "value": "next_attempt_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "runner_harness_outbox_due_idx",
+      "entityType": "indexes",
+      "table": "runner_harness_outbox"
     },
     {
       "columns": [
