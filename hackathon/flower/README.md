@@ -24,16 +24,22 @@ Local adapter output does not establish a model response or live Puff delivery.
 
 ## Guardian mode (default product path)
 
-`guardian/` is a third AgentApp, run once per coding agent whenever Jev reports
-a meaningful change in that agent. Its input is the agent's instruction and
-last 30 events plus the other agents' board cards; its output is the agent's
-own board card and, only when the agent drifts into another agent's files or
-feature, a correction instruction for that agent.
+`guardian/` is a third AgentApp, run once per coding agent whenever Jev flags a
+meaningful change in that agent. Input (capped at 6 KB): the agent's latest
+person-assigned task, the events of Jev-flagged bursts (file paths, not diffs),
+and a summary of every other agent's board card including its discoveries.
+Output: the agent's own card (task, files, discoveries with evidence) and, when
+another agent's discovery matters here, an informational, source-cited finding
+("thr_A found X; it also affects your approach"). Agents work in separate
+workspaces, so editing the same file is expected and is not flagged. A redirect
+is only a proposal and always waits for owner approval.
 
 ```text
-OpenCode A/B events -> server -> worker.py -> Jev (reporter, per agent)
-  -> guardian:<thread> on SuperGrid (Endeavor) -> PUT work-card (shared board)
-  -> overlap? -> correction proposed, or sent with POST /threads/:id/instructions
+OpenCode A/B events -> server -> worker.py -> Jev (reporter, per burst)
+  -> guardian:<thread> on SuperGrid (Endeavor, gpt-5.6-sol fallback)
+  -> PUT work-card (shared board, model recorded)
+  -> finding: delivered as a note via POST /threads/:id/instructions (autoSend)
+  -> proposal: pending until approve.py sends it
 ```
 
 Run from `hackathon/flower/`:
@@ -41,20 +47,18 @@ Run from `hackathon/flower/`:
 ```powershell
 copy worker.example.json worker.json   # fill serverUrl, projectId, thread IDs
 .\.venv\Scripts\python.exe worker.py --config worker.json
-.\.venv\Scripts\python.exe approve.py --config worker.json          # list proposals
-.\.venv\Scripts\python.exe approve.py --config worker.json RUN_ID   # send one
+.\.venv\Scripts\python.exe approve.py --config worker.json       # list pending
+.\.venv\Scripts\python.exe approve.py --config worker.json ID    # send one
 ```
 
 Secrets live only in the git-ignored `.env`: `TYPESAFE_API_KEY` (Jev),
-`PUFF_ANALYSIS_USER`/`PUFF_ANALYSIS_PASSWORD` (the server's `analysis`
-identity), and `PUFF_MEMBER_USER`/`PUFF_MEMBER_PASSWORD` (needed to submit
-instructions; the server allows only members to do that). With
-`"autoSend": false` (default) corrections wait for owner approval in
-`.runtime/worker/corrections.jsonl`; `true` sends them immediately.
-Guardian-tagged instructions never re-trigger a guardian, and the same
-correction is not repeated within `correctionCooldownSeconds`. Instructions are
-queued, so the agent receives a correction when its current run ends.
-`"mode": "chain"` keeps the two-analysis-plus-coordination chain below.
+`PUFF_ANALYSIS_USER`/`PUFF_ANALYSIS_PASSWORD` (card writes), and
+`PUFF_MEMBER_USER`/`PUFF_MEMBER_PASSWORD` (reads and note delivery; the server
+grants the analysis identity only work-card updates). Settings: `autoSend`
+delivers findings without approval; `guardianStub` returns a deterministic
+finding without calling a model; `guardianModel` picks the primary model.
+Guardian notes and the agent's run of them never re-trigger a guardian, and the
+same finding is delivered once. `"mode": "chain"` keeps the older chain below.
 
 ## Setup and checks
 

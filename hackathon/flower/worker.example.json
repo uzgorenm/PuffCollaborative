@@ -16,5 +16,6 @@
   "jevTimeoutSeconds": 5,
   "mode": "guardian",
   "autoSend": false,
-  "correctionCooldownSeconds": 300
+  "guardianStub": false,
+  "guardianModel": null
 }
