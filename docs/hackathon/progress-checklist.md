@@ -214,3 +214,6 @@ For a source/unit-only gate, mark irrelevant runtime fields `not exercised`; do 
 ## Serdar desktop checkpoint — September 29
 
 Native/UI code `f4c8ad9ee4f9c9e411e161e6ea6980099ecc85c0` on serdar/ui: session rail, original coding composer/tools/inline diff, exact-bound panel and motion; focused checks/builds/production comparison recorded in [native receipt](evidence/2026-09-29-serdar-native.md). Full app suite retains one known Punjabi locale failure. Actual native rendering uses synthetic fixtures plus external mock-backed coordination service. Final independent D01–D06 retest remains in the QA receipt; this does not close live WF02/WF10 or sharing/export/awareness contract gates. No main integration by the UI lead.
+
+
+**Native error-reuse correction:** [receipt](evidence/2026-09-29-error-fix-reuse.md) at UI code `d9609a30aa` records 71 focused app checks, 47 browser checks, typecheck/build and 13 real HTTP client/backend checks with actual isolated patch/test execution. Error reuse and grouped people are test-backend complete; real selected worker fix reports and live Flower discovery remain open. No live gate is closed by these checks.

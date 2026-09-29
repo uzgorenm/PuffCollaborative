@@ -2,6 +2,8 @@
 
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
 
+**Native error-reuse correction:** `d9609a30aa` adds automatic error matching, Inspect / Apply fix / No thanks, exact source/revision rechecks, application receipts, and person -> aggregate summary -> sessions in the desktop. The internally synthetic backend applies a real patch to a disposable workspace and runs its tests; the live producer/Flower boundary remains open. [Verification receipt](evidence/2026-09-29-error-fix-reuse.md).
+
 **React browser preview:** [`apps/web`](../../apps/web/README.md) adds the requested Codex-style Next.js interface, collaborator avatars, and bottom session summaries. Source `b23f29418d` passes production build and browser navigation/draft checks; [receipt](evidence/2026-09-29-react-web-preview.md). It reads synthetic simulator data and saves local drafts. Real presence and execution remain unconnected; this does not close the live workflow gates.
 
 **Main web sidebar update:** source `790518a2c9688e9fc1d09f3b6b02a29b965c7a03` groups personal threads and each teammate's recent work under the Stanford Hackathon project in the main browser app. The separate `/puff` overview page was removed. [Verification receipt](evidence/2026-09-29-main-web-sidebar.md). The activity remains demo or simulator data; live workflow gates are unchanged.

@@ -8,11 +8,11 @@
 
 ## Tasks
 
-- [ ] Root: failing tests for matching error, unrelated error, stale/foreign/unattributed evidence, post-completion suppression, verification failure and instruction source identity; implement `fix-reuse.ts`.
-- [ ] Root: add source lookup on meaningful failure/report change, revalidate on Apply, preserve exact retry identity, clear stale results on account/target changes; tests for actual controller flow.
-- [ ] Root: add Inspect / Apply fix / No thanks within shared conversation and exact receipt states through i18n.
-- [ ] Existing sidebar owner: person name -> aggregate fresh report -> individual sessions, search and accessible collapse, settings disclosure.
-- [ ] Existing backend owner: error/fix fixtures, canonical idempotent instruction admission and actual isolated file/test application. Unrelated/private cases stay excluded.
+- [x] Root: failing tests for matching error, unrelated error, stale/foreign/unattributed evidence, post-completion suppression, verification failure and instruction source identity; implement `fix-reuse.ts`.
+- [x] Root: add source lookup on meaningful failure/report change, revalidate on Apply, preserve exact retry identity, clear stale results on account/target changes; tests for actual controller flow.
+- [x] Root: add Inspect / Apply fix / No thanks within shared conversation and exact receipt states through i18n.
+- [x] Existing sidebar owner: person name -> aggregate fresh report -> individual sessions, search and accessible collapse, settings disclosure.
+- [x] Existing backend owner: error/fix fixtures, canonical idempotent instruction admission and actual isolated file/test application. Unrelated/private cases stay excluded.
 - [ ] Root: verify focused tests, package typecheck/build, native walkthrough on an isolated checkpoint; record evidence, integrate concurrent serhat changes, push normally.
 
 ## Review focus
