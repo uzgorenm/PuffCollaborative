@@ -205,7 +205,11 @@ export function make(input: Dependencies): Recovery {
     if (admitted.promotedSeq === undefined) {
       if (inspection.state.state === "idle" && inspection.state.activeTools !== 0)
         return { kind: "uncertain" as const, execution, reason: "Scoped tools have not been proved idle before wake" }
-      return { kind: "admitted" as const, execution, unpromoted: true }
+      return {
+        kind: "uncertain" as const,
+        execution,
+        reason: "Coordinator active reservation has not been verified before wake",
+      }
     }
     if (
       inspection.state.state === "active" &&

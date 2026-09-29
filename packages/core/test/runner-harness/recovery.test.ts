@@ -239,7 +239,7 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
     }),
   )
 
-  it.effect("reattaches a persisted runtime before inspecting and waking an unpromoted input", () =>
+  it.effect("reattaches a persisted runtime before holding an unverified unpromoted input", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("admitted")
       yield* setup.admit()
@@ -250,8 +250,9 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
       expect(setup.state.order).toContain("inspect")
       expect(setup.state.reattachments).toEqual([runId])
       expect(setup.state.execution.runtime?.id).toBe("runtime_after_restart")
-      expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
-      expect(setup.state.wakes).toBe(1)
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.starts).toHaveLength(0)
+      expect(setup.state.wakes).toBe(0)
     }),
   )
 
@@ -292,14 +293,19 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
     }),
   )
 
-  it.effect("reconciles lost submission acknowledgment and wakes only unpromoted input", () =>
+  it.effect("recognizes lost submission acknowledgment without replaying an unverified input", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("admitted")
       yield* setup.admit()
-      expect(yield* setup.make().reconcile(setup.command.runnerMessageId)).toBe("admitted")
+      const uncertain = yield* setup
+        .make()
+        .reconcile(setup.command.runnerMessageId)
+        .pipe(Effect.catch((error) => Effect.succeed(error)))
+      expect(uncertain).toMatchObject({ code: "unavailable" })
       yield* setup.make().recover
-      expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
-      expect(setup.state.wakes).toBe(1)
+      expect(setup.state.starts).toHaveLength(0)
+      expect(setup.state.wakes).toBe(0)
+      expect(setup.state.execution.phase).toBe("recovery_required")
     }),
   )
 
@@ -333,15 +339,19 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
     }),
   )
 
-  it.effect("reattaches observation for a held unpromoted input before waking", () =>
+  it.effect("keeps a held unpromoted input unavailable without reservation proof", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("recovery_required")
       yield* setup.admit()
       setup.state.startUnavailable = true
-      expect(yield* setup.make().reconcile(setup.command.runnerMessageId)).toBe("admitted")
+      const uncertain = yield* setup
+        .make()
+        .reconcile(setup.command.runnerMessageId)
+        .pipe(Effect.catch((error) => Effect.succeed(error)))
+      expect(uncertain).toMatchObject({ code: "unavailable" })
       yield* setup.make().recover
-      expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
-      expect(setup.state.wakes).toBe(1)
+      expect(setup.state.starts).toHaveLength(0)
+      expect(setup.state.wakes).toBe(0)
       expect(setup.state.execution.phase).toBe("recovery_required")
     }),
   )
