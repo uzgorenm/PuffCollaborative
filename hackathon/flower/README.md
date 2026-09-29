@@ -12,12 +12,46 @@ Python adapter explicitly passes the completed analysis outputs and their run
 IDs to the coordination app. This is a host-mediated agent chain, **not native
 Grid communication**. No app is published by these commands.
 
-Status: the producer-to-chain adapter is locally connected, but real Puff run
-completion and result retrieval are **unverified**. The earlier synthetic live
-attempt was rejected by SuperGrid authentication; the latest preflight could
-not reach SuperLink from this environment. No new Flower run was started. See
-[verification.md](verification.md). Do not present local adapter output as a
-model response or a successful hackathon demo.
+Status (September 29): after `flwr login supergrid`, synthetic chains and
+guardian runs completed on SuperGrid, including on `flower-endeavor-v1.0`
+(for example coordination run `15257103598039078808`, guardian run
+`12842551889246562196`). Nothing has run against the live coordination server
+or real OpenCode sessions yet. See [verification.md](verification.md) for the
+earlier local evidence.
+
+## Guardian mode (default product path)
+
+`guardian/` is a third AgentApp, run once per coding agent whenever Jev reports
+a meaningful change in that agent. Its input is the agent's instruction and
+last 30 events plus the other agents' board cards; its output is the agent's
+own board card and, only when the agent drifts into another agent's files or
+feature, a correction instruction for that agent.
+
+```text
+OpenCode A/B events -> server -> worker.py -> Jev (reporter, per agent)
+  -> guardian:<thread> on SuperGrid (Endeavor) -> PUT work-card (shared board)
+  -> overlap? -> correction proposed, or sent with POST /threads/:id/instructions
+```
+
+Run from `hackathon/flower/`:
+
+```powershell
+copy worker.example.json worker.json   # fill serverUrl, projectId, thread IDs
+.\.venv\Scripts\python.exe worker.py --config worker.json
+.\.venv\Scripts\python.exe approve.py --config worker.json          # list proposals
+.\.venv\Scripts\python.exe approve.py --config worker.json RUN_ID   # send one
+```
+
+Secrets live only in the git-ignored `.env`: `TYPESAFE_API_KEY` (Jev),
+`PUFF_ANALYSIS_USER`/`PUFF_ANALYSIS_PASSWORD` (the server's `analysis`
+identity), and `PUFF_MEMBER_USER`/`PUFF_MEMBER_PASSWORD` (needed to submit
+instructions; the server allows only members to do that). With
+`"autoSend": false` (default) corrections wait for owner approval in
+`.runtime/worker/corrections.jsonl`; `true` sends them immediately.
+Guardian-tagged instructions never re-trigger a guardian, and the same
+correction is not repeated within `correctionCooldownSeconds`. Instructions are
+queued, so the agent receives a correction when its current run ends.
+`"mode": "chain"` keeps the two-analysis-plus-coordination chain below.
 
 ## Setup and checks
 
