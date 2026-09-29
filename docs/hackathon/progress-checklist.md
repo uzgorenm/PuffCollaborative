@@ -35,7 +35,7 @@ The [activity revision recheck](evidence/2026-09-29-coordination-activity-revisi
 
 The [content revision recheck](evidence/2026-09-29-coordination-content-revision.md) at `8bf5459` passed the focused SQLite freshness and comment tests (2 tests, 26 assertions) and all nine process cases (1,084 assertions). Content events now advance `Thread.activitySeq`; queue, lifecycle and card events keep their project cursor without changing that revision. The process worker remains fake.
 
-The [activity-feed receipt](evidence/2026-09-29-coordination-activity-feed.md) at `a0ee1dd` verifies the `run.output` read-model projection with fixture events (3 tests, 16 assertions) and the existing mock HTTP integration (1 test, 51 assertions). Real runner output in the live view remains to be checked.
+The [activity-feed receipt](evidence/2026-09-29-coordination-activity-feed.md) verifies the `run.output` read-model projection with fixture events at `a0ee1dd` (3 tests, 16 assertions) and authenticated HTTP delivery at `c2f24b5` (1 focused process case, 14 assertions). Real runner output in the live view remains to be checked.
 
 This is backend integration evidence against external simulators. It does not change the G0 through G7 or WF01 through WF10 statuses. The real OpenCode runner, shared frontend, and Jev/Flower exchange still need live receipts.
 
