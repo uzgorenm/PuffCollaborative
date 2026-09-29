@@ -49,6 +49,12 @@ export interface Projects {
     readonly name: string
     readonly requestId: string
   }) => Effect.Effect<Coordination.SharedProject, Failure>
+  readonly grantMember: (input: {
+    readonly auth: Coordination.AuthContext
+    readonly projectId: Coordination.ProjectID
+    readonly targetUserId: Coordination.UserID
+    readonly requestId: string
+  }) => Effect.Effect<Coordination.Membership, Failure>
   readonly listThreads: (
     auth: Coordination.AuthContext,
     projectId: Coordination.ProjectID,
@@ -57,7 +63,6 @@ export interface Projects {
     readonly auth: Coordination.AuthContext
     readonly projectId: Coordination.ProjectID
     readonly sessionId: Coordination.Thread["sessionId"]
-    readonly workerId: Coordination.WorkerID
     readonly title: string
     readonly requestId: string
   }) => Effect.Effect<Coordination.Thread, Failure>
@@ -66,6 +71,12 @@ export interface Projects {
     projectId: Coordination.ProjectID,
     userId?: Coordination.UserID,
   ) => Effect.Effect<ReadonlyArray<Coordination.Contribution>, Failure>
+}
+
+export interface SessionBinding {
+  readonly resolve: (
+    sessionId: Coordination.Thread["sessionId"],
+  ) => Effect.Effect<{ readonly projectId: Coordination.ProjectID; readonly workerId: Coordination.WorkerID }, Failure>
 }
 
 export interface Comments {
@@ -133,6 +144,7 @@ export interface Queue {
   readonly instructions: (
     threadId: Coordination.ThreadID,
   ) => Effect.Effect<ReadonlyArray<Coordination.InstructionRequest>, Failure>
+  readonly runs: (threadId: Coordination.ThreadID) => Effect.Effect<ReadonlyArray<Coordination.Run>, Failure>
   readonly submit: (input: {
     readonly principal: Coordination.AuthContext
     readonly threadId: Coordination.ThreadID
@@ -216,6 +228,7 @@ export interface RunnerPort {
 }
 
 export interface Runner {
+  readonly approvals: (threadId: Coordination.ThreadID) => Effect.Effect<ReadonlyArray<Coordination.Approval>, Failure>
   readonly claim: (
     principal: Coordination.AuthContext,
     threadId: Coordination.ThreadID,
