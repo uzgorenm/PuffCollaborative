@@ -71,7 +71,7 @@ Agent 2 owns the feature-local `SharedProject`, `Membership`, `Comment` and `Con
 | `cancelling`        | `cancelled`, `failed`, `recovery_required`                                   |
 | `recovery_required` | `running`, `cancelled`, `failed` after reconciliation                        |
 
-`completed`, `failed` and `cancelled` are terminal. A pending approval keeps the thread lane occupied. The queue starts the next Run only after the previous Run is terminal. On restart, an expired nonterminal lease becomes `recovery_required`. The adapter checks stable `runnerMessageId` against durable Session input before resuming or failing; it never blindly submits a second prompt.
+`completed`, `failed` and `cancelled` are terminal. A pending approval keeps the thread lane occupied. The queue starts the next Run only after the previous Run is terminal. On restart, an expired `reserved` Run becomes `recovery_required`; a `cancelling` Run stays `cancelling` so recovery can retry the interrupt. The adapter checks stable `runnerMessageId` against durable Session input before resuming or failing; it never blindly submits a second prompt.
 
 ## Shared services
 

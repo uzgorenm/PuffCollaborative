@@ -22,6 +22,13 @@ import { schemaErrorLayer } from "./middleware/schema-error"
 import { PtyEnvironment } from "./pty-environment"
 import { layer as locationLayer } from "./location"
 import { sessionLocationLayer } from "./middleware/session-location"
+import { coordinationAuthLayer } from "./middleware/coordination-auth"
+import { CoordinationRuntime } from "./coordination-runtime"
+
+const coordinationRuntimeLayer = Layer.succeed(
+  CoordinationRuntime,
+  CoordinationRuntime.of({ missing: ["coordination identity and service adapters"] }),
+)
 
 const applicationServices = LayerNode.group([
   Database.node,
@@ -56,6 +63,8 @@ function makeRoutes<AuthError, AuthServices>(auth: Layer.Layer<ServerAuth.Config
     Layer.provide(sessionLocationLayer),
     Layer.provide(locationLayer),
     Layer.provide(authorizationLayer),
+    Layer.provide(coordinationAuthLayer),
+    Layer.provide(coordinationRuntimeLayer),
     Layer.provide(schemaErrorLayer),
     Layer.provide(auth),
     Layer.provide(serviceLayer),
