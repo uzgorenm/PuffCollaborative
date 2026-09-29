@@ -1,6 +1,11 @@
 # Puff team workspace
 
-This is the team's shared task board and feature-status page. Detailed implementation checklists live in [team-plan.md](team-plan.md); behavior, acceptance criteria, and data contracts live in [mvp-spec.md](mvp-spec.md).
+This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
+
+- [Ten concrete acceptance workflows](acceptance-workflows.md): exact scenarios, expected behavior and failure controls.
+- [Integration gates](integration-gates.md): shared contract decisions and producer/consumer handoffs.
+- [Owner checklists](team-plan.md): the next verifiable result for each teammate.
+- [Product spec](mvp-spec.md): required behavior; [shared backend contract](../coordination-contract.md): current implementation interfaces.
 
 ## Our tasks
 
@@ -8,14 +13,14 @@ This is the team's shared task board and feature-status page. Detailed implement
 
 | Task | Owner | Deliverable | Status | Verified commit / blocker |
 | --- | --- | --- | --- | --- |
-| T1 — Shared state and API | Serhat | Shared session topics, current activity, source-linked awareness delivery, approval checks, and durable decisions. | Planned | No merged implementation verified yet. |
-| T2 — OpenCode adapter | Talha | Export selected activity; deliver relevant awareness at a safe turn boundary and approved instructions to the correct session. | Planned | No merged implementation verified yet. |
-| T3 — Team interface | Serdar | Show simultaneous experiments, progress, source-linked updates, decisions, and delivery/failure states. | Planned | No merged implementation verified yet. |
-| T4 — Flower coordinator | Ferit | Real SuperGrid summaries that distinguish parallel alternatives from duplicates and find shared constraints. | Planned | Standalone template smoke test passed; product integration, multiple-Flower-agent collaboration, and our own Hub publication remain unverified. See the [official brief review](../../README.md#official-hackathon-requirements-and-readiness). |
+| T1 — Shared state and API | Serhat | Shared topics/evidence, validated awareness routing, state and events. | In progress — service modules and protocol | Incoming source through [5c8e111931](https://github.com/uzgorenm/PuffCollaborative/commit/5c8e111931) adds access/projects/comments, journal, runner/approval controls, snapshot composition, protocol declarations and test source. Full handlers, executed tests and actual awareness integration remain unverified here; G0 stays open. |
+| T2 — OpenCode adapter | Talha | Export selected activity; admit awareness into an already active Session and reconcile retries. | Integration unverified | Prove G1 and WF02; the existing upstream queue alone does not prove active-session awareness. |
+| T3 — Team interface | Serdar | Show distinct experiments, inspectable evidence and admission/promotion/use. | In progress — local UI | Local preview/adapter/components observed; ongoing UI changes are not yet a live-service receipt. Provisional API/auth differs from backend; close G0 and G5. |
+| T4 — Flower coordinator | Ferit | Real cooperating Flower agents distinguish alternatives and produce a usable finding. | Product exchange unverified | Upstream template smoke test is recorded; G2/WF10 and team-owned publication still need evidence. See the [official brief review](../../README.md#official-hackathon-requirements-and-readiness). |
 
 Open [the task checklists](team-plan.md) and find the numbered task with your name. Each has file ownership, inputs/outputs, acceptance checks, and a scope cut if time gets short.
 
-Status reflects verified shared work on main, not unknown work in another person's local clone. Update your row to **In progress**, **Blocked**, or **Done** as appropriate. For Blocked, write the dependency/error; for Done, link the pushed commit and state the check that passed. Tick your detailed checklist at the same time.
+Status distinguishes merged work, explicitly observed local work and unverified integration. The [baseline receipt](evidence/2026-09-29-coordinator-baseline.md) names the inspected commit and limits. For **Blocked**, name the dependency/owner; for **Done**, link a pushed commit and passing workflow receipt. Update the progress checklist at the same time. Do not infer another person's progress from absent commits.
 
 ## Our features
 
@@ -30,14 +35,14 @@ Status reflects verified shared work on main, not unknown work in another person
 | F7 | Automatic context checks at session start | Talha, Ferit | Stretch | Deferred |
 | F8 | Native Flower Grid worker queries | Ferit | Stretch | Deferred |
 
-Read [feature acceptance criteria and contracts](mvp-spec.md) before implementing a feature. Summaries describe observed work; only human-approved decisions become accepted project knowledge.
+Read the [feature acceptance criteria](mvp-spec.md) and [workflow cases](acceptance-workflows.md) before implementing. Feature completion is not established by the partial workstream progress above. F1–F4/F6 are evidenced by WF01–WF07; F5 by WF09. Multiple-Flower cooperation is separately required by WF10 even while the particular native-Grid option F8 remains stretch.
 
 ## Shared workflow
 
 - **One default branch: main. No PRs or feature branches.** Use a separate local clone for each person.
 - Read this board and your task checklist before editing. Respect the file boundaries; Serhat owns shared schemas and root dependency changes, and Serdar owns shared UI entry points.
 - Make small, working commits. Verify your slice, fetch origin/main, merge incoming commits, rerun any affected checks, and push to main. Never force-push.
-- Update this board and your checklist in the same commit as meaningful progress. Preserve other owners' status updates when integrating.
+- Update this board and the [progress checklist](progress-checklist.md) with a named gate/case and evidence receipt in the same commit as meaningful progress. Preserve other owners' status updates when integrating.
 - GitHub Issues is disabled. This page is the task board; the spec is the feature list and contract reference.
 
 ## First checkpoint

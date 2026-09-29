@@ -104,6 +104,9 @@ is a stretch feature; ongoing awareness is the core demo.
 
 **Start here: [Team task board and feature status](docs/hackathon/README.md).**
 
+- [Progress gates and evidence checklist](docs/hackathon/progress-checklist.md)
+- [Concrete workflow cases, including parallel frontend experiments](docs/hackathon/acceptance-workflows.md)
+- [Integration contracts and blocking decisions](docs/hackathon/integration-gates.md)
 - [Your assigned task and implementation checklist](docs/hackathon/team-plan.md)
 - [Feature scope, acceptance criteria, and shared contracts](docs/hackathon/mvp-spec.md)
 - [README review against the original idea](docs/hackathon/README-review.md)
