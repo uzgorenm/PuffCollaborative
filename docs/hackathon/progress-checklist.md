@@ -4,6 +4,20 @@ This is the coordinator's working checklist. A feature counts as progress when i
 
 ## Current checkpoint
 
+**Ferit — local producer/consumer checkpoint, September 29:** the Activity
+producer now feeds the Flower chain adapter through one validated handoff, and
+`python bridge_demo.py` walks a two-session, four-event synthetic history
+through source-reference mapping into server-shaped WorkCard and awareness-note
+candidates. This is a local adapter demonstration with a synthetic Flower
+report. No test suite or live Flower run was performed for this checkpoint;
+SuperLink was unreachable from the current environment. No backend write or
+OpenCode delivery occurred. See
+[`evidence/2026-09-29-ferit-activity-flower-bridge.md`](evidence/2026-09-29-ferit-activity-flower-bridge.md).
+
+Earlier Activity/Jev component tests and eight synthetic histories are recorded
+in [`evidence/2026-09-29-activity-intelligence.md`](evidence/2026-09-29-activity-intelligence.md).
+C2/C3/C4/C8 and live workflow gates remain open.
+
 Baseline reviewed on September 29 at source commit `e42a799cf6aefe1cc6d6907310b3ff8bf467ed43`, with incoming-source updates through `5c8e111931`. The [baseline receipt](evidence/2026-09-29-coordinator-baseline.md) distinguishes those inspections. Later changes need their own evidence.
 
 | Area | Evidence available at the baseline | Next demonstrable result |
@@ -50,6 +64,13 @@ These checkpoints do not close G0 through G7 or WF01 through WF10. Selected acti
 **Later backend quality checkpoint:** [receipt at `dec2fb31c0`](evidence/2026-09-29-backend-quality.md) records 17 passing local integration tests, 177 assertions, core typecheck and independent source review for atomic activity revisions and overlapping comment retry. The same checks passed again in a clean publication checkout. This is partial implementation evidence for G4/F2; live gates remain open, and `run.output` inclusion in the separate activity feed is a follow-up.
 
 **Later source-inspection checkpoint:** [receipt at `e332cbf539`](evidence/2026-09-29-source-inspection.md) records exact inline citation lookup, original-attempt tool-decision retry and real Session identity. Coordinator checks passed 67 focused tests, 46 browser tests, app/desktop typechecks and app build. Native N1/N2/N3 acceptance and live WF02/WF10 remain open; a synthetic HTTP response is not a Flower delivery receipt.
+
+**Flower checkpoint — September 29:** Agent 1's
+[receipt](evidence/2026-09-29-flower-chain.md) records two separate AgentApp builds,
+local boundary/lifecycle checks and a blocked synthetic SuperGrid attempt.
+Authentication failed before run IDs were returned. G2/WF10 remain open; no
+live collaboration or publication is claimed. Serhat's C3/C8 mapping is still
+needed before the provisional input/output adapter can be called integrated.
 
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.
 - `NOT RUN`: no matching evidence. Leave unchecked even if code or fixtures exist.
