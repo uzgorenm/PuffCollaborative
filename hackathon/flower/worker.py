@@ -6,13 +6,20 @@ is worth a refresh, runs the Flower chain through `bridge.coordinate_activity`
 for the changed thread and its partner thread, then writes both work cards back
 with `PUT /threads/:id/work-card`.
 
+Default mode is "guardian": one Flower guardian run per triggered agent reads
+that agent's instruction and recent events plus every other agent's board card,
+writes the agent's own card back, and on overlap proposes (or, with autoSend,
+submits) a correction instruction into that agent's thread. Mode "chain" keeps
+the earlier two-analysis-plus-coordination chain through the bridge.
+
 Awareness-note delivery into the target OpenCode session is not a server route
-yet; notes go to `deliver_note`, which records them under the state directory.
+yet; chain-mode notes go to `deliver_note`, which records them locally.
 
     python worker.py --config worker.json
 
 Credentials come from PUFF_ANALYSIS_USER / PUFF_ANALYSIS_PASSWORD (environment
-or the git-ignored .env next to this file), never from the config file.
+or the git-ignored .env next to this file), never from the config file. Sending
+guardian instructions needs a member login: PUFF_MEMBER_USER / PUFF_MEMBER_PASSWORD.
 """
 
 import argparse
@@ -33,11 +40,14 @@ from activity.jev import Jev, Refresh
 from activity.pipeline import Activity
 from bridge import coordinate_activity
 from coordinator import CoordinationFailure
+from transport import run_agent
 
 HERE = Path(__file__).resolve().parent
 # Only these kinds advance Thread.activitySeq on the server; see bridge README.
 ADVANCING = {"comment.created", "run.tool", "run.output"}
 MAX_EVENTS_PER_THREAD = 20
+# Marks instructions the guardian itself submitted, so they never re-trigger it.
+GUARDIAN_TAG = "[Puff guardian]"
 
 
 def log(message, **fields):
@@ -82,6 +92,10 @@ class Server:
     def thread(self, thread_id):
         return self.call("GET", f"/threads/{quote(thread_id)}")
 
+    def submit_instruction(self, thread_id, request_id, text):
+        body = {"requestId": request_id, "text": text}
+        return self.call("POST", f"/threads/{quote(thread_id)}/instructions", body)
+
     def put_work_card(self, update):
         body = {key: update[key] for key in ("expectedVersion", "sourceActivitySeq", "card")}
         return self.call("PUT", f"/threads/{quote(update['threadId'])}/work-card", body)
@@ -118,6 +132,25 @@ def content_for(event):
     return None
 
 
+def feed_item(event):
+    """Compact, model-visible view of one server event for the guardian."""
+    payload, kind = event.get("payload") or {}, event["kind"]
+    parts = {
+        "run.tool": (payload.get("toolName"), payload.get("status"), payload.get("summary")),
+        "run.diff": (payload.get("ref"), payload.get("summary")),
+    }
+    text = {
+        "instruction.submitted": payload.get("text"),
+        "comment.created": payload.get("body"),
+        "run.output": payload.get("text"),
+    }.get(kind)
+    if kind in parts:
+        text = " ".join(str(part) for part in parts[kind] if part)
+    if text is None:
+        text = kind.removeprefix("run.")
+    return {"eventId": event["id"], "seq": event["seq"], "kind": kind, "text": str(text)[:2000]}
+
+
 def card_status(card):
     status = card.get("status")
     if status == "running":
@@ -144,6 +177,13 @@ class Worker:
         self.activity = None
         self.cursor = -1
         self.busy = set()
+        self.mode = config.get("mode", "guardian")
+        self.auto_send = config.get("autoSend", False)
+        self.member = None  # Server logged in as a member, for submitting instructions
+        self.feed = {}  # threadId -> guardian feed items
+        self.objective = {}  # threadId -> latest non-guardian instruction text
+        self.board = {}  # threadId -> latest guardian card (richer than the server card)
+        self.sent = {}  # threadId -> (overlapWith, monotonic time) of last correction
 
     # -- setup ---------------------------------------------------------------
     def load_threads(self):
@@ -153,8 +193,8 @@ class Worker:
                 raise ValueError(f"Thread {thread_id} belongs to another project")
             self.threads[thread_id] = thread
             self.events.setdefault(thread_id, [])
-        if len(self.threads) != 2:
-            raise ValueError("The worker currently pairs exactly two shared threads")
+        if len(self.threads) < 2 or (self.mode == "chain" and len(self.threads) != 2):
+            raise ValueError("Guardian mode needs at least two threads; chain mode exactly two")
         self.activity = self._activity(self.threads)
 
     def _activity(self, threads):
@@ -211,6 +251,12 @@ class Worker:
         content = content_for(event)
         if content is None:
             return
+        item = feed_item(event)
+        self.feed[thread_id] = [*self.feed.get(thread_id, []), item][-30:]
+        if event["kind"] == "instruction.submitted":
+            if item["text"].startswith(GUARDIAN_TAG):
+                return
+            self.objective[thread_id] = item["text"]
         thread = self.threads[thread_id]
         if event["kind"] in ADVANCING:
             thread["activitySeq"] = max(thread["activitySeq"], event["seq"])
@@ -242,6 +288,11 @@ class Worker:
             thread_id = next(
                 t for t in self.threads if self.key(t) == (intent["workerId"], intent["sessionId"])
             )
+            if self.mode == "guardian":
+                if thread_id not in self.busy:
+                    self.busy.add(thread_id)
+                    asyncio.create_task(self.run_guardian(thread_id, intent["reason"]))
+                continue
             pair = frozenset((thread_id, self.partner(thread_id)))
             if pair in self.busy:
                 continue
@@ -292,6 +343,121 @@ class Worker:
             log("flower chain error", error=f"{type(error).__name__}: {error}")
         finally:
             self.busy.discard(pair)
+
+    async def run_guardian(self, thread_id, reason):
+        try:
+            board = await asyncio.to_thread(self.board_view, thread_id)
+            payload = {
+                "schemaVersion": 1,
+                "me": {
+                    "threadId": thread_id,
+                    "objective": self.objective.get(thread_id, self.threads[thread_id]["title"]),
+                    "events": self.feed.get(thread_id, [])[-30:],
+                },
+                "others": [{"threadId": tid, **card} for tid, card in board.items()][:8],
+            }
+            log("guardian start", thread=thread_id, reason=reason, others=len(board))
+            started = time.monotonic()
+            envelope = await asyncio.to_thread(
+                run_agent,
+                str(HERE / "guardian"),
+                payload,
+                str(self.state_dir / "guardian-events.jsonl"),
+                f"guardian:{thread_id}",
+            )
+            result, run_id = envelope["result"], envelope["runId"]
+            log(
+                "guardian done",
+                thread=thread_id,
+                run=run_id,
+                seconds=round(time.monotonic() - started, 1),
+                overlap=result.get("overlap"),
+            )
+            card = result.get("myCard") or {}
+            self.board[thread_id] = card
+            self.record("board.jsonl", {"threadId": thread_id, "runId": run_id, **result})
+            await asyncio.to_thread(self.write_card, thread_id, card, run_id, result)
+            if result.get("overlap") and result.get("instruction"):
+                await asyncio.to_thread(self.correct, thread_id, run_id, result)
+        except Exception as error:  # noqa: BLE001 - coding sessions never wait on us
+            log("guardian error", thread=thread_id, error=f"{type(error).__name__}: {error}")
+        finally:
+            self.busy.discard(thread_id)
+
+    def board_view(self, thread_id):
+        """Other agents' cards: their guardian's richer card, else the server's work card."""
+        view = {}
+        for tid in self.threads:
+            if tid == thread_id:
+                continue
+            if tid in self.board:
+                view[tid] = self.board[tid]
+                continue
+            server_card = self.server.thread(tid).get("workCard")
+            if server_card:
+                view[tid] = {
+                    k: server_card[k] for k in ("currentTask", "progress", "blockers", "status")
+                }
+                continue
+            view[tid] = {
+                "currentTask": self.objective.get(tid, self.threads[tid]["title"]),
+                "progress": "unknown",
+            }
+        return view
+
+    def write_card(self, thread_id, card, run_id, result):
+        """Publish this agent's guardian card to the shared board (server work card)."""
+        snapshot = self.server.thread(thread_id)
+        seq, existing = snapshot["thread"]["activitySeq"], snapshot.get("workCard")
+        seqs = {item["eventId"]: item["seq"] for item in self.feed.get(thread_id, [])}
+        refs = [
+            {"threadId": thread_id, "eventId": event_id, "seq": seqs[event_id]}
+            for event_id in result.get("evidenceEventIds") or []
+            if event_id in seqs and seqs[event_id] <= seq
+        ]
+        files = ", ".join(str(item) for item in (card.get("filesTouched") or [])[:10])
+        progress = str(card.get("progress") or "")[:1500] + (f" | Files: {files}" if files else "")
+        activity_card = self.activity.card(self.key(thread_id))
+        update = {
+            "threadId": thread_id,
+            "expectedVersion": existing["version"] if existing else 0,
+            "sourceActivitySeq": seq,
+            "card": {
+                "currentTask": str(card.get("currentTask") or "unknown")[:1000],
+                "progress": progress,
+                "blockers": [str(item)[:500] for item in (card.get("blockers") or [])][:10],
+                "status": card_status(activity_card),
+                "summaryJobId": run_id,
+                "recentVerifiedOutcome": None,
+                "contributors": activity_card["contributors"][:16],
+                "evidenceRefs": refs,
+                "generatedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            },
+        }
+        try:
+            saved = self.server.put_work_card(update)
+            log("board card written", thread=thread_id, version=saved.get("version"))
+        except RuntimeError as error:
+            log("board card rejected", thread=thread_id, error=error)
+
+    def correct(self, thread_id, run_id, result):
+        """Propose, or with autoSend submit, the guardian's correction to its own agent."""
+        other, now = result.get("overlapWith"), time.monotonic()
+        last = self.sent.get(thread_id)
+        cooldown = self.config.get("correctionCooldownSeconds", 300)
+        if last and last[0] == other and now - last[1] < cooldown:
+            log("correction suppressed (cooldown)", thread=thread_id, overlapWith=other)
+            return
+        text = f"{GUARDIAN_TAG} {result['instruction']} (Reason: {result.get('reason', '')})"
+        proposal = {"threadId": thread_id, "runId": run_id, "overlapWith": other, "text": text}
+        proposal["sent"] = bool(self.auto_send and self.member)
+        if proposal["sent"]:
+            self.member.submit_instruction(thread_id, f"guardian-{run_id}", text)
+            self.sent[thread_id] = (other, now)
+            log("CORRECTION SENT", thread=thread_id, text=json.dumps(text))
+        else:
+            log("CORRECTION PROPOSED (owner approval)", thread=thread_id, text=json.dumps(text))
+        self.record("corrections.jsonl", proposal)
 
     def capture(self, source_id, target_id):
         """Build one bridge job pinned to the server's current activitySeq for both threads."""
@@ -393,6 +559,9 @@ def main():
         sys.exit("Set PUFF_ANALYSIS_USER and PUFF_ANALYSIS_PASSWORD (environment or .env)")
     server = Server(config["serverUrl"], username, password)
     worker = Worker(config, server, Jev(timeout=config.get("jevTimeoutSeconds", 5)), args.state_dir)
+    member_user, member_password = env("PUFF_MEMBER_USER"), env("PUFF_MEMBER_PASSWORD")
+    if member_user and member_password:
+        worker.member = Server(config["serverUrl"], member_user, member_password)
     try:
         asyncio.run(worker.run(args.interval))
     except KeyboardInterrupt:
