@@ -95,6 +95,7 @@ const meaningfulKinds = new Set<Coordination.EventKind>([
   "instruction.cancelled",
   "run.started",
   "run.tool",
+  "run.output",
   "run.workspace",
   "run.diff",
   "run.approval.requested",
@@ -230,6 +231,9 @@ function sourceThread(thread: Coordination.Thread): SourceThread {
 }
 
 function outcome(event: Coordination.Event) {
-  const text = event.payload.recentVerifiedOutcome ?? event.payload.summary ?? event.payload.message
-  return typeof text === "string" ? text : null
+  const text =
+    event.kind === "run.output"
+      ? event.payload.text
+      : (event.payload.recentVerifiedOutcome ?? event.payload.summary ?? event.payload.message)
+  return typeof text === "string" ? text.slice(0, 8_000) : null
 }
