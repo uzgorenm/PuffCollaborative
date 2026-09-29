@@ -93,6 +93,15 @@ test("configured repository and canonical workspace root reject path escape and 
       await Effect.runPromise(
         policy.artifact({
           execution: { run, phase: "prepared", workspace },
+          path: path.join(workspaceDirectory, "src.ts"),
+          ref: "runner:run_fixture/diff",
+        }),
+      ),
+    ).toEqual({ ref: "runner:run_fixture/diff" })
+    expect(
+      await Effect.runPromise(
+        policy.artifact({
+          execution: { run, phase: "prepared", workspace },
           path: path.join(workspaceDirectory, ".env"),
         }),
       ),
@@ -107,24 +116,20 @@ test("configured repository and canonical workspace root reject path escape and 
     ).toBeUndefined()
     expect(
       await Effect.runPromise(
-        Effect.flip(
-          policy.artifact({
-            execution: { run, phase: "prepared", workspace },
-            path: path.join(workspaceDirectory, "linked.txt"),
-          }),
-        ),
+        policy.artifact({
+          execution: { run, phase: "prepared", workspace },
+          path: path.join(workspaceDirectory, "linked.txt"),
+        }),
       ),
-    ).toMatchObject({ code: "invalid" })
+    ).toBeUndefined()
     expect(
       await Effect.runPromise(
-        Effect.flip(
-          policy.artifact({
-            execution: { run, phase: "prepared", workspace },
-            path: path.join(workspaces, "escape", "file.txt"),
-          }),
-        ),
+        policy.artifact({
+          execution: { run, phase: "prepared", workspace },
+          path: path.join(workspaces, "escape", "file.txt"),
+        }),
       ),
-    ).toMatchObject({ code: "forbidden" })
+    ).toBeUndefined()
   } finally {
     await rm(root, { recursive: true, force: true })
   }
