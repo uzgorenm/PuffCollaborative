@@ -222,7 +222,12 @@ export function make(input: Dependencies): Recovery {
         current.run.attempt !== execution.run.attempt ||
         current.run.executionOwner?.workerId !== command.executionOwner.workerId ||
         current.run.executionOwner?.instanceId !== command.executionOwner.instanceId ||
-        (current.run.state !== "reserved" && current.run.state !== "running")
+        !(
+          current.run.state === "running" ||
+          (current.run.state === "reserved" &&
+            current.run.leaseUntil &&
+            Date.parse(current.run.leaseUntil) > Date.now())
+        )
       )
         return { kind: "uncertain" as const, execution, reason: "Coordinator no longer reserves this execution" }
       return { kind: "admitted" as const, execution, unpromoted: true }

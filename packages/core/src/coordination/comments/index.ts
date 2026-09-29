@@ -15,6 +15,9 @@ const conflict: CoordinationContracts.Failure = {
   message: "Request conflicts with an existing comment",
 }
 const invalid: CoordinationContracts.Failure = { code: "invalid", message: "Comment must contain 1 to 8000 characters" }
+const unavailable: CoordinationContracts.Failure = { code: "unavailable", message: "Comment was not committed" }
+
+class ExactRetry extends Error {}
 
 function fromRow(row: typeof CommentTable.$inferSelect): Coordination.Comment {
   return {
@@ -48,6 +51,7 @@ export function make(input: {
     Effect.gen(function* () {
       if (request.auth.kind !== "member") return yield* Effect.fail(forbidden)
       if (!request.requestId || !request.body.trim() || request.body.length > 8000) return yield* Effect.fail(invalid)
+      const authorId = request.auth.userId
       const thread = yield* input.access.getThread(request.auth, request.threadId, "submit")
       const prior = yield* input.db
         .select()
@@ -55,7 +59,7 @@ export function make(input: {
         .where(
           and(
             eq(CommentTable.thread_id, request.threadId),
-            eq(CommentTable.author_id, request.auth.userId),
+            eq(CommentTable.author_id, authorId),
             eq(CommentTable.request_id, request.requestId),
           ),
         )
@@ -67,7 +71,7 @@ export function make(input: {
       const comment = {
         id,
         threadId: request.threadId,
-        authorId: request.auth.userId,
+        authorId,
         body: request.body,
         createdAt: new Date(now).toISOString(),
       } satisfies Coordination.Comment
@@ -82,6 +86,18 @@ export function make(input: {
         },
         (seq) =>
           Effect.gen(function* () {
+            const accepted = yield* input.db
+              .select()
+              .from(CommentTable)
+              .where(
+                and(
+                  eq(CommentTable.thread_id, request.threadId),
+                  eq(CommentTable.author_id, authorId),
+                  eq(CommentTable.request_id, request.requestId),
+                ),
+              )
+              .get()
+            if (accepted) return yield* Effect.die(new ExactRetry())
             yield* input.db
               .insert(CommentTable)
               .values({
@@ -100,8 +116,21 @@ export function make(input: {
               .where(eq(ThreadTable.id, request.threadId))
               .run()
           }).pipe(Effect.orDie),
-      )
-      return comment
+      ).pipe(Effect.catchDefect((defect) => defect instanceof ExactRetry ? Effect.void : Effect.die(defect)))
+      const stored = yield* input.db
+        .select()
+        .from(CommentTable)
+        .where(
+          and(
+            eq(CommentTable.thread_id, request.threadId),
+            eq(CommentTable.author_id, authorId),
+            eq(CommentTable.request_id, request.requestId),
+          ),
+        )
+        .get()
+        .pipe(Effect.orDie)
+      if (!stored) return yield* Effect.fail(unavailable)
+      return stored.body === request.body ? fromRow(stored) : yield* Effect.fail(conflict)
     })
 
   return { list, create }
