@@ -716,6 +716,9 @@ export function createTeamController(transport?: ProjectTransport) {
       )
         throw new ProjectApiError("invalid")
       set("fixAttempts", id, { ...attempt, uncertain: false, runId: response.run.id })
+      invalidateThread()
+      overviewRead?.controller.abort()
+      overviewRead = undefined
     } catch (error) {
       if (!valid()) return
       if (
@@ -729,7 +732,8 @@ export function createTeamController(transport?: ProjectTransport) {
     } finally {
       if (ticket === connection) {
         set("action", "")
-        void refresh()
+        if (state.fixAttempts[id]?.runId) await Promise.all([refresh(), refreshOverview()])
+        else void refresh()
       }
     }
   }
