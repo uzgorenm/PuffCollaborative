@@ -6,9 +6,7 @@
 
 ## Branch Names
 
-Use a short branch name of at most three words, separated by hyphens. Do not use slashes or type prefixes such as `feat/` or `fix/`.
-
-Examples: `session-recovery`, `fix-scroll-state`, `regenerate-sdk`.
+Use short-lived `codex/` feature branches targeting `dev`. Delete feature branches after their changes merge into `dev`.
 
 ## Commits and PR Titles
 

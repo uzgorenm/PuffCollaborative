@@ -4,7 +4,7 @@ inputs:
   install-flags:
     description: "Additional flags to pass to 'bun install'"
     required: false
-    default: ""
+    default: "--frozen-lockfile"
 runs:
   using: "composite"
   steps:
