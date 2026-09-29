@@ -105,12 +105,12 @@ export const make = Effect.fn("RunnerSecurityPolicy.make")(function* (config: Co
 
   const artifact: RunnerHarnessContracts.SecurityPolicy["artifact"] = (input) =>
     Effect.gen(function* () {
-      if (!input.execution.workspace || !path.isAbsolute(input.path)) return yield* Effect.fail(invalid)
+      if (!input.execution.workspace) return yield* Effect.fail(invalid)
       yield* workspace({ run: input.execution.run, workspace: input.execution.workspace })
-      if (RunnerRedaction.sensitiveArtifact(input.path)) return undefined
+      if (!path.isAbsolute(input.path) || RunnerRedaction.sensitiveArtifact(input.path)) return undefined
       const root = yield* canonicalDirectory(input.execution.workspace.directory)
-      const target = yield* canonicalPath(input.path)
-      if (!within(root, target)) return yield* Effect.fail(forbidden)
+      const target = yield* canonicalPath(input.path).pipe(Effect.catch(() => Effect.succeed(undefined)))
+      if (!target || !within(root, target)) return undefined
       return { ref: RunnerRedaction.safeReference(input.ref) }
     })
 
