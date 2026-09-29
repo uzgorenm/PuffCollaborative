@@ -98,6 +98,18 @@ const fixture = (phase: LocalExecution["phase"]) =>
     const state = {
       execution,
       authorized,
+      coordinatorRun: {
+        id: runId,
+        threadId,
+        instructionId: Coordination.InstructionID.make("ins_recovery"),
+        state: "reserved",
+        attempt: 1,
+        runnerMessageId: command.runnerMessageId,
+        executionOwner: command.executionOwner,
+        createdAt: "2026-09-29T00:00:00.000Z",
+      } as Coordination.Run,
+      coordinatorAvailable: true,
+      reservationChecks: 0,
       inspection: "idle" as RuntimeInspection["state"],
       activeTools: 0 as RuntimeInspection["activeTools"],
       runtimeAvailable: true,
@@ -163,6 +175,16 @@ const fixture = (phase: LocalExecution["phase"]) =>
         },
         binding: {
           authorize: () => Effect.succeed(state.authorized),
+          currentRun: () =>
+            Effect.sync(() => {
+              state.reservationChecks += 1
+            }).pipe(
+              Effect.flatMap(() =>
+                state.coordinatorAvailable
+                  ? Effect.succeed(state.coordinatorRun)
+                  : Effect.fail({ code: "unavailable" as const, message: "Coordinator is offline" }),
+              ),
+            ),
           attach: () => Effect.succeed(state.authorized.session),
         },
         runtimes: runtimes ?? {
@@ -239,7 +261,7 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
     }),
   )
 
-  it.effect("reattaches a persisted runtime before holding an unverified unpromoted input", () =>
+  it.effect("reattaches a persisted runtime before inspecting and waking a reserved unpromoted input", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("admitted")
       yield* setup.admit()
@@ -250,9 +272,9 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
       expect(setup.state.order).toContain("inspect")
       expect(setup.state.reattachments).toEqual([runId])
       expect(setup.state.execution.runtime?.id).toBe("runtime_after_restart")
-      expect(setup.state.execution.phase).toBe("recovery_required")
-      expect(setup.state.starts).toHaveLength(0)
-      expect(setup.state.wakes).toBe(0)
+      expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
+      expect(setup.state.wakes).toBe(1)
+      expect(setup.state.reservationChecks).toBeGreaterThan(0)
     }),
   )
 
@@ -293,19 +315,51 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
     }),
   )
 
-  it.effect("recognizes lost submission acknowledgment without replaying an unverified input", () =>
+  it.effect("reconciles lost submission acknowledgment and wakes only a reserved unpromoted input", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("admitted")
       yield* setup.admit()
-      const uncertain = yield* setup
-        .make()
-        .reconcile(setup.command.runnerMessageId)
-        .pipe(Effect.catch((error) => Effect.succeed(error)))
-      expect(uncertain).toMatchObject({ code: "unavailable" })
+      expect(yield* setup.make().reconcile(setup.command.runnerMessageId)).toBe("admitted")
       yield* setup.make().recover
+      expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
+      expect(setup.state.wakes).toBe(1)
+    }),
+  )
+
+  it.effect("holds an unpromoted input after the coordinator marks its Run terminal", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "completed" }
+      yield* setup.make().recover
+      expect(setup.state.execution.phase).toBe("recovery_required")
       expect(setup.state.starts).toHaveLength(0)
       expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("holds an unpromoted input when the coordinator attempt changed", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, attempt: 2 }
+      yield* setup.make().recover
       expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("holds an unpromoted input when the coordinator owner changed", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.coordinatorRun = {
+        ...setup.state.coordinatorRun,
+        executionOwner: { workerId, instanceId: "replacement_instance" },
+      }
+      yield* setup.make().recover
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.wakes).toBe(0)
     }),
   )
 
@@ -344,6 +398,7 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
       const setup = yield* fixture("recovery_required")
       yield* setup.admit()
       setup.state.startUnavailable = true
+      setup.state.coordinatorAvailable = false
       const uncertain = yield* setup
         .make()
         .reconcile(setup.command.runnerMessageId)

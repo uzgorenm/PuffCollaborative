@@ -20,7 +20,7 @@ import { ExecutionTable } from "./sql"
 export interface Dependencies {
   readonly db: Database.Interface["db"]
   readonly lifecycle: Pick<Lifecycle, "start" | "transition" | "get" | "byMessageId" | "reattach">
-  readonly binding: Pick<SessionBinding, "authorize" | "attach">
+  readonly binding: Pick<SessionBinding, "authorize" | "currentRun" | "attach">
   readonly runtimes: Pick<Runtimes, "inspect" | "wake">
   readonly reports: Pick<ReportDelivery, "pending" | "flush">
   readonly cancellations: Cancellations
@@ -205,11 +205,27 @@ export function make(input: Dependencies): Recovery {
     if (admitted.promotedSeq === undefined) {
       if (inspection.state.state === "idle" && inspection.state.activeTools !== 0)
         return { kind: "uncertain" as const, execution, reason: "Scoped tools have not been proved idle before wake" }
-      return {
-        kind: "uncertain" as const,
-        execution,
-        reason: "Coordinator active reservation has not been verified before wake",
-      }
+      const current = yield* input.binding.currentRun(command).pipe(
+        Effect.map((run) => ({ run }) as const),
+        Effect.catch((error) => Effect.succeed({ error } as const)),
+      )
+      if ("error" in current)
+        return {
+          kind: "uncertain" as const,
+          execution,
+          reason: `Coordinator reservation cannot be verified (${current.error.code})`,
+        }
+      if (
+        current.run.id !== command.runId ||
+        current.run.threadId !== command.threadId ||
+        current.run.runnerMessageId !== messageId ||
+        current.run.attempt !== execution.run.attempt ||
+        current.run.executionOwner?.workerId !== command.executionOwner.workerId ||
+        current.run.executionOwner?.instanceId !== command.executionOwner.instanceId ||
+        (current.run.state !== "reserved" && current.run.state !== "running")
+      )
+        return { kind: "uncertain" as const, execution, reason: "Coordinator no longer reserves this execution" }
+      return { kind: "admitted" as const, execution, unpromoted: true }
     }
     if (
       inspection.state.state === "active" &&
