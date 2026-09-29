@@ -34,6 +34,59 @@ describe("desktop renderer initialization", () => {
     expect(initializationData(Object.assign(() => sidecar, { error: undefined }))).toBe(sidecar)
   })
 
+  test("preserves healthy sidecar data when an external server is selected", () => {
+    const sidecar = { url: "http://127.0.0.1:1234", username: "opencode", password: "secret" }
+
+    expect(
+      initializationData(
+        Object.assign(() => sidecar, { error: undefined }),
+        "https://server.example",
+      ),
+    ).toBe(sidecar)
+  })
+
+  test.each(["http://127.0.0.1:4096", "https://server.example", " HTTPS://Server.Example:443/ "])(
+    "allows the selected external server %s after sidecar failure without reading failed data",
+    (url) => {
+      const error = new Error("sidecar startup failed")
+      const state = Object.assign(
+        () => {
+          throw error
+        },
+        { error, loading: false },
+      )
+
+      expect(initializationData(state, url)).toBeUndefined()
+      expect(initializationReady(state, url)).toBe(true)
+    },
+  )
+
+  test.each([
+    undefined,
+    null,
+    "",
+    "sidecar",
+    "wsl:Ubuntu",
+    "localhost:4096",
+    "/api",
+    "file:///tmp/server",
+    "javascript:alert(1)",
+    "http://",
+    "https:///server.example",
+    "https://server.example:invalid",
+    "https://server.example\\path",
+    "https://server.example/path with spaces",
+    "https://user:secret@server.example",
+    "https://server.example?token=secret",
+    "https://server.example#fragment",
+  ])("keeps startup failures visible for invalid external default %s", (url) => {
+    const error = new Error("sidecar startup failed")
+    const state = Object.assign(() => undefined, { error, loading: false })
+
+    expect(() => initializationData(state, url)).toThrow(error)
+    expect(() => initializationReady(state, url)).toThrow(error)
+  })
+
   test("does not discard falsy initialization errors", () => {
     let caught: unknown
     try {
