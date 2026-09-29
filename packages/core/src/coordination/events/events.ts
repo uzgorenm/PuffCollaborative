@@ -13,6 +13,13 @@ import { ThreadTable } from "../threads/sql"
 
 const maxPageSize = 256
 const defaultSubscriberCapacity = 256
+const contentRevisionKinds = new Set<Coordination.EventKind>([
+  "comment.created",
+  "run.tool",
+  "run.output",
+  "run.workspace",
+  "run.diff",
+])
 const storedType = EventV2.versionedType(CoordinationEvent.Changed.type, 1)
 const decodeData = Schema.decodeUnknownSync(CoordinationEvent.Changed.data)
 
@@ -244,22 +251,25 @@ export const layerWith = (options?: LayerOptions) =>
                   commit: (seq) =>
                     Effect.gen(function* () {
                       yield* project(seq)
-                      if (!input.threadId || input.kind === "work-card.updated") return
-                      const thread = yield* db
-                        .update(ThreadTable)
-                        .set({ activity_seq: seq })
-                        .where(and(eq(ThreadTable.id, input.threadId), eq(ThreadTable.project_id, input.projectId)))
-                        .returning({ id: ThreadTable.id })
-                        .get()
-                        .pipe(Effect.orDie)
-                      if (thread) return
+                      if (!input.threadId) return
+                      if (contentRevisionKinds.has(input.kind)) {
+                        const thread = yield* db
+                          .update(ThreadTable)
+                          .set({ activity_seq: seq })
+                          .where(and(eq(ThreadTable.id, input.threadId), eq(ThreadTable.project_id, input.projectId)))
+                          .returning({ id: ThreadTable.id })
+                          .get()
+                          .pipe(Effect.orDie)
+                        if (thread) return
+                      }
                       const otherProject = yield* db
                         .select({ projectId: ThreadTable.project_id })
                         .from(ThreadTable)
                         .where(eq(ThreadTable.id, input.threadId))
                         .get()
                         .pipe(Effect.orDie)
-                      if (otherProject) return yield* Effect.fail(failure("not_found", "Thread not found in project"))
+                      if (otherProject && otherProject.projectId !== input.projectId)
+                        return yield* Effect.fail(failure("not_found", "Thread not found in project"))
                     }).pipe(Effect.catch((error) => Effect.die(new CoordinationContracts.ProjectionFailure(error)))),
                 },
               )
