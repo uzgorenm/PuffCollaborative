@@ -24,6 +24,26 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`runner_harness_approval\` (
+          \`approval_id\` text PRIMARY KEY,
+          \`run_id\` text NOT NULL,
+          \`thread_id\` text NOT NULL,
+          \`session_id\` text NOT NULL,
+          \`permission_request_id\` text NOT NULL,
+          \`tool_call_id\` text NOT NULL,
+          \`source_message_id\` text NOT NULL,
+          \`scope_hash\` text NOT NULL,
+          \`tool_name\` text NOT NULL,
+          \`summary\` text NOT NULL,
+          \`decision_id\` text,
+          \`decision\` text,
+          \`delivery\` text NOT NULL,
+          \`invalidated_reason\` text,
+          \`requested_at\` integer NOT NULL,
+          \`updated_at\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`runner_harness_outbox\` (
           \`callback_id\` text PRIMARY KEY,
           \`run_id\` text NOT NULL,
@@ -278,6 +298,7 @@ export default {
           \`workspace_directory\` text,
           \`runtime_id\` text,
           \`admitted_message_id\` text,
+          \`artifact_baseline\` text,
           \`last_session_seq\` integer,
           \`interrupt_abort\` text,
           \`interrupt_state\` text,
@@ -411,6 +432,18 @@ export default {
           CONSTRAINT \`fk_session_share_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
         );
       `)
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_approval_permission_idx\` ON \`runner_harness_approval\` (\`permission_request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_approval_decision_idx\` ON \`runner_harness_approval\` (\`decision_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_approval_active_run_idx\` ON \`runner_harness_approval\` (\`run_id\`) WHERE "runner_harness_approval"."delivery" IN ('pending', 'unknown');`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`runner_harness_approval_run_idx\` ON \`runner_harness_approval\` (\`run_id\`,\`requested_at\`);`,
+      )
       yield* tx.run(
         `CREATE UNIQUE INDEX \`runner_harness_outbox_producer_idx\` ON \`runner_harness_outbox\` (\`run_id\`,\`producer_key\`);`,
       )
