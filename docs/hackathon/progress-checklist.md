@@ -1,5 +1,7 @@
 # Puff progress and verification
 
+**Browser UI preview (September 29):** Next.js/React source `b23f29418d` adds the Codex-style workspace at `apps/web`. Production compilation/TypeScript and observed session navigation, filters, dock controls, and local draft persistence passed. [Evidence and limitations](evidence/2026-09-29-react-web-preview.md). Simulator fixtures are labeled synthetic; no live-awareness, real-presence, or execution gate is closed by this preview.
+
 This is the coordinator's working checklist. A feature counts as progress when its behavior can be demonstrated with evidence. Use the [workflow cases](acceptance-workflows.md) to run the checks and the [integration gates](integration-gates.md) to resolve interfaces. Human ownership remains Serhat (server), Talha (OpenCode), Serdar (interface), Ferit (Flower).
 
 ## Current checkpoint

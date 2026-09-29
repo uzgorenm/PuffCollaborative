@@ -2,6 +2,8 @@
 
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
 
+**React browser preview:** [`apps/web`](../../apps/web/README.md) adds the requested Codex-style Next.js interface, collaborator avatars, and bottom session summaries. Source `b23f29418d` passes production build and browser navigation/draft checks; [receipt](evidence/2026-09-29-react-web-preview.md). It reads synthetic simulator data and saves local drafts. Real presence and execution remain unconnected; this does not close the live workflow gates.
+
 **Desktop unblock:** the [startup integration receipt](evidence/2026-09-29-desktop-startup-integration.md) records the retained-host repair and independent checks. Follow [desktop access ownership](desktop-coordination.md) so simultaneous chats do not control the same app or push conflicting changes.
 
 **Current development:** [chat assignments and handoffs](next-development.md) track the ongoing frontend work, isolated Project overview scope and backend integration. The [backend quality receipt](evidence/2026-09-29-backend-quality.md) records verified activity-revision and exact-comment-retry fixes at `dec2fb31c0`. These checks do not close live-awareness gates.
