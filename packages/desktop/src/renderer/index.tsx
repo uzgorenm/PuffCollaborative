@@ -23,7 +23,7 @@ import { createEffect, createMemo, createResource, createSignal, onCleanup, Show
 import { render } from "solid-js/web"
 import pkg from "../../package.json"
 import { t } from "./i18n"
-import { initializationData } from "./initialization"
+import { externalServerUrl, initializationData } from "./initialization"
 import { DesktopFirstLaunchOnboarding } from "./onboarding"
 import { resetZoom, setPinchZoomEnabled, webviewZoom, zoomIn, zoomOut } from "./webview-zoom"
 import { windowFullscreen } from "./window-fullscreen"
@@ -380,13 +380,15 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
       () => !defaultServer.loading && !sidecar.loading && !locale.loading && !wslServers.isLoading,
     )
     const servers = createMemo(() => {
-      const data = initializationData(sidecar)
+      if (defaultServer.loading) return []
+      const external = externalServerUrl(defaultServer.latest)
+      const data = initializationData(sidecar, external)
       const list: ServerConnection.Any[] = []
       if (data) {
         list.push({
-          displayName: language.t("desktop.server.local"),
-          type: "sidecar",
-          variant: "base",
+          ...(external === data.url
+            ? { type: "http" as const }
+            : { type: "sidecar" as const, variant: "base" as const, displayName: language.t("desktop.server.local") }),
           http: {
             url: data.url,
             username: data.username ?? undefined,
@@ -394,11 +396,19 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
           },
         })
       }
+      if (sidecar.error !== undefined && external) {
+        list.push({ type: "http", http: { url: external } })
+      }
       list.push(...readyWslConnections(wslServers.data, language.t("wsl.server.label")))
       return list
     })
     const effectiveDefaultServer = createMemo(() =>
-      ServerConnection.Key.make(availableStartupServer(defaultServer.latest, wslServers.data)),
+      ServerConnection.Key.make(
+        availableStartupServer(
+          sidecar.error !== undefined ? externalServerUrl(defaultServer.latest) : defaultServer.latest,
+          wslServers.data,
+        ),
+      ),
     )
     return (
       <Show when={ready()} fallback={<LoadingSplash />}>

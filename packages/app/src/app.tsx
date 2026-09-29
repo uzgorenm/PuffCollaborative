@@ -68,8 +68,11 @@ import { createSessionLineage } from "@/pages/session/session-lineage"
 import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } from "@/pages/session"
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
+import { TeamProvider } from "@/pages/puff/team-context"
+import { TeamHome } from "@/pages/puff/team-thread"
 
 const PuffPage = lazy(() => import("@/pages/puff"))
+const TeamThreadPage = lazy(() => import("@/pages/puff/team-thread"))
 
 const NewSession = lazy(() => import("@/pages/new-session"))
 
@@ -371,15 +374,12 @@ function LegacyServerScopedShell(props: ServerScopedShellProps) {
 }
 
 function NewAppLayout(props: ParentProps<{ serverScoped?: JSX.Element }>) {
-  const location = useLocation()
   return (
-    <Show when={location.pathname !== "/puff"} fallback={props.children}>
-      <SelectedServerProviders>
-        <ServerScopedProviders serverScoped={props.serverScoped}>
-          <NewLayout>{props.children}</NewLayout>
-        </ServerScopedProviders>
-      </SelectedServerProviders>
-    </Show>
+    <SelectedServerProviders>
+      <ServerScopedProviders serverScoped={props.serverScoped}>
+        <NewLayout>{props.children}</NewLayout>
+      </ServerScopedProviders>
+    </SelectedServerProviders>
   )
 }
 
@@ -575,8 +575,10 @@ export function AppInterface(props: {
   const ServerShell = (shellProps: ParentProps) => (
     <QueryProvider>
       <SharedProviders>
-        {props.children}
-        {shellProps.children}
+        <TeamProvider>
+          {props.children}
+          {shellProps.children}
+        </TeamProvider>
       </SharedProviders>
     </QueryProvider>
   )
@@ -617,24 +619,6 @@ export function AppInterface(props: {
   )
 }
 
-function PuffHomeEntry(props: ParentProps) {
-  const language = useLanguage()
-  return (
-    <div class="flex flex-col min-h-0 flex-1 h-full">
-      <a
-        href="/puff"
-        class="mx-3 mt-2 px-4 py-3 rounded-lg border border-border-weak-base bg-surface-raised-base flex items-center justify-between text-text-strong"
-      >
-        <span>
-          {language.t("puff.name")} · {language.t("puff.nav")}
-        </span>
-        <span aria-hidden="true">↗</span>
-      </a>
-      {props.children}
-    </div>
-  )
-}
-
 function Routes(props: { serverScoped?: JSX.Element }) {
   const settings = useSettings()
 
@@ -648,14 +632,7 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         <Show when={!settings.general.newLayoutDesigns()}>
           {
             <>
-              <Route
-                path="/"
-                component={() => (
-                  <PuffHomeEntry>
-                    <LegacyHome />
-                  </PuffHomeEntry>
-                )}
-              />
+              <Route path="/" component={LegacyHome} />
               <Route path="/server/:serverKey/session/:id" component={LegacyTargetSessionRoute} />
             </>
           }
@@ -666,19 +643,16 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         </Route>
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
-        <Route
-          path="/"
-          component={() => (
-            <PuffHomeEntry>
-              <NewHome />
-            </PuffHomeEntry>
-          )}
-        />
+        <Route path="/" component={NewHome} />
         <Route path="/:dir/session/:id" component={NewLayoutLegacySessionRedirect} />
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
-      <Route path="/puff" component={PuffPage} />
+      <Route path="/puff" component={TeamHome} />
+      <Route path="/puff/thread/:threadId" component={TeamThreadPage} />
+      <Show when={import.meta.env.DEV}>
+        <Route path="/puff/preview" component={PuffPage} />
+      </Show>
     </>
   )
 }
