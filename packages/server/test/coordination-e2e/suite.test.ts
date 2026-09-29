@@ -15,6 +15,8 @@ async function shared(testbed: Harness, count = 2, other = false) {
   const sessions = Array.from({ length: count }, (_, index) => `ses_e2e_${index}`)
   testbed.seed("prj_e2e_main", sessions)
   if (other) testbed.seed("prj_e2e_other", ["ses_e2e_other"])
+  for (const sessionId of sessions) testbed.selectSession("usr_alice", "prj_e2e_main", sessionId)
+  if (other) testbed.selectSession("usr_dan", "prj_e2e_other", "ses_e2e_other")
   good(
     await testbed.request("/api/coordination/v1/projects", "alice", "POST", {
       projectId: "prj_e2e_main",
@@ -257,6 +259,7 @@ test("A: migrate the immediately preceding schema snapshot through registered co
     expect(tables.length).toBeGreaterThanOrEqual(9)
     sqlite.close()
     testbed.seed("prj_e2e_main", ["ses_e2e_upgrade"])
+    testbed.selectSession("usr_alice", "prj_e2e_main", "ses_e2e_upgrade")
     expect(
       good(
         await testbed.request<{ id: string }>("/api/coordination/v1/projects", "alice", "POST", {

@@ -186,6 +186,9 @@ export async function startHarness(initialize?: (dbPath: string) => void | Promi
   const seed = (projectId: string, sessionIds: string[]) => {
     const sqlite = new Database(dbPath)
     const now = Date.now()
+    sqlite.run(
+      "CREATE TABLE IF NOT EXISTS puff_e2e_session_selection (user_id TEXT NOT NULL, project_id TEXT NOT NULL, session_id TEXT NOT NULL, worker_id TEXT NOT NULL, PRIMARY KEY (user_id, project_id, session_id, worker_id))",
+    )
     sqlite
       .query("INSERT INTO project (id, worktree, sandboxes, time_created, time_updated) VALUES (?, ?, ?, ?, ?)")
       .run(projectId, directory, "[]", now, now)
@@ -196,6 +199,15 @@ export async function startHarness(initialize?: (dbPath: string) => void | Promi
         )
         .run(id, projectId, id, directory, id, "fixture", now, now),
     )
+    sqlite.close()
+  }
+  const selectSession = (userId: string, projectId: string, sessionId: string) => {
+    const sqlite = new Database(dbPath)
+    sqlite
+      .query(
+        "INSERT OR IGNORE INTO puff_e2e_session_selection (user_id, project_id, session_id, worker_id) VALUES (?, ?, ?, ?)",
+      )
+      .run(userId, projectId, sessionId, "wrk_e2e")
     sqlite.close()
   }
   const snapshot = async (threadId: string, user: User = "alice") =>
@@ -236,6 +248,7 @@ export async function startHarness(initialize?: (dbPath: string) => void | Promi
     request,
     admin,
     seed,
+    selectSession,
     snapshot,
     replay,
     state,
