@@ -20,8 +20,8 @@ This is a coordination protocol, not an operating-system lock. The coordinator i
 
 ## Active access record
 
-- **Interactive desktop owner:** native QA, `Summarize current team work`. The frontend lead explicitly released the final instance after committing `f4c8ad9ee4`; coordinator confirmed the transfer.
-- **Next owner:** unassigned. The frontend lead and all reviewers stay source-only until QA explicitly releases control and the coordinator assigns the next owner.
+- **Interactive desktop handoff:** native QA, `Summarize current team work`, completed its pass and explicitly released CDP9223. The frontend lead's already-started polling-focus regression fix is finishing; it must record its fix commit and release input. No other chat may interact during that closeout.
+- **Next owner:** unassigned. After the lead's explicit release, all chats remain source-only until the coordinator assigns the next native pass.
 - **Current UI checkout:** `PuffCollaborative-serdar-ui`; integration uses a separate `PuffCollaborative-main-integration` checkout. The original checkout remains untouched.
 - **Known development backend:** `127.0.0.1:4466`, explicitly synthetic/mock fixture. Treat the source/runtime identity from the latest lead handoff as authoritative; never publish credentials here.
 - **Final QA target:** profile `/tmp/puff-serdar-ui-desktop`, renderer port 5175, debugging port 9223, source checkpoint `f4c8ad9ee4` on `serdar/ui`. Verify instance identity before any action. This already-running window is not a freshly launched main-integration build.
