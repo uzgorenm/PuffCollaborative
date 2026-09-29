@@ -280,9 +280,9 @@ export default function Workspace() {
           return <div className="workflow-sidebar-person" key={member.name}>
             <div className="workflow-sidebar-owner"><span className={`avatar ${member.color}`}>{member.initials}</span><strong>{displayName(member.name)}</strong><span>{owned.length}</span></div>
             <p className="workflow-sidebar-total" title={total}>{total}</p>
-            {(expanded ? matches : matches.slice(0, 5)).map(session => <button className={`session-item ${selected === session.id && view === "chat" ? "active" : ""}`} key={session.id} onClick={() => openSession(session.id)} aria-label={`Open sidebar session ${session.title}`}>
-              <span className={`status-dot ${session.status}`} />
-              <span className="session-item-content"><span className="session-item-title">{session.title}</span><span className="workflow-sidebar-session-summary" title={session.summary}>{session.summary}</span><span className="session-item-meta">{labels[session.status]}</span></span>
+            {(expanded ? matches : matches.slice(0, 5)).map(session => <button className={`session-item ${selected === session.id && view === "chat" ? "active" : ""}`} key={session.id} onClick={() => openSession(session.id)} aria-label={`Open sidebar session ${session.title}. ${labels[session.status]}`} title={labels[session.status]}>
+              <span className={`status-dot ${session.status}`} aria-hidden="true" />
+              <span className="session-item-content"><span className="session-item-title">{session.title}</span><span className="workflow-sidebar-session-summary" title={session.summary}>{session.summary}</span></span>
             </button>)}
             {matches.length > 5 && <button className="workflow-sidebar-more" aria-expanded={expanded} onClick={() => setExpandedPeople(previous => expanded ? previous.filter(name => name !== member.name) : [...previous, member.name])}>{expanded ? "Show fewer sessions" : `Show ${matches.length - 5} more sessions`}</button>}
             <details className="workflow-recent-updates">
