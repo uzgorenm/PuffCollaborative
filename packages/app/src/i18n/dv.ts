@@ -1,4 +1,6 @@
+import { puff } from "./puff-en"
 export const dict = {
+  ...puff, // Explicit English fallback for the hackathon feature.
   "desktop.menu.app": "OpenCode އެވެ",
   "desktop.menu.file": "ފައިލް",
   "desktop.menu.edit": "ބަދަލު ގެނައުން",

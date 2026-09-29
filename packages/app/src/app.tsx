@@ -69,6 +69,8 @@ import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } fro
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
 
+const PuffPage = lazy(() => import("@/pages/puff"))
+
 const NewSession = lazy(() => import("@/pages/new-session"))
 
 const SessionRoute = () => {
@@ -369,12 +371,15 @@ function LegacyServerScopedShell(props: ServerScopedShellProps) {
 }
 
 function NewAppLayout(props: ParentProps<{ serverScoped?: JSX.Element }>) {
+  const location = useLocation()
   return (
-    <SelectedServerProviders>
-      <ServerScopedProviders serverScoped={props.serverScoped}>
-        <NewLayout>{props.children}</NewLayout>
-      </ServerScopedProviders>
-    </SelectedServerProviders>
+    <Show when={location.pathname !== "/puff"} fallback={props.children}>
+      <SelectedServerProviders>
+        <ServerScopedProviders serverScoped={props.serverScoped}>
+          <NewLayout>{props.children}</NewLayout>
+        </ServerScopedProviders>
+      </SelectedServerProviders>
+    </Show>
   )
 }
 
@@ -612,6 +617,24 @@ export function AppInterface(props: {
   )
 }
 
+function PuffHomeEntry(props: ParentProps) {
+  const language = useLanguage()
+  return (
+    <div class="flex flex-col min-h-0 flex-1 h-full">
+      <a
+        href="/puff"
+        class="mx-3 mt-2 px-4 py-3 rounded-lg border border-border-weak-base bg-surface-raised-base flex items-center justify-between text-text-strong"
+      >
+        <span>
+          {language.t("puff.name")} · {language.t("puff.nav")}
+        </span>
+        <span aria-hidden="true">↗</span>
+      </a>
+      {props.children}
+    </div>
+  )
+}
+
 function Routes(props: { serverScoped?: JSX.Element }) {
   const settings = useSettings()
 
@@ -625,7 +648,14 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         <Show when={!settings.general.newLayoutDesigns()}>
           {
             <>
-              <Route path="/" component={LegacyHome} />
+              <Route
+                path="/"
+                component={() => (
+                  <PuffHomeEntry>
+                    <LegacyHome />
+                  </PuffHomeEntry>
+                )}
+              />
               <Route path="/server/:serverKey/session/:id" component={LegacyTargetSessionRoute} />
             </>
           }
@@ -636,11 +666,19 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         </Route>
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
-        <Route path="/" component={NewHome} />
+        <Route
+          path="/"
+          component={() => (
+            <PuffHomeEntry>
+              <NewHome />
+            </PuffHomeEntry>
+          )}
+        />
         <Route path="/:dir/session/:id" component={NewLayoutLegacySessionRedirect} />
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
+      <Route path="/puff" component={PuffPage} />
     </>
   )
 }

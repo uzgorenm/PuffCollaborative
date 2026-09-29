@@ -1,8 +1,10 @@
+import { puff } from "./puff-en"
 import { dict as en } from "./en"
 
 type Keys = keyof typeof en
 
 export const dict = {
+  ...puff, // Explicit English fallback for the hackathon feature.
   "command.category.suggested": "Vorgeschlagen",
   "command.category.view": "Ansicht",
   "command.category.project": "Projekt",

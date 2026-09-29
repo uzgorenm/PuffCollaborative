@@ -1,8 +1,10 @@
+import { puff } from "./puff-en"
 import { dict as en } from "./en"
 
 type Keys = keyof typeof en
 
 export const dict = {
+  ...puff, // Explicit English fallback for the hackathon feature.
   "desktop.menu.app": "OpenCode",
   "desktop.menu.file": "檔案",
   "desktop.menu.edit": "編輯",
