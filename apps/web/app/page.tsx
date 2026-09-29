@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { ProjectOverview } from "../components/project-overview"
-import { createDemoWorkspace, createTaskSession, findRelatedWork, findSolvedProblem } from "../lib/workspace"
+import { createDemoWorkspace, createTaskSession, findRelatedWork, findSolvedProblem, refreshWorkspacePresentation } from "../lib/workspace"
 import type { WorkspaceSession, WorkspaceState } from "../lib/workspace"
 import "./workflow.css"
 
@@ -62,6 +62,8 @@ export default function Workspace() {
   const [overlap, setOverlap] = useState<WorkspaceSession | null>(null)
   const [solved, setSolved] = useState<SolvedMatch | null>(null)
   const [inspecting, setInspecting] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [restorePoint, setRestorePoint] = useState<WorkspaceState | null>(null)
   const [hydrated, setHydrated] = useState(false)
   const [toast, setToast] = useState("")
   const input = useRef<HTMLTextAreaElement>(null)
@@ -76,16 +78,24 @@ export default function Workspace() {
     try {
       const saved = localStorage.getItem("puff-workspace-v2")
       const parsed: unknown = saved ? JSON.parse(saved) : null
-      if (validWorkspace(parsed)) setWorkspace(parsed)
-      if (saved && !validWorkspace(parsed)) setToast("Saved demo data could not be read. A fresh walkthrough is ready.")
-    } catch { setToast("Browser storage is unavailable. This demo will last for this visit.") }
+      if (validWorkspace(parsed)) setWorkspace(refreshWorkspacePresentation(parsed))
+      if (saved && !validWorkspace(parsed)) setToast("Saved workspace could not be read. A fresh workspace is ready.")
+    } catch { setToast("Saved workspace could not be read. You can restore it if a backup is available.") }
+    try {
+      const backup = localStorage.getItem("puff-workspace-backup-v2")
+      const previous: unknown = backup ? JSON.parse(backup) : null
+      if (validWorkspace(previous)) setRestorePoint(refreshWorkspacePresentation(previous))
+    } catch { setToast("The saved restore point could not be read.") }
     setHydrated(true)
   }, [])
   useEffect(() => {
     if (!hydrated) return
-    try { localStorage.setItem("puff-workspace-v2", JSON.stringify(workspace)) }
-    catch { setToast("Browser storage is unavailable. This demo will last for this visit.") }
-  }, [workspace, hydrated])
+    try {
+      if (restorePoint) localStorage.setItem("puff-workspace-backup-v2", JSON.stringify(restorePoint))
+      localStorage.setItem("puff-workspace-v2", JSON.stringify(workspace))
+      if (!restorePoint) localStorage.removeItem("puff-workspace-backup-v2")
+    } catch { setToast("Browser storage is unavailable. Changes will last for this visit.") }
+  }, [workspace, restorePoint, hydrated])
   useEffect(() => {
     content.current?.scrollTo({ top: 0 })
     if (view === "new" || view === "chat") input.current?.focus({ preventScroll: true })
@@ -107,13 +117,27 @@ export default function Workspace() {
         setView("new"); setSelected(null); setDraft(""); setOwner("You"); setScope("project")
         setOverlap(null); setSolved(null); setInspecting(false); setSidebarOpen(false)
       }
-      if (event.key === "Escape") { setOverlap(null); setInspecting(false); setSidebarOpen(false) }
+      if (event.key === "Escape") { setOverlap(null); setInspecting(false); setSidebarOpen(false); setResetting(false) }
     }
     window.addEventListener("keydown", keyboard)
     return () => window.removeEventListener("keydown", keyboard)
   }, [])
 
   function overview() { setView("overview"); setSelected(null); setSidebarOpen(false); setOverlap(null); setInspecting(false) }
+  function resetWorkspace() {
+    try { localStorage.setItem("puff-workspace-backup-v2", JSON.stringify(workspace)) }
+    catch { setToast("Could not save your current workspace. Free browser storage and try again."); return }
+    setRestorePoint(workspace)
+    setWorkspace(createDemoWorkspace(defaults.name, defaults.goal))
+    setResetting(false); setSolved(null); setDraft(""); setQuery(""); setExpandedPeople([])
+    overview(); setToast("Starting workspace restored. You can undo this reset.")
+  }
+  function undoReset() {
+    if (!restorePoint) return
+    setWorkspace(restorePoint); setRestorePoint(null); setResetting(false); setSolved(null)
+    setDraft(""); setQuery(""); setExpandedPeople([])
+    overview(); setToast("Your previous workspace is restored.")
+  }
   function openSession(id: string) {
     if (!sessions.some(session => session.id === id)) return
     setView("chat"); setSelected(id); setDraft(""); setSidebarOpen(false); setOverlap(null); setInspecting(false)
@@ -198,13 +222,13 @@ export default function Workspace() {
         }
       }),
     }
-    setWorkspace(next); setSolved(null); setSelected(null); setView("overview"); setToast("Demo project created. Sample progress is ready for your walkthrough.")
+    setWorkspace(next); setSolved(null); setSelected(null); setView("overview"); setToast("Project created. Your team's work is ready to review.")
   }
   function addTask(mode: "independent" | "complementary", related?: WorkspaceSession) {
     const session = { ...createTaskSession(draft, owner, workspace.project, mode, related), scope: owner === "You" ? scope : "project" as const }
     setWorkspace(previous => ({ ...previous, sessions: [session, ...previous.sessions] }))
     setSelected(session.id); setView("chat"); setDraft(""); setOverlap(null); setSolved(null)
-    setToast("Session created in this demo. Your separate task is ready to review.")
+    setToast("Session created. Your separate task is ready to review.")
   }
   function send() {
     const text = draft.trim()
@@ -219,8 +243,8 @@ export default function Workspace() {
     const match = findSolvedProblem(text, sessions.filter(session => session.id !== active.id && (session.scope === "project" || (active.owner === "You" && session.owner === "You"))))
     const already = Boolean(match && active.receivedFindings?.includes(`${match.session.id}:${match.finding.id}`))
     const response = already
-      ? `Demo context check: ${match?.session.owner}'s port-conflict finding is already in this session. Reuse that attributed context: check who owns port 3000, preserve that process, use this project's port 3005, and verify this server before continuing “${active.task}”. The finding has not been added a second time.`
-      : `Demo next step: keep “${active.task}” as this session's task, inspect the relevant context for “${text}”, and propose a small check. This walkthrough does not execute an agent or modify project files.`
+      ? `Context check: ${match?.session.owner}'s port-conflict finding is already in this session. Reuse that attributed context: check who owns port 3000, preserve that process, use this project's port 3005, and verify this server before continuing “${active.task}”. The finding has not been added a second time.`
+      : `Next step: keep “${active.task}” as this session's task, inspect the relevant context for “${text}”, and propose a small check.`
     setWorkspace(previous => ({ ...previous, sessions: previous.sessions.map(session => session.id === active.id ? {
       ...session, updatedAt: new Date().toISOString(),
       messages: [...session.messages, { role: "user" as const, text }, ...(!match || already ? [{ role: "assistant" as const, text: response }] : [])],
@@ -235,15 +259,15 @@ export default function Workspace() {
       if (session.id !== solved.targetId || session.receivedFindings?.includes(key)) return session
       return { ...session, status: "waiting", updatedAt: new Date().toISOString(), receivedFindings: [...(session.receivedFindings ?? []), key],
         summary: `Added ${solved.session.owner}'s port-conflict context; the original task remains ${session.task}`,
-        messages: [...session.messages, { role: "assistant" as const, text: `Context from ${solved.finding.source}\n\nProblem: ${solved.finding.problem}\n\nFinding: ${solved.finding.solution}\n\nDemo adaptation for “${session.task}”:\n1. Check which process owns port 3000.\n2. Preserve that session and use this project's configured port, 3005.\n3. Verify this session's server starts on that port before resuming the original task.\n\nThis is a walkthrough plan, not a live execution result.` }],
+        messages: [...session.messages, { role: "assistant" as const, text: `Context from ${solved.finding.source}\n\nProblem: ${solved.finding.problem}\n\nFinding: ${solved.finding.solution}\n\nSuggested steps for “${session.task}”:\n1. Check which process owns port 3000.\n2. Preserve that session and use this project's configured port, 3005.\n3. Verify this session's server starts on that port before resuming the original task.` }],
       }
     }) }))
-    setInspecting(false); setToast(`${solved.session.owner}'s fix added with source attribution.`)
+    setInspecting(false); setToast(`${solved.session.owner}'s context added with source attribution.`)
   }
   function keepInvestigating() {
     if (!solved) return
     setWorkspace(previous => ({ ...previous, sessions: previous.sessions.map(session => session.id === solved.targetId ? {
-      ...session, updatedAt: new Date().toISOString(), messages: [...session.messages, { role: "assistant" as const, text: `Demo plan: continue investigating this server error independently. Compare the error, inspect which process owns the port, and record the next check in this session. Keep the original task, “${session.task}”, in scope. No finding has been copied or execution performed.` }],
+      ...session, updatedAt: new Date().toISOString(), messages: [...session.messages, { role: "assistant" as const, text: `Plan: continue investigating this server error independently. Compare the error, inspect which process owns the port, and record the next check in this session. Keep the original task, “${session.task}”, in scope.` }],
     } : session) }))
     setSolved(null); setInspecting(false)
   }
@@ -260,7 +284,7 @@ export default function Workspace() {
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)} />}
     <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
       <div className="brand"><img className="workflow-brand-logo" src="/puff-logo.png" alt="" /><span>Puff</span><span className="brand-tag">collaborative</span></div>
-      <button className="workspace-switch" onClick={overview}><span className="workspace-icon">{workspace.project.name[0]}</span><span>{workspace.project.name}<small>Demo team workspace</small></span><Icon name="chevron" size={16} /></button>
+      <button className="workspace-switch" onClick={overview}><span className="workspace-icon">{workspace.project.name[0]}</span><span>{workspace.project.name}<small>Team workspace</small></span><Icon name="chevron" size={16} /></button>
       <button className={`nav-button ${view === "overview" ? "project-active" : ""}`} onClick={overview}><Icon name="layers" /><span>Project overview</span></button>
       <button className="nav-button" onClick={() => newSession()}><Icon name="plus" /><span>New session</span><kbd>⌘ K</kbd></button>
       <button className="nav-button" onClick={() => setSearching(previous => !previous)}><Icon name="search" /><span>Search sessions</span></button>
@@ -297,31 +321,31 @@ export default function Workspace() {
         {!filtered.length && <p className="workflow-sidebar-empty">No sessions match this search.</p>}
       </div>
       <button className="nav-button workflow-new-project" onClick={() => beginSetup(true)}><Icon name="plus" size={16} /><span>New project</span></button>
-      <div className="sidebar-footer"><div className="avatar green">S</div><div><strong>Serdar</strong><small>Interactive demo</small></div><button className="icon-button" aria-label="Project setup" onClick={() => beginSetup()}><Icon name="settings" /></button></div>
+      <div className="sidebar-footer"><div className="avatar green">S</div><div><strong>Serdar</strong><small>Project owner</small></div><button className="icon-button" aria-label="Project setup" onClick={() => beginSetup()}><Icon name="settings" /></button></div>
     </aside>
     <main className="main">
       <header className="topbar">
         <div className="breadcrumb"><button className="icon-button mobile-menu" aria-label="Toggle sidebar" onClick={() => setSidebarOpen(previous => !previous)}><Icon name="panel" /></button><Icon name="folder" size={16} /><span className="workflow-breadcrumb-project">{workspace.project.name}</span><span className="breadcrumb-divider">/</span><span className="breadcrumb-current">{view === "overview" ? "Overview" : view === "setup" ? "Setup" : view === "new" ? "New session" : "Session"}</span></div>
-        <div className="topbar-actions"><div className="presence">{workspace.project.members.map(member => <div key={member.name} className={`avatar ${member.color}`} title={member.name}>{member.initials}</div>)}</div><span className="workflow-demo-label">Interactive demo</span><button className="invite-button" onClick={() => beginSetup()}><Icon name="settings" size={14} /><span>Project setup</span></button></div>
+        <div className="topbar-actions"><div className="presence">{workspace.project.members.map(member => <div key={member.name} className={`avatar ${member.color}`} title={member.name}>{member.initials}</div>)}</div><button className="invite-button" onClick={() => beginSetup()}><Icon name="settings" size={14} /><span>Project setup</span></button></div>
       </header>
       <section ref={content} className={`content workflow-content ${view === "setup" ? "setup-content" : ""}`}>
-        {view === "overview" && <ProjectOverview project={workspace.project} sessions={sessions} onOpenSession={openSession} onNewSession={() => newSession()} onSetup={() => beginSetup()} onStartScenario={startScenario} />}
+        {view === "overview" && <ProjectOverview project={workspace.project} sessions={sessions} onOpenSession={openSession} onNewSession={() => newSession()} onSetup={() => beginSetup()} onStartScenario={startScenario} onReset={() => setResetting(true)} onUndoReset={restorePoint ? undoReset : undefined} />}
         {view === "setup" && <form className="workflow-setup" onSubmit={event => { event.preventDefault(); advanceSetup() }}>
-          <div className="workflow-setup-step">PROJECT SETUP · {step + 1} OF 3</div><h1>{["Give your project a home", "Bring your people together", "Start with a task for everyone"][step]}</h1><p className="workflow-setup-intro">{freshSetup ? "A new project starts a fresh demo with sample progress for the walkthrough. Sessions and changes stay in this browser." : "Update your project details. Existing sessions and attributed context are kept; changed assignments get separate waiting sessions."}</p><div className="workflow-step-dots" aria-label={`Step ${step + 1} of 3`}>{[0, 1, 2].map(number => <span className={number <= step ? "active" : ""} key={number} />)}</div>
+          <div className="workflow-setup-step">PROJECT SETUP · {step + 1} OF 3</div><h1>{["Give your project a home", "Bring your people together", "Start with a task for everyone"][step]}</h1><p className="workflow-setup-intro">{freshSetup ? "Set a goal, bring your people together, and assign their first tasks. Current sessions are replaced when you finish setup." : "Update your project details. Existing sessions and attributed context are kept; changed assignments get separate waiting sessions."}</p><div className="workflow-step-dots" aria-label={`Step ${step + 1} of 3`}>{[0, 1, 2].map(number => <span className={number <= step ? "active" : ""} key={number} />)}</div>
           {step === 0 && <><label className="field">Project name<input aria-label="Project name" value={setup.name} onChange={event => setSetup(previous => ({ ...previous, name: event.target.value }))} autoFocus /></label><label className="field">Project goal<textarea aria-label="Project goal" value={setup.goal} onChange={event => setSetup(previous => ({ ...previous, goal: event.target.value }))} rows={3} /></label></>}
           {step === 1 && <><div className="workflow-fixed-person"><span className="avatar green">S</span><strong>Serdar</strong><span>You · project owner</span></div><label className="field">First teammate name<input aria-label="First teammate name" value={setup.sam} onChange={event => setSetup(previous => ({ ...previous, sam: event.target.value }))} autoFocus /></label><label className="field">Second teammate name<input aria-label="Second teammate name" value={setup.alice} onChange={event => setSetup(previous => ({ ...previous, alice: event.target.value }))} /></label></>}
           {step === 2 && ["You", setup.sam, setup.alice].map((name, index) => <label className="field" key={index}>{name}&apos;s first task<input aria-label={`${name}'s first task`} value={setup.tasks[index]} onChange={event => setSetup(previous => ({ ...previous, tasks: previous.tasks.map((task, position) => position === index ? event.target.value : task) }))} autoFocus={index === 0} /></label>)}
           {setupError && <p className="workflow-form-error" role="alert">{setupError}</p>}
-          <div className="workflow-setup-actions"><button type="button" className="workflow-secondary-button" onClick={step ? () => { setStep(step - 1); setSetupError("") } : overview}>{step ? "Back" : "Cancel"}</button><button className="workflow-primary-button" type="submit">{step === 2 ? (freshSetup ? "Create demo project" : "Save project settings") : "Continue"}<Icon name="arrow" size={14} /></button></div>
+          <div className="workflow-setup-actions"><button type="button" className="workflow-secondary-button" onClick={step ? () => { setStep(step - 1); setSetupError("") } : overview}>{step ? "Back" : "Cancel"}</button><button className="workflow-primary-button" type="submit">{step === 2 ? (freshSetup ? "Create project" : "Save project settings") : "Continue"}<Icon name="arrow" size={14} /></button></div>
         </form>}
         {view === "new" && <div className="workflow-new-view"><img className="workflow-welcome-logo" src="/puff-logo.png" alt="Puff" /><div className="eyebrow">A LITTLE CONTEXT. A LOT LESS CATCHING UP.</div><h1>What will you work on?</h1><p>Give one task its own session. Puff will surface related work before you begin.</p><div className="workflow-new-options"><label>Assigned to<select aria-label="Session owner" value={owner} onChange={event => { setOwner(event.target.value); if (event.target.value !== "You") setScope("project") }}>{workspace.project.members.map(member => <option key={member.name} value={member.name}>{displayName(member.name)}</option>)}</select></label><label>Visibility<select aria-label="Session visibility" value={scope} onChange={event => setScope(event.target.value as "project" | "private")}><option value="project">Project · shared</option>{owner === "You" && <option value="private">Private · only you</option>}</select></label></div></div>}
         {view === "chat" && active && <div className="chat-view workflow-chat">
-          <div className="workflow-chat-heading"><div className="eyebrow">{active.scope === "private" ? "PRIVATE DEMO SESSION" : "PROJECT DEMO SESSION"}</div><h1>{active.title}</h1><div className="message-meta"><span className={`avatar ${active.color}`}>{active.initials}</span><span>{displayName(active.owner)}</span><span className={`status-dot ${active.status}`} /><span>{labels[active.status]}</span>{active.scope === "private" && <span>· Private</span>}</div></div>
+          <div className="workflow-chat-heading"><div className="eyebrow">{active.scope === "private" ? "PRIVATE SESSION" : "PROJECT SESSION"}</div><h1>{active.title}</h1><div className="message-meta"><span className={`avatar ${active.color}`}>{active.initials}</span><span>{displayName(active.owner)}</span><span className={`status-dot ${active.status}`} /><span>{labels[active.status]}</span>{active.scope === "private" && <span>· Private</span>}</div></div>
           {active.relation && <div className="workflow-relation"><Icon name="layers" size={14} /><span>{displayRelation(active.relation)}</span></div>}
-          {active.messages.map((message, index) => <article className={`message ${message.role}`} key={`${active.id}-${index}`}><div className="message-label">{message.role === "user" ? displayName(active.owner) : <><img className="workflow-message-logo" src="/puff-logo.png" alt="" />Puff<span className="workflow-message-demo">Demo</span></>}</div><div className="message-body">{message.text}</div></article>)}
-          {solved?.targetId === active.id && <section className="workflow-finding-banner" aria-label="Related solved problem"><div className="workflow-finding-kicker">{fixAdded ? "CONTEXT ADDED" : "RELATED FINDING"}</div><h2>{solved.session.owner} solved a matching server error</h2><p>{solved.finding.title}. Compare the source with your error before applying the fix.</p><div className="workflow-finding-actions"><button onClick={() => setInspecting(true)}>Inspect {solved.session.owner}&apos;s fix</button><button className="workflow-apply-fix" onClick={addFix} disabled={fixAdded}>{fixAdded ? "Fix already added" : "Add fix to this session"}</button>{!fixAdded && <button onClick={keepInvestigating}>Keep investigating</button>}</div></section>}
+          {active.messages.map((message, index) => <article className={`message ${message.role}`} key={`${active.id}-${index}`}><div className="message-label">{message.role === "user" ? displayName(active.owner) : <><img className="workflow-message-logo" src="/puff-logo.png" alt="" />Puff</>}</div><div className="message-body">{message.text}</div></article>)}
+          {solved?.targetId === active.id && <section className="workflow-finding-banner" aria-label="Related solved problem"><div className="workflow-finding-kicker">{fixAdded ? "CONTEXT ADDED" : "RELATED FINDING"}</div><h2>{solved.session.owner} solved a matching server error</h2><p>{solved.finding.title}. Compare the source with your error before applying the fix.</p><div className="workflow-finding-actions"><button onClick={() => setInspecting(true)}>Inspect {solved.session.owner}&apos;s fix</button><button className="workflow-apply-fix" onClick={addFix} disabled={fixAdded}>{fixAdded ? "Context already added" : "Add context to this session"}</button>{!fixAdded && <button onClick={keepInvestigating}>Keep investigating</button>}</div></section>}
         </div>}
-        {(view === "new" || (view === "chat" && active)) && <div className="composer-wrap workflow-composer-wrap"><div className="composer"><div className="composer-context"><Icon name="folder" size={14} /><span>{workspace.project.name}</span><span className="context-divider">/</span><span>{displayName(view === "new" ? owner : active?.owner ?? "You")}</span></div><textarea ref={input} value={draft} onChange={event => setDraft(event.target.value)} placeholder={view === "new" ? "Describe a task…" : "Add a message or describe a problem…"} rows={2} aria-label="Session prompt" onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} /><div className="composer-toolbar"><span className="workflow-composer-note">{view === "new" ? "Checks related project work" : "Local demo response"}</span><button className="workflow-submit-session" disabled={!draft.trim()} onClick={send}>{view === "new" ? "Start session" : "Send message"}<Icon name="arrow" size={15} /></button></div></div><div className="keyboard-hint">Enter to {view === "new" ? "start" : "send"}<span>·</span>Shift + Enter for a new line<span>·</span>Demo, no live agent execution</div></div>}
+        {(view === "new" || (view === "chat" && active)) && <div className="composer-wrap workflow-composer-wrap"><div className="composer"><div className="composer-context"><Icon name="folder" size={14} /><span>{workspace.project.name}</span><span className="context-divider">/</span><span>{displayName(view === "new" ? owner : active?.owner ?? "You")}</span></div><textarea ref={input} value={draft} onChange={event => setDraft(event.target.value)} placeholder={view === "new" ? "Describe a task…" : "Add a message or describe a problem…"} rows={2} aria-label="Session prompt" onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} /><div className="composer-toolbar"><span className="workflow-composer-note">{view === "new" ? "Checks related project work" : "Keep context in this session"}</span><button className="workflow-submit-session" disabled={!draft.trim()} onClick={send}>{view === "new" ? "Start session" : "Send message"}<Icon name="arrow" size={15} /></button></div></div><div className="keyboard-hint">Enter to {view === "new" ? "start" : "send"}<span>·</span>Shift + Enter for a new line</div></div>}
       </section>
       {(view === "new" || view === "chat") && <section className={`workflow-dock ${dockOpen ? "" : "is-collapsed"}`} aria-label="Team work summaries"><div className="workflow-dock-header"><span><Icon name="layers" size={14} />Across this project</span><button className="icon-button" aria-label={dockOpen ? "Collapse team summaries" : "Expand team summaries"} aria-expanded={dockOpen} onClick={() => setDockOpen(previous => !previous)}><Icon name="chevron" size={14} /></button></div>{dockOpen && <div className="workflow-dock-people">{workspace.project.members.map(member => {
         const owned = sessions.filter(session => session.owner === member.name)
@@ -331,7 +355,8 @@ export default function Workspace() {
       })}</div>}</section>}
     </main>
     {overlap && <div className="modal-backdrop" onClick={() => setOverlap(null)}><section className="modal workflow-modal" role="dialog" aria-modal="true" aria-labelledby="overlap-title" onClick={event => event.stopPropagation()}><div className="modal-header"><h2 id="overlap-title">{overlap.owner === "You" ? "You are" : `${overlap.owner} is`} already working on this</h2><button className="icon-button" aria-label="Close related work" onClick={() => setOverlap(null)}><Icon name="close" /></button></div><p>Your task overlaps with existing project work. Choose how you want to continue.</p><div className="workflow-source-card"><span className="workflow-source-owner"><span className={`avatar ${overlap.color}`}>{overlap.initials}</span>{displayName(overlap.owner)} · {labels[overlap.status]}</span><h3>{overlap.title}</h3><p>{overlap.summary}</p></div><div className="workflow-modal-choices"><button className="workflow-primary-button" onClick={() => openSession(overlap.id)}>Open existing session</button><button onClick={() => addTask("complementary", overlap)}>Work on a complementary task<small>{overlap.topic === "navigation" ? "Accessibility checks and project-switching tests" : overlap.topic === "backend" ? "API contract tests and access-rule review" : overlap.topic === "dev-server" ? "Startup configuration and reproduction checks" : "Edge cases and verification review"}</small></button><button onClick={() => addTask("independent", overlap)}>Explore another approach<small>Your own session, with a reference to this work</small></button></div><button className="workflow-modal-cancel" onClick={() => setOverlap(null)}>Cancel</button></section></div>}
-    {inspecting && solved && <div className="modal-backdrop" onClick={() => setInspecting(false)}><section className="modal workflow-modal workflow-source-modal" role="dialog" aria-modal="true" aria-labelledby="source-title" onClick={event => event.stopPropagation()}><div className="modal-header"><h2 id="source-title">{solved.finding.title}</h2><button className="icon-button" aria-label="Close source fix" onClick={() => setInspecting(false)}><Icon name="close" /></button></div><p className="workflow-source-attribution">{solved.finding.source}</p><div className="workflow-source-conversation">{solved.session.messages.map((message, index) => <article key={index}><strong>{message.role === "user" ? solved.session.owner : "Puff · Demo"}</strong><p>{message.text}</p></article>)}</div><div className="workflow-source-finding"><strong>Recorded finding</strong><p>{solved.finding.problem}</p><p>{solved.finding.solution}</p></div><button className="workflow-primary-button" disabled={fixAdded} onClick={addFix}>{fixAdded ? "Fix already added" : "Add fix to this session"}</button><button className="workflow-modal-cancel" onClick={() => setInspecting(false)}>Back to my session</button></section></div>}
+    {inspecting && solved && <div className="modal-backdrop" onClick={() => setInspecting(false)}><section className="modal workflow-modal workflow-source-modal" role="dialog" aria-modal="true" aria-labelledby="source-title" onClick={event => event.stopPropagation()}><div className="modal-header"><h2 id="source-title">{solved.finding.title}</h2><button className="icon-button" aria-label="Close source fix" onClick={() => setInspecting(false)}><Icon name="close" /></button></div><p className="workflow-source-attribution">{solved.finding.source}</p><div className="workflow-source-conversation">{solved.session.messages.map((message, index) => <article key={index}><strong>{message.role === "user" ? solved.session.owner : "Puff"}</strong><p>{message.text}</p></article>)}</div><div className="workflow-source-finding"><strong>Recorded finding</strong><p>{solved.finding.problem}</p><p>{solved.finding.solution}</p></div><button className="workflow-primary-button" disabled={fixAdded} onClick={addFix}>{fixAdded ? "Context already added" : "Add context to this session"}</button><button className="workflow-modal-cancel" onClick={() => setInspecting(false)}>Back to my session</button></section></div>}
+    {resetting && <div className="modal-backdrop" onClick={() => setResetting(false)}><section className="modal workflow-modal" role="dialog" aria-modal="true" aria-labelledby="reset-title" onClick={event => event.stopPropagation()}><div className="modal-header"><h2 id="reset-title">Reset workspace?</h2><button className="icon-button" aria-label="Close reset workspace" onClick={() => setResetting(false)}><Icon name="close" /></button></div><p>Restore the starting workspace with Sam&apos;s frontend sessions and Alice&apos;s server fix. Your current workspace is saved so you can undo this reset.</p><div className="workflow-finding-actions"><button className="workflow-primary-button" onClick={resetWorkspace}>Reset workspace</button><button onClick={() => setResetting(false)}>Keep current workspace</button></div></section></div>}
     {toast && <div className="toast workflow-toast" role="status"><Icon name="check" size={14} />{toast}</div>}
   </div>
 }

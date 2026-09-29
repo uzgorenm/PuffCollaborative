@@ -15,6 +15,8 @@ export type ProjectOverviewProps = {
   onNewSession: () => void
   onSetup: () => void
   onStartScenario: (scenario: "overlap" | "solution" | "solo") => void
+  onReset: () => void
+  onUndoReset?: () => void
 }
 
 const statusLabels = { running: "Working", waiting: "Ready", complete: "Completed" }
@@ -33,15 +35,18 @@ export function ProjectOverview(props: ProjectOverviewProps) {
         <p className="overview-goal">{props.project.goal}</p>
       </div>
       <div className="overview-actions">
-        <span className="overview-demo-badge"><span aria-hidden="true" />Interactive demo</span>
         <div className="overview-action-buttons">
           <button type="button" className="overview-settings" onClick={props.onSetup}>Project settings</button>
           <button type="button" className="overview-new-session" onClick={props.onNewSession}><span aria-hidden="true">+</span> New session</button>
         </div>
+        <div className="overview-reset-actions">
+          {props.onUndoReset && <button type="button" onClick={props.onUndoReset}>Undo reset</button>}
+          <button type="button" onClick={props.onReset}>Reset workspace</button>
+        </div>
       </div>
     </header>
 
-    <nav className="overview-workflows" aria-label="Try a demo workflow">
+    <nav className="overview-workflows" aria-label="Project workflows">
       <span className="overview-workflows-label">Try a workflow</span>
       <button type="button" onClick={() => props.onStartScenario("overlap")}>Avoid duplicate work<span aria-hidden="true">↗</span></button>
       <button type="button" onClick={() => props.onStartScenario("solution")}>Reuse a solved problem<span aria-hidden="true">↗</span></button>

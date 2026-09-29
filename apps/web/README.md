@@ -4,6 +4,19 @@ A browser demo built with React 19 and Next.js 16. The project overview groups w
 
 The interactive demo uses local sample `WorkspaceState` data from `lib/workspace.ts`. You, Sam, and Alice illustrate a team scenario. Their conversations and work statuses are examples; the demo does not execute agents or represent real teammate presence.
 
+The app uses product copy without scripted/demo labels. Its technical boundary remains this local scenario, not a connection to live agents. Generated messages describe proposed plans and context additions rather than claiming code execution. Existing saved generated copy is migrated without rewriting user messages, tasks, or source references.
+
+## Test the full experience
+
+Open the running workspace and choose **Reset workspace**, then confirm. This restores the six starting sessions for You, Sam, and Alice. **Undo reset** restores your previous workspace, including after reload; the backup is retained in browser storage until undo or the next reset.
+
+1. **Project setup:** choose **New project** in the sidebar. Enter a name and goal, keep Sam and Alice for the two teammates, then keep the default three tasks and choose **Create project**. Each person has two separate sessions.
+2. **Overlapping frontend work:** choose **Avoid duplicate work**, then **Start session**. Puff surfaces Sam's existing navigation work. Choose **Open existing session**, **Work on a complementary task**, or **Explore another approach**; the latter two create independent sessions with a source reference.
+3. **Solved server error:** return to **Project overview**, choose **Reuse a solved problem**, then **Send message**. The prepared prompt reports `EADDRINUSE` on port 3000. Inspect Alice's source conversation and choose **Add context to this session**. Repeat the same error to verify that the attributed context is not added twice.
+4. **Parallel personal work:** choose **Find my context** and open your other sessions from the bottom summaries or sidebar. Use the overview's **My work** filter to view both workstreams together.
+
+Use **Reset workspace** whenever you want to repeat these flows from the starting state. Custom setup tasks intentionally produce independent waiting plans; they do not borrow Alice's completed finding unless the source scenario is retained.
+
 ## Run
 
 ```sh
