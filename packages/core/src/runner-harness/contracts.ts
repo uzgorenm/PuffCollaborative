@@ -65,6 +65,9 @@ export interface RuntimeInspection {
 export interface InterruptionResult {
   readonly runtime: RuntimeIdentity
   readonly sessionId: Session.ID
+  /** Acknowledgment only confirms that the abort request reached the runtime. */
+  readonly abort: "acknowledged" | "unknown" | "not_delivered"
+  /** Stopped requires the exact drain and scoped tools to have settled. */
   readonly state: "stopped" | "already_idle" | "uncertain"
   readonly checkedAt: number
 }
@@ -118,6 +121,9 @@ export interface ApprovalMapping {
   readonly sessionId: Session.ID
   readonly permissionRequestId: Permission.ID
   readonly toolCallId: string
+  readonly toolName: string
+  /** Bounded, redacted action detail suitable for coordinator activity. */
+  readonly summary: string
   readonly approvalId: string
   readonly decisionId?: string
   readonly decision?: "approve" | "reject"
@@ -164,6 +170,12 @@ export interface Runtimes {
   readonly wake: (execution: LocalExecution) => Effect.Effect<void, Failure>
   readonly inspect: (execution: LocalExecution) => Effect.Effect<RuntimeInspection, Failure>
   readonly interrupt: (execution: LocalExecution) => Effect.Effect<InterruptionResult, Failure>
+  /** Start the scoped callback-delivery tick only after R10 recovery has completed. */
+  readonly startDelivery: (input: {
+    readonly drainDue: (limit: number) => Effect.Effect<number, Failure>
+    readonly batchSize: number
+    readonly intervalMs: number
+  }) => Effect.Effect<void, Failure>
   readonly shutdown: (runtime: RuntimeIdentity) => Effect.Effect<void, Failure>
 }
 
@@ -190,6 +202,10 @@ export interface Lifecycle {
   readonly approvalRequested: (mapping: ApprovalMapping) => Effect.Effect<LocalExecution, Failure>
   readonly approvalResolved: (result: ApprovalResult) => Effect.Effect<LocalExecution, Failure>
   readonly cancellationRequested: (runId: Coordination.RunID) => Effect.Effect<LocalExecution, Failure>
+  readonly cancellationObserved: (input: {
+    readonly runId: Coordination.RunID
+    readonly result: InterruptionResult
+  }) => Effect.Effect<LocalExecution, Failure>
   readonly runtimeFailed: (input: {
     readonly runId: Coordination.RunID
     readonly runtime: RuntimeIdentity

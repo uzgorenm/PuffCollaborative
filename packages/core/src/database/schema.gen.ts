@@ -24,6 +24,26 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`runner_harness_outbox\` (
+          \`callback_id\` text PRIMARY KEY,
+          \`run_id\` text NOT NULL,
+          \`producer_key\` text NOT NULL,
+          \`worker_id\` text NOT NULL,
+          \`instance_id\` text NOT NULL,
+          \`ordinal\` integer NOT NULL,
+          \`callback\` text NOT NULL,
+          \`source_session_seq\` integer,
+          \`terminal\` integer DEFAULT 0 NOT NULL,
+          \`created_at\` integer NOT NULL,
+          \`acknowledged_at\` integer,
+          \`attempt_count\` integer DEFAULT 0 NOT NULL,
+          \`next_attempt_at\` integer NOT NULL,
+          \`permanent_failure_at\` integer,
+          \`last_error\` text,
+          CONSTRAINT \`fk_runner_harness_outbox_run_id_runner_harness_execution_run_id_fk\` FOREIGN KEY (\`run_id\`) REFERENCES \`runner_harness_execution\`(\`run_id\`) ON DELETE RESTRICT
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`account_state\` (
           \`id\` integer PRIMARY KEY,
           \`active_account_id\` text,
@@ -259,6 +279,9 @@ export default {
           \`runtime_id\` text,
           \`admitted_message_id\` text,
           \`last_session_seq\` integer,
+          \`interrupt_abort\` text,
+          \`interrupt_state\` text,
+          \`interrupt_checked_at\` integer,
           \`created_at\` integer NOT NULL,
           \`updated_at\` integer NOT NULL,
           \`terminal_at\` integer
@@ -388,6 +411,15 @@ export default {
           CONSTRAINT \`fk_session_share_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
         );
       `)
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_outbox_producer_idx\` ON \`runner_harness_outbox\` (\`run_id\`,\`producer_key\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`runner_harness_outbox_order_idx\` ON \`runner_harness_outbox\` (\`run_id\`,\`ordinal\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`runner_harness_outbox_due_idx\` ON \`runner_harness_outbox\` (\`acknowledged_at\`,\`permanent_failure_at\`,\`next_attempt_at\`);`,
+      )
       yield* tx.run(
         `CREATE INDEX \`coordination_approval_thread_idx\` ON \`coordination_approval\` (\`thread_id\`,\`requested_at\`);`,
       )
