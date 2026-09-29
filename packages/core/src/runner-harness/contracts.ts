@@ -143,6 +143,8 @@ export interface ApprovalResult {
 export interface SessionBinding {
   /** Check the exact command against trusted coordinator Run, Instruction, Thread, and Session records. */
   readonly authorize: (command: StartCommand) => Effect.Effect<AuthorizedRun, Failure>
+  /** Return the current authoritative Run after validating the same exact command and binding. */
+  readonly currentRun: (command: StartCommand) => Effect.Effect<Coordination.Run, Failure>
   /** Verify that the already bound Session still belongs to the persistent Thread workspace. */
   readonly attach: (input: {
     readonly run: AuthorizedRun
