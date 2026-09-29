@@ -2,6 +2,8 @@
 
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
 
+**Desktop unblock:** the [startup integration receipt](evidence/2026-09-29-desktop-startup-integration.md) records the retained-host repair and independent checks. Follow [desktop access ownership](desktop-coordination.md) so simultaneous chats do not control the same app or push conflicting changes.
+
 - [Ten concrete acceptance workflows](acceptance-workflows.md): exact scenarios, expected behavior and failure controls.
 - [Integration gates](integration-gates.md): shared contract decisions and producer/consumer handoffs.
 - [Owner checklists](team-plan.md): the next verifiable result for each teammate.
