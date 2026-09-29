@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. The intended execution method here is four human owners working in parallel; no agents or teammates have been dispatched by this document.
 
-**Goal:** Demonstrate evidence-backed coordination between two real coding sessions through Flower, including human approval and context reuse.
+**Goal:** Demonstrate live, evidence-backed awareness between two real coding sessions through Flower, including alternative approaches to the same feature and visible adaptation by an ongoing agent.
 
-**Architecture:** Two OpenCode workers export selected activity to a small hub. A SuperGrid AgentApp produces summaries and proposals from permitted evidence; the hub validates human approval and routes one attributed input to the target session's original worker.
+**Architecture:** Two OpenCode workers export selected activity to a small hub. A SuperGrid AgentApp distinguishes alternative experiments from redundant work and identifies relevant findings. The hub routes short source-linked awareness notes to related opted-in sessions at safe turn boundaries; work-redirection instructions still need the target owner to approve them.
 
 **Tech Stack:** Existing OpenCode TypeScript/Bun and SolidJS; a project-local Python/uv Flower AgentApp; local persistent JSON records; no additional agent framework or database service.
 
@@ -14,7 +14,7 @@
 
 ## Global constraints
 
-- Budget: 5–6 hours, four people, one project, two workers, three actual agents.
+- Budget: 5–6 hours, four people, one project, two isolated worker sessions (which may have the same owner), three actual agents.
 - OpenCode repo toolchain: bun@1.3.14. Prove startup before product changes; Bun was missing in the inspected shell.
 - Flower bootstrap: 1.39.0; thereafter use the generated project's compatible dependencies, uv.lock, and `uv run flwr ...`. Preserve the verified original template outside this repo.
 - No React replacement, new agent framework, local Ollama setup, external database service, or desktop packaging.
@@ -47,30 +47,30 @@ Serhat is the integration owner for shared schemas and the root manifest/lockfil
 
 ## Task 1 — Serhat: contracts, hub, durable decisions
 
-**Features:** F1 registry; F4 approval/routing; F5 memory; shared persistence for F2/F3/F6.
+**Features:** F1 shared session topics; F4 informational awareness and approved action routing; F5 memory after the core loop; shared persistence for F2/F3/F6.
 
 **Create:** hackathon/contracts/v1.schema.json, fixtures.json, README.md; hackathon/hub/package.json, tsconfig.json, server.ts, store.ts, jobs.ts, approval.ts, server.test.ts, approval.test.ts, README.md.
 
 **Consumes:** worker events; Ferit's `coordinate` boundary; member/worker runtime credentials.
 
-**Produces:** all `/puff/v1/...` routes from the spec, fixed-roster authorization, persistent snapshots, proposal/version validation, delivery queue, accepted decisions, and integration fixtures. Runtime storage lives outside tracked source and is ignored by Git.
+**Produces:** all `/puff/v1/...` routes from the spec, fixed-roster authorization, persistent snapshots, relation/topic selection, source-revision checks, an awareness/approved-action delivery queue, accepted decisions, and integration fixtures. Runtime storage lives outside tracked source and is ignored by Git.
 
-- [ ] Publish the v1 schema and one shared fixture file by minute 25. Include two workers/sessions, one permitted event per session, an overlap proposal, a stale proposal, and an accepted decision. These are labeled synthetic fixtures, not live evidence.
-- [ ] Write failing checks: `duplicate_event_is_noop`; `old_revision_does_not_replace_new`; `spoofed_actor_and_wrong_project_are_rejected`; `stale_approval_returns_conflict`; `double_approval_creates_one_delivery`; `restart_preserves_approved_decisions`; `superseded_decision_is_not_current`.
+- [ ] Publish the v1 schema and one shared fixture file by minute 25. Include two isolated sessions owned by one person and marked as alternative approaches to one feature topic; add permitted events, a relevant shared constraint, an awareness note, a stale proposal, and an accepted decision. These are labeled synthetic fixtures, not live evidence.
+- [ ] Write focused checks for duplicate/old events, wrong-project identities, a note blocked by an unshared or unrelated target, one note per source revision and target, stale approval, and repeat delivery. Test accepted-decision persistence if F5 is reached.
 - [ ] Run `bun test` from hackathon/hub and confirm intended failures.
 - [ ] Implement the narrow single-project API and single-writer persistence. Derive actor/worker identity from authentication; do not treat OpenCode's instance-level password as project membership.
 - [ ] Implement async coordinator jobs keyed by requestId. Save run/result/error state, validate reports, and preserve source revisions. Do not rerun Flower when the UI polls.
-- [ ] Implement owner-only approval with exact version/text/target binding, one pending delivery per session, worker claims/acknowledgments, and explicit knowledge acceptance/supersession.
+- [ ] Route informational notes only between opted-in related sessions, deduplicate by source revision and target, and allow mute/unshare. Keep owner-only approval for work-redirection instructions with exact version/text/target binding. Allow one pending delivery per session, worker claims/acknowledgments, and explicit knowledge acceptance/supersession.
 - [ ] Run tests and `bun typecheck`; restart the service and verify decisions persist. Verify unauthorized calls fail and duplicate approval returns the same action without an extra execution.
 - [ ] Write the integrated startup order; commit with `feat(hub): coordinate shared project state`.
 
-**Done when:** fixtures can be replaced with real worker events without changing the schema, two people can read the same project state, and approved delivery is authorized and idempotent.
+**Done when:** fixtures can be replaced with real worker events without changing the schema, related sessions can read each other's permitted current state, and awareness/approved delivery is authorized and idempotent.
 
 **If time is short:** fixed roster, JSON storage, and 2-second UI polling are sufficient. Do not build account onboarding, organizations, a generic job platform, or a vector index.
 
 ## Task 2 — Talha: connect real OpenCode sessions
 
-**Features:** F1 capture; F4 delivery; F5 delivery to new/existing sessions.
+**Features:** F1 capture; F4 live awareness and approved-action delivery; F5 delivery to new/existing sessions after the core loop.
 
 **Create:** hackathon/worker/package.json, tsconfig.json, adapter.ts, sharing.ts, worker.ts, adapter.test.ts, sharing.test.ts, README.md.
 
@@ -81,20 +81,20 @@ Serhat is the integration owner for shared schemas and the root manifest/lockfil
 **Produces:** `captureSession(sessionId) -> SharedEvent[]`; `deliverContext(delivery) -> {messageId, state, error}`; heartbeats; delivery acknowledgments.
 
 - [ ] In the first 30 minutes, launch the chosen OpenCode runtime, create a synthetic session, fetch its messages/events, and submit one ordinary prompt through the actual supported API. Record the exact working path/version.
-- [ ] Write failing checks: `unshared_session_exports_nothing`; `selected_session_exports_only_allowed_fields`; `retry_delivery_reuses_message_id`; `delivery_cannot_target_other_worker`; `busy_session_uses_existing_queue`.
+- [ ] Write focused checks for unshared sessions exporting nothing, selected fields only, awareness reaching only the selected related session, retry reusing the same message ID, and busy sessions using the existing queue.
 - [ ] Run `bun test` from hackathon/worker and confirm the new assertions fail for the intended missing behavior.
 - [ ] Implement selected-session capture, sharing preview, durable event cursor, 10-second heartbeat, hub publishing, and polling/claiming deliveries. Use capped payloads and only the assigned project's sessions.
-- [ ] Implement context delivery through existing prompt admission. Preserve worker/session identity and author metadata. Never replay an ambiguous delivery automatically.
+- [ ] Implement informational awareness and approved instructions through existing prompt admission at safe boundaries. Preserve worker/session identity and source attribution. Never replay an ambiguous delivery automatically; do not interrupt an active model/tool turn to inject a note.
 - [ ] Run package tests and `bun typecheck`; prove with a real session that a repeated delivery produces one visible context input and the session subsequently uses it.
 - [ ] Document startup and shutdown without printing credentials; commit with `feat(worker): bridge shared OpenCode sessions`.
 
-**Done when:** a second person sees a permitted event and an approved proposal reaches exactly the intended local session. A private session stays absent; an offline worker reports failure rather than delivery.
+**Done when:** a related ongoing agent visibly uses a source-linked update from another session's permitted event, and an approved action reaches exactly the intended local session. A private session stays absent; an offline worker reports failure rather than delivery.
 
 **If blocked at minute 45:** pair with Serhat on one verified HTTP path; use explicit capture/context buttons instead of automatic hooks. Do not spend the entire hackathon supporting both API generations.
 
 ## Task 3 — Serdar: shared overview and human review
 
-**Features:** F1 visibility; F4 approval controls; F5 decision view; F6 observable demo.
+**Features:** F1 visibility and relation labels; F4 live awareness and approval controls; F5 decision view after the core loop; F6 observable demo.
 
 **Create:** packages/app/src/pages/puff/index.tsx, project-api.ts, project-state.test.ts; packages/app/src/components/puff/session-card.tsx, proposal-card.tsx, decision-list.tsx. Modify only the necessary route in packages/app/src/app.tsx and app i18n resources.
 
@@ -103,10 +103,10 @@ Serhat is the integration owner for shared schemas and the root manifest/lockfil
 **Produces:** one team overview with worker/session cards, source-linked summaries, context-check action, proposal review, delivery status, and accepted decisions.
 
 - [ ] Use the existing app development path and components. Render the common fixture by minute 45; no alternate React app or desktop packaging.
-- [ ] Write meaningful state checks: `offline_worker_is_not_displayed_as_current`; `approval_sends_expected_version_and_final_text`; `stale_conflict_requires_refresh`; `delivery_ack_required_for_success`; `proposal_text_is_rendered_as_untrusted_content`.
+- [ ] Write meaningful state checks for two alternative approaches remaining distinct, planned work not shown as completed, offline workers marked stale, an awareness note awaiting delivery, approval sending the expected version/text, and delivery requiring acknowledgment.
 - [ ] Run the specific tests from packages/app using its existing test setup and confirm intended failures; read its AGENTS.md before changes.
-- [ ] Build one route with two worker lanes and a central proposal area. Show owner, worker, session, last update, evidence references, and Flower run ID. Clearly label fixtures until real data replaces them.
-- [ ] Add Approve/Edit/Reject for the authorized target owner, an explicit Check team context action, and a separate Accept as project decision action. The server remains the authorization authority.
+- [ ] Build one route with two worker lanes and a central proposal area. Show each alternative approach and its planned/ongoing/completed status, source-linked awareness notes, owner, last update, and Flower run ID. Clearly label fixtures until real data replaces them.
+- [ ] Add a shared feature-topic control, awareness mute/unshare, source links, and visible note delivery. Add Approve/Edit/Reject for redirection proposals and an explicit Check team context fallback; the server remains the authorization authority. Add Accept as project decision after the live loop works.
 - [ ] Integrate hub polling; show pending/failed/stale/delivered distinctly. Existing conversation links must target the intended server/session, not assume the viewer's localhost is the worker.
 - [ ] Run relevant app tests, `bun typecheck`, and a browser walkthrough at two viewport sizes. Verify the complete review/delivery flow with Serhat and Talha.
 - [ ] Commit with `feat(app): show team context and handoffs`.
@@ -117,7 +117,7 @@ Serhat is the integration owner for shared schemas and the root manifest/lockfil
 
 ## Task 4 — Ferit: Flower summaries and coordination
 
-**Features:** F2 summaries; F3 evidence-based detection; F5 context retrieval; F6 Flower trace.
+**Features:** F2 summaries; F3 alternative versus duplicate detection; F4 source-linked awareness; F5 context retrieval after the core loop; F6 Flower trace.
 
 **Create:** hackathon/flower/pyproject.toml, uv.lock, LICENSE, agent/agent_app.py, agent/utils.py, coordinator.py, test_coordinator.py, README.md. Derive the AgentApp from the official template, preserving its licensing and compatible dependency declarations.
 
@@ -126,17 +126,17 @@ Serhat is the integration owner for shared schemas and the root manifest/lockfil
 **Produces:** `coordinate(request, snapshot) -> CoordinationReport`; a real Flower run ID; source-linked summaries/proposals; bounded failure states.
 
 - [ ] In the first 45 minutes, run the official-template-derived app on SuperGrid with the fixture input; capture the run ID and retrieve one structured result through the selected CLI/log channel. Prove local-host-to-SuperGrid submission and return before writing sophisticated prompts.
-- [ ] Write failing checks using Python's standard unittest: `unknown_evidence_is_rejected`; `report_preserves_request_and_session_ids`; `no_overlap_can_return_empty_proposals`; `superseded_decision_excluded`; `failed_run_never_becomes_success`; `repeated_request_id_does_not_launch_twice` (the hub owns durable deduplication; adapter honors its existing run ID).
+- [ ] Write focused checks for unknown evidence, correct request/session IDs, parallel alternatives not mislabeled as redundant, no relation returning no finding, failed runs not becoming success, and repeat request IDs not launching twice. Add superseded-decision checks if F5 is reached.
 - [ ] Run `uv run python -m unittest discover` from hackathon/flower and confirm intended failures.
-- [ ] Implement bounded input selection, session summarization, overlap/dependency/reuse reasoning, and accepted-decision lookup. Record the exact source revisions considered. Do not send unrelated history or make up evidence.
+- [ ] Implement bounded input selection, session summarization, alternative/duplicate/dependency/reuse reasoning, and source-linked awareness notes. Preserve planned/ongoing/completed status and exact source revisions; never infer that two alternatives are redundant from similar wording alone. Add accepted-decision lookup after the live loop works. Do not send unrelated history or make up evidence.
 - [ ] Emit one schema-valid coordination report and visible response; parse the report strictly on return. Pass subprocess arguments as an argument array, never interpolated shell text. Runtime failures preserve safe diagnostics and the run ID.
-- [ ] Integrate the async hub boundary. A request must finish or fail within 90 seconds. Preserve coding availability when coordination fails. Add debounced refresh only after explicit checks succeed.
-- [ ] Run unit checks, `uv run flwr build`, and two real smoke tests: overlap and unrelated tasks. Inspect the report and completed run status; do not infer success merely from a created run ID.
+- [ ] Integrate the async hub boundary. A request must finish or fail within 90 seconds. Preserve coding availability when coordination fails. Prove explicit checks first, then add debounced refresh on meaningful progress for the live demo.
+- [ ] Run unit checks, `uv run flwr build`, and two real smoke tests: related alternative experiments with a shared constraint, and unrelated tasks. Inspect the report and completed run status; do not infer success merely from a created run ID.
 - [ ] Commit with `feat(flower): propose evidence-backed coordination`.
 
-**Done when:** the actual Flower result changes what the target session knows, with source references and human approval. A static canned proposal or an animation alone does not satisfy this task.
+**Done when:** the actual Flower result changes what a related ongoing agent knows, with source references and an observable response that uses the finding. Human approval still gates any work-redirection instruction. A static canned proposal or an animation alone does not satisfy this task.
 
-**If time is short:** use the existing runtime model and an explicit check button. Defer native Grid routing, automatic provider selection, a separate verifier agent, and local inference.
+**If time is short:** use the existing runtime model and keep the explicit check as a clearly labeled fallback while resolving the live trigger. Defer native Grid routing, automatic provider selection, a separate verifier agent, and local inference.
 
 ## Integration schedule
 
@@ -145,8 +145,8 @@ Serhat is the integration owner for shared schemas and the root manifest/lockfil
 | 0:00–0:25 | Agree scope/contracts, verify toolchains, fixed demo roster and connectivity. Each owner uses a separate checkout based on current remote main; it includes Serhat's reviewed README. |
 | 0:25–0:45 | Talha proves OpenCode capture/input; Serhat supplies fixtures/API; Ferit proves Flower structured round trip; Serdar renders fixtures. Pair immediately on a blocked execution dependency. |
 | 0:45–2:00 | Implement owned slices against frozen contract. Verify and integrate small working commits into main early; do not wait for polish to share interfaces. |
-| 2:00–3:00 | First live vertical slice: both workers -> hub -> Flower -> proposal -> owner approval -> actual target session response. |
-| 3:00–4:00 | Add accepted decisions and new-session reuse; test stale source, duplicate approval, private session, and worker offline. |
+| 2:00–3:00 | First live slice: two alternative experiments -> hub -> Flower -> source-linked awareness note -> target agent adapts while still working. |
+| 3:00–4:00 | Add the debounced meaningful-change trigger and test unrelated/private sessions, duplicate note delivery, and worker offline. Add approved redirection and decision reuse if the core loop works. |
 | 4:00–5:00 | Freeze new features, integrate, rehearse, restart services, capture a clearly labeled backup recording of a genuine successful run. |
 | Optional hour 6 | Fix defects and improve clarity. Add a stretch item only if the complete demo has succeeded twice. |
 
@@ -156,18 +156,16 @@ Serhat is the integration owner for shared schemas and the root manifest/lockfil
 - Each owner shares the working command, exact pushed commit, evidence of their checks, and known limitations. This document does not itself notify anyone or assign GitHub issues.
 - Serhat coordinates integration order: contracts and fixtures first; hub, worker, Flower, and UI slices follow as their interfaces work. Check each slice before committing and pushing it to main; authors preserve another person's in-progress changes.
 - Use separate local clones, all on main. Fetch before every integration. If a push is rejected because main advanced, merge the incoming commits, rerun affected checks, and push normally. Do not create a PR or feature branch.
-- Each owner reserves the final hour for integration and testing. Ferit narrates the Flower run; Talha and Serhat operate the two demo workers; Serdar operates the overview and shows the approval flow.
+- Each owner reserves the final hour for integration and testing. Ferit narrates the Flower run; Talha and Serhat operate the two demo workers; Serdar shows both experiments, the source-linked note, and the receiving agent's response.
 - Checkpoints measure observed outcomes. A build, fixture response, live Flower run, and successful context delivery prove different things.
 
 ## Final acceptance rehearsal
 
-1. Start two real, explicitly shared synthetic sessions on different machines; show distinct worker/session identities.
+1. Start two real, explicitly shared synthetic sessions in isolated workspaces, both owned by the same developer and labeled as alternatives for one frontend feature. Show distinct worker/session identities and ongoing status.
 2. Keep one private session unshared and demonstrate that it does not appear in the hub or Flower input.
-3. Request context; show a completed Flower run with an evidence-backed dependency or reuse suggestion.
-4. Change a referenced source and verify the old proposal cannot be approved.
-5. Generate a fresh proposal, edit or approve it as the target worker owner, and observe one attributed input plus the destination agent's response.
-6. Retry the same approval/delivery and verify no second input is created.
-7. Accept a source-backed project decision; restart the hub and retrieve it from a fresh session.
-8. Disconnect a worker and show an honest offline/failure state. Explain exactly which content left each machine and which model/runtime handled it.
+3. Show A exploring one design and B another. A discovers a relevant shared constraint; a completed Flower run cites A's source event without declaring either approach the winner.
+4. Show B receive the source-linked awareness note at a safe boundary and respond by adapting its own approach. Repeat the same source revision and verify no second note appears.
+5. Demonstrate that an unrelated or unshared session receives nothing. Disconnect a worker and show an honest offline/failure state.
+6. If the core loop is stable, approve one proposed work-redirection action, choose an accepted decision, and retrieve it from a fresh session. Explain exactly which content left each machine and which model/runtime handled it.
 
 GitHub Issues was disabled when this plan was written. These four task cards are ready to become issues if the repository owner enables that feature; GitHub handles and platform assignments are separate from the human ownership recorded here.

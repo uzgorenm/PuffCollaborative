@@ -11,25 +11,94 @@ other’s work without manually transferring context.
 
 > Status: Proposed MVP. The capabilities below describe the intended design.
 
+## Official hackathon requirements and readiness
+
+Checked September 29, 2026 against the organizers' [Stanford hackathon brief](https://discuss.flower.ai/t/collaborative-agent-hackathon-stanford-ca-2026/1275).
+Use that page and `#hackathon_stanford_2026` in [Flower Slack](https://flower.ai/join-slack)
+for updates and support.
+
+- **Challenge:** Demonstrate multiple Flower Agents collaborating through
+  SuperGrid, with a result that benefits from their cooperation. The brief gives
+  agent chains and context/handoffs between AgentApps as examples.
+- **Judging:** Depth of Flower/SuperGrid use, impact and originality, and demo
+  clarity and delivery. **Endeavor is a bonus**, not a prerequisite.
+- **Schedule:** September 29, 2026, 9:30 am–7:30 pm at 389 Jane Stanford Way.
+  Demo preparation starts at 4:30 pm; presentations start at 5:15 pm and last
+  **3–5 minutes** per team. Submit before the demos; the post does not specify
+  a separate exact submission cutoff.
+- **Runtime:** SuperGrid tasks have a five-minute timeout from entering Running.
+  Keep coordination bounded so coding can continue if analysis fails.
+
+### Submission checklist
+
+- [ ] Register the team name, members, and email addresses using the
+  [team form](https://flowerlabs.typeform.com/to/rQuplUGG).
+- [ ] Publish our own working AgentApp on Flower Hub and record its public link.
+  Follow the [publication guide](https://flower.ai/docs/agent/how-to-guides/use-flower-hub.html#publish-your-agentapp).
+- [ ] Submit a short project description and the GitHub repository link.
+- [ ] Rehearse the working result and explain the problem and Flower's role
+  within the presentation time.
+
+Unchecked means not verified in this repository, including actions teammates
+may already have completed elsewhere. A local build or use of an upstream Hub
+template does not establish publication of our own app.
+
+### Where Puff fits, and the remaining gap
+
+Our live coding-session awareness idea fits the collaboration theme: one agent's
+finding helps another agent adapt before a person manually transfers context.
+However, the current engineering baseline is **two OpenCode agents and one Flower
+AgentApp**. It uses Flower, but that alone does not demonstrate the brief's
+multiple-Flower-agent collaboration. Treat the baseline as an integration
+checkpoint, not a claim that the hackathon challenge is already satisfied.
+
+The original `@flwrlabs/collaborative-agent` setup completed a real SuperGrid
+greeting run, `12037878883441469089`; its `finished:completed` status was rechecked
+on September 29. That test requested no tools. It proves runtime access, not
+agent-to-agent cooperation or Puff integration. At this review, the shared
+repository has no verified Puff-specific Flower integration or recorded
+team-owned Hub publication.
+
+**Recommended next step:** Ferit should prove a small real exchange between
+Flower agents as an early integration checkpoint. For example, a session
+analysis agent passes an evidence-backed finding to a coordination agent, which
+relates it to another session and produces the awareness note. This is a proposed
+extension, not implemented behavior. The
+[organizers' collaborative-agent example](https://github.com/jafermarq/flower-collaborative-agent-hackathon)
+demonstrates agents communicating across SuperNodes connected to SuperGrid.
+Native Grid transport is one implementation option; the brief also permits
+agent chains. Ask a mentor to confirm the fit if retaining only one Flower agent.
+
+Protect one complete demo: permitted session evidence -> actual Flower-agent
+exchange -> source-linked update -> delivery into a running coding session ->
+visible adaptation. Show the participating agents and their exchanged result,
+along with run status and delivery evidence. Then publish the working AgentApp.
+Retain the four existing ownership areas; their interfaces still support this
+flow. The [team board](docs/hackathon/README.md) tracks implementation evidence.
+
 ## Problem and product direction
 
 AI coding sessions help people build quickly, but useful context often stays
-inside one conversation. The same person repeats explanations across sessions;
-teammates independently investigate or build the same thing because their agents
-do not know what others are doing or have already learned.
+inside one conversation. One developer can have several agents exploring the
+same frontend feature in parallel without any agent knowing what the others
+are trying or learning. The same person repeats explanations across sessions;
+teammates independently investigate or build the same thing for the same reason.
 
 Puff should connect that work: summarize each shared session's current objective,
 progress, and blockers; notice overlaps and reusable findings; and bring relevant
-context into both new and ongoing sessions. The value is less repeated work and
-less manual explanation, with sources that let people check each suggestion.
+context into both new and ongoing sessions while they work. Related sessions
+may be deliberate alternative experiments, not redundant copies. The value is
+less repeated work and less manual explanation, with sources that let people
+check each suggestion.
 
 Serdar's broader idea includes an evolving project or company wiki assembled from
 session knowledge, selective retention and reuse of useful results, and eventually
 suggestions about what someone should work on next. These are product directions,
-not all requirements for the 5–6 hour hackathon. The proposed MVP starts with small,
-human-approved decision records; full wiki generation, general result caching,
-and task recommendations remain future work. Automatic context lookup at session
-start is a stretch feature; explicit lookup must work first.
+not all requirements for the 5–6 hour hackathon. The proposed MVP centers on
+awareness among ongoing agents; small, human-approved decision records follow
+if that loop works. Full wiki generation, general result caching, and task
+recommendations remain future work. Automatic context lookup at session start
+is a stretch feature; ongoing awareness is the core demo.
 
 ## Team workspace
 
@@ -51,8 +120,13 @@ local clone and integrates incoming commits before pushing. Never force-push.
   and blockers. Summaries refresh when the work meaningfully changes.
 - **Shared context:** Agents retrieve relevant decisions and activity from
   other threads without loading every conversation into every prompt.
+- **Live agent awareness:** When a selected, related session makes meaningful
+  progress, its peers receive a short source-linked update at a safe turn
+  boundary after it is ready. Parallel experiments remain separate until a
+  person chooses.
 - **Avoid repeated work:** Flower identifies overlapping work, dependencies,
-  and opportunities to reuse a finding, with links to the supporting sessions.
+  deliberate alternatives, and opportunities to reuse a finding, with links
+  to the supporting sessions.
 - **Lasting project memory:** People approve useful findings as project decisions.
   New and ongoing sessions can retrieve them; outdated decisions can be superseded.
 - **Distributed execution:** Run coding sessions across different machines
@@ -68,7 +142,9 @@ its interface with shared projects, live activity, and collaborative controls.
 ### Flower SuperGrid
 
 Runs a custom coordination AgentApp that summarizes ongoing work, identifies
-cross-thread dependencies, and proposes handoffs for human approval.
+cross-thread dependencies, distinguishes parallel experiments, and reports
+source-linked findings to related sessions. Instructions that redirect work
+remain subject to human approval.
 
 ### Collaboration Service
 
@@ -109,26 +185,29 @@ credentials or grant unrestricted access to another person’s machine.
 
 ## MVP Demo
 
-Two developers work in separate sessions across two machines. One has already
-found an answer or built something that the other is about to repeat. A real
-Flower run detects the overlap or dependency, cites both sessions, and proposes
-the useful context to share.
+One developer runs two separate sessions exploring different frontend designs
+for the same feature. Each agent can see the other's stated approach and current
+progress without assuming either design has been chosen. One session discovers
+a shared constraint; a real Flower run cites that finding and flags it for the
+other agent. At a safe turn boundary, that agent receives the update and
+visibly adjusts its plan while continuing its own experiment.
 
-The target worker's owner reviews, edits, approves, or rejects the proposal.
-Approval delivers one attributed instruction to that session on its existing
-host, and the session visibly uses the finding. Its credentials, workspace, and
-host do not move. A new session then retrieves an accepted decision, showing
-that the team's knowledge survives the original conversation.
+The developer compares both approaches and chooses one. An instruction that
+redirects work requires the target worker owner's approval; accepted findings
+can then be recorded as project knowledge. The sessions keep their own
+workspaces, credentials, and hosts. A new session later retrieves the decision,
+showing that the team's knowledge survives the original conversations.
 
 The interface should make worker ownership, shared evidence, the Flower run,
 human approval, and actual delivery visible. The magic moment is seeing one
-session avoid repeating work because another session's finding reached it.
+agent change course because another active agent found something relevant.
 
 ## Initial Scope
 
-Prioritize current session summaries, overlap/reuse detection, approved context
-delivery, and a minimal durable project memory. Shared visibility and collaborative
-input support this complete flow. Protect one reliable demo with four people in
+Prioritize current session summaries, distinguishing alternative experiments
+from duplicate work, and delivering relevant updates into ongoing sessions.
+An approved action and minimal project memory complete the demo if time permits.
+Protect one reliable flow with four people in
 5–6 hours; the [MVP spec](docs/hackathon/mvp-spec.md) defines the acceptance criteria.
 
 Defer full company-wiki generation, automatic task assignment, general result
@@ -153,7 +232,8 @@ Demo test: Two teammates submit to the same thread. Both see the same queue, the
 Owns turning an authorized run into actual coding work.
 Build:
 - The adapter connecting each shared thread to its OpenCode session.
-- A separate worktree and branch for each independently executing thread.
+- A separate workspace for each independently executing thread; verified
+  shared repository changes still go through `main`.
 - Execution of the entire agent turn, including model calls and tool use.
 - Reporting of streamed output, tool activity, changed files, diffs, and final status to the server.
 - Cancellation and approval handling connected to the server’s controls.

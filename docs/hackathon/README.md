@@ -8,10 +8,10 @@ This is the team's shared task board and feature-status page. Detailed implement
 
 | Task | Owner | Deliverable | Status | Verified commit / blocker |
 | --- | --- | --- | --- | --- |
-| T1 — Shared state and API | Serhat | Shared contract, worker/session records, approval checks, delivery queue, and durable decisions. | Planned | No merged implementation verified yet. |
-| T2 — OpenCode adapter | Talha | Export selected session activity; deliver approved context to the correct existing session once. | Planned | No merged implementation verified yet. |
-| T3 — Team interface | Serdar | Session overview, proposal review, accepted decisions, and delivery/failure states. | Planned | No merged implementation verified yet. |
-| T4 — Flower coordinator | Ferit | Real SuperGrid summaries and source-linked overlap/dependency/reuse proposals. | Planned | Standalone template smoke test passed; product integration remains to be built. |
+| T1 — Shared state and API | Serhat | Shared session topics, current activity, source-linked awareness delivery, approval checks, and durable decisions. | Planned | No merged implementation verified yet. |
+| T2 — OpenCode adapter | Talha | Export selected activity; deliver relevant awareness at a safe turn boundary and approved instructions to the correct session. | Planned | No merged implementation verified yet. |
+| T3 — Team interface | Serdar | Show simultaneous experiments, progress, source-linked updates, decisions, and delivery/failure states. | Planned | No merged implementation verified yet. |
+| T4 — Flower coordinator | Ferit | Real SuperGrid summaries that distinguish parallel alternatives from duplicates and find shared constraints. | Planned | Standalone template smoke test passed; product integration, multiple-Flower-agent collaboration, and our own Hub publication remain unverified. See the [official brief review](../../README.md#official-hackathon-requirements-and-readiness). |
 
 Open [the task checklists](team-plan.md) and find the numbered task with your name. Each has file ownership, inputs/outputs, acceptance checks, and a scope cut if time gets short.
 
@@ -21,11 +21,11 @@ Status reflects verified shared work on main, not unknown work in another person
 
 | ID | Feature | Main contributors | Priority | Status |
 | --- | --- | --- | --- | --- |
-| F1 | Selected shared sessions and activity | Talha, Serhat, Serdar | Required | Planned |
-| F2 | Current summaries with source revisions | Ferit, Serhat | Required | Planned |
-| F3 | Overlap, dependency, and reuse suggestions | Ferit | Required | Planned |
-| F4 | Human-approved context handoff | Serhat, Talha, Serdar | Required | Planned |
-| F5 | Durable, approved project memory | Serhat, Ferit, Serdar | Required | Planned |
+| F1 | Selected related sessions and activity | Talha, Serhat, Serdar | Required | Planned |
+| F2 | Current approach/progress summaries with source revisions | Ferit, Serhat | Required | Planned |
+| F3 | Alternative/duplicate/dependency/reuse detection | Ferit | Required | Planned |
+| F4 | Live awareness inside an ongoing agent; approval for work redirection | Serhat, Talha, Serdar | Required | Planned |
+| F5 | Durable, approved project memory | Serhat, Ferit, Serdar | Secondary | Planned |
 | F6 | Visible agent cooperation, run IDs, and failures | All four | Required | Planned |
 | F7 | Automatic context checks at session start | Talha, Ferit | Stretch | Deferred |
 | F8 | Native Flower Grid worker queries | Ferit | Stretch | Deferred |
@@ -46,10 +46,10 @@ Within 45 minutes: Talha proves real session capture/input; Serhat publishes com
 
 ## Demo to protect
 
-Two separate coding sessions -> selected shared evidence -> a real Flower proposal -> human approval -> one attributed input into the target session -> a response using the new context. Then show an accepted decision being retrieved in a fresh session.
+One person runs two opted-in coding sessions exploring different approaches to the same frontend feature -> both see each other's current approach -> one finds a constraint relevant to both -> Flower produces a source-linked update -> the other active agent receives it at a safe boundary and visibly adapts. The person chooses an approach and approves any work-redirection instruction. Show a saved decision in a fresh session if the core flow is stable.
 
 Keep the original workers, worktrees, and credentials in place. Sharing context is not permission for arbitrary remote commands.
 
 ## Repository setup
 
-The [desktop cleanup](https://github.com/uzgorenm/PuffCollaborative/commit/19076859c4d43ef59c0ec96b3b4ad565d8927c10) retains the desktop app, shared UI, runtime, server, and SDK. It removes 14 unused workspace packages, 21 translated READMEs, and upstream publishing and hosting tooling. All 21 workspace type checks, the desktop build, and 42 server/API/SDK checks passed locally.
+The [desktop cleanup](https://github.com/uzgorenm/PuffCollaborative/commit/19076859c4d43ef59c0ec96b3b4ad565d8927c10) retains the desktop app, shared UI, runtime, server, and SDK. It removes 14 unused workspace packages, 21 translated READMEs, and upstream publishing and hosting tooling. All 21 workspace type checks, the desktop build, and 42 server/API/SDK checks passed locally. GitHub Actions workflows have been removed; run checks locally.

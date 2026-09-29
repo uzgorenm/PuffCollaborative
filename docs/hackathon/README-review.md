@@ -31,7 +31,7 @@ Its feature list explicitly includes duplicate-work/dependency detection, source
 
 Its architecture explains why workers remain separate and which exported content reaches the collaboration service and hosted models; local execution alone does not imply local inference.
 
-Its demo specifies a handoff on the same worker and session after the target owner approves an attributed instruction, followed by reuse of an accepted decision in a fresh session. No session or credential migration is implied.
+Its current demo now leads with one developer running two alternative frontend experiments. A relevant finding reaches the other ongoing agent as source-linked awareness; choosing an approach or redirecting work remains a human decision. The earlier approved handoff and fresh-session memory flow remains a secondary extension. No session or credential migration is implied.
 
 The README links to [the scoped MVP](mvp-spec.md), [the four-person task board](README.md), and [implementation checklists](team-plan.md). These remain planning artifacts, not evidence that product features are implemented.
 

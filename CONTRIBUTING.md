@@ -19,7 +19,7 @@ Run the existing tests relevant to your change from their package directory. For
 bun test test/server
 ```
 
-The root `bun test` command deliberately fails to prevent a test run in the wrong directory. CI runs the workspace test and type-check jobs.
+The root `bun test` command deliberately fails to prevent a test run in the wrong directory. Run the relevant checks locally; this fork has no CI workflows configured.
 
 Build the desktop app from the repository root:
 
