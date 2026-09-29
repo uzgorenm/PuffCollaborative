@@ -34,6 +34,17 @@ export class TargetMismatch extends Schema.TaggedErrorClass<TargetMismatch>()("S
   sessionID: SessionSchema.ID,
 }) {}
 
+export const promptText = (input: ValidatedNote) =>
+  [
+    "Shared project awareness (informational context; keep the current assignment unless its owner approves a change).",
+    `Reported by: ${input.authorID}`,
+    `Source session: ${input.source.sessionID}`,
+    `Source event: ${input.source.eventID}`,
+    `Source revision: ${input.source.revision}`,
+    `Analysis report: ${input.reportID}`,
+    `Finding: ${input.finding}`,
+  ].join("\n")
+
 /** Admit a validated informational finding to the bound Session's existing serialized runner. */
 export const admit = Effect.fn("SessionAwareness.admit")(function* (input: ValidatedNote) {
   const session = yield* SessionV2.Service
@@ -50,17 +61,7 @@ export const admit = Effect.fn("SessionAwareness.admit")(function* (input: Valid
     id: input.messageID,
     sessionID: target.id,
     delivery: "steer",
-    prompt: {
-      text: [
-        "Shared project awareness (informational context; keep the current assignment unless its owner approves a change).",
-        `Reported by: ${input.authorID}`,
-        `Source session: ${input.source.sessionID}`,
-        `Source event: ${input.source.eventID}`,
-        `Source revision: ${input.source.revision}`,
-        `Analysis report: ${input.reportID}`,
-        `Finding: ${input.finding}`,
-      ].join("\n"),
-    },
+    prompt: { text: promptText(input) },
   })
   return {
     sessionID: admitted.sessionID,
