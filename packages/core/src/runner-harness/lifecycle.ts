@@ -562,6 +562,66 @@ export function make(input: Dependencies): Lifecycle {
       })
     })
 
+  const reattach: Lifecycle["reattach"] = (runId) =>
+    starts.withLock(runId)(
+      Effect.gen(function* () {
+        const current = yield* get(runId)
+        if (!current) return yield* Effect.fail(failure("not_found", "Local Run is missing"))
+        if (terminal.has(current.phase) || !current.workspace || !current.runtime)
+          return yield* Effect.fail(failure("conflict", "Run has no active runtime binding to reattach"))
+        yield* input.credentials.verify(current.run.command.executionOwner)
+        const principal = yield* input.credentials.principal(current.run.command.executionOwner)
+        if (
+          principal.workerId !== current.run.command.executionOwner.workerId ||
+          principal.instanceId !== current.run.command.executionOwner.instanceId
+        )
+          return yield* Effect.fail(failure("forbidden", "Runner identity does not match execution owner"))
+        const authorized = yield* input.binding.authorize(current.run.command)
+        if (
+          !sameCommand(authorized.command, current.run.command) ||
+          authorized.attempt !== current.run.attempt ||
+          authorized.projectId !== current.run.projectId ||
+          authorized.session.id !== current.run.session.id ||
+          authorized.session.projectID !== current.run.projectId
+        )
+          return yield* Effect.fail(failure("conflict", "Coordinator Run changed before runtime reattachment"))
+        yield* input.policy.workspace({ run: authorized, workspace: current.workspace })
+        const runtime = yield* input.runtimes.ensure({
+          run: authorized,
+          workspace: current.workspace,
+          readinessTimeoutMs: input.readinessTimeoutMs ?? 30_000,
+        })
+        if (
+          runtime.workerId !== current.run.command.executionOwner.workerId ||
+          runtime.instanceId !== current.run.command.executionOwner.instanceId
+        )
+          return yield* Effect.fail(failure("conflict", "Current runtime belongs to another execution owner"))
+        const session = yield* input.binding.attach({ run: authorized, workspace: current.workspace, runtime })
+        if (
+          session.id !== current.run.session.id ||
+          session.projectID !== current.run.projectId ||
+          session.location.directory !== current.workspace.directory ||
+          session.location.workspaceID !== current.workspace.id
+        )
+          return yield* Effect.fail(failure("conflict", "Session binding changed before runtime reattachment"))
+        const row = yield* input.db
+          .update(ExecutionTable)
+          .set({ runtime_id: runtime.id })
+          .where(
+            and(
+              eq(ExecutionTable.run_id, runId),
+              eq(ExecutionTable.phase, current.phase),
+              eq(ExecutionTable.runtime_id, current.runtime.id),
+            ),
+          )
+          .returning()
+          .get()
+          .pipe(Effect.mapError(() => failure("unavailable", "Local execution database unavailable")))
+        if (!row) return yield* Effect.fail(failure("conflict", "Runtime reattachment raced with a Run transition"))
+        return yield* load(row)
+      }),
+    )
+
   const holdObservation = (execution: LocalExecution, sourceKey: string) =>
     transition({
       runId: execution.run.command.runId,
@@ -892,6 +952,7 @@ export function make(input: Dependencies): Lifecycle {
     cancellationRequested,
     cancellationObserved,
     runtimeFailed,
+    reattach,
     get,
     byMessageId,
   }
