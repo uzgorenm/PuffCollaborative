@@ -10,6 +10,7 @@ import { PermissionV2 } from "../../../src/permission"
 import type { RunnerHarnessContracts } from "../../../src/runner-harness/contracts"
 import { RunnerEnvironment } from "../../../src/runner-harness/security/environment"
 import { RunnerSecurityPolicy } from "../../../src/runner-harness/security/policy"
+import { RunnerRedaction } from "../../../src/runner-harness/security/redaction"
 
 test("configured repository and canonical workspace root reject path escape and scope mismatch", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "runner-security-fixture-"))
@@ -150,4 +151,6 @@ test("tool rules and service destinations fail closed", () => {
       "coordination.example.test",
     ]),
   ).toBe(false)
+  expect(RunnerRedaction.safeReference("runner:/private/host/path")).toBeUndefined()
+  expect(RunnerRedaction.safeReference("runner:run_fixture/diff")).toBe("runner:run_fixture/diff")
 })
