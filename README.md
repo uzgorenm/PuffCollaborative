@@ -267,3 +267,63 @@ Runner → Server	Output, tool events, workspace changes, and execution status.
 Server → Intelligence	Meaningful events with authoritative sequence numbers.
 Intelligence → Server	Updated work card with the source event sequence it covers.
 UI ↔ Server	User actions in; shared events and activity cards out.
+
+## Run locally
+
+The desktop app is the main interface for this fork.
+
+Install Bun 1.3.14, the version pinned in `package.json`, then install dependencies:
+
+```sh
+bun install
+```
+
+Start the desktop app:
+
+```sh
+bun dev:desktop
+```
+
+The desktop development script builds the local server and prepares the Electron resources. See [packages/desktop/README.md](packages/desktop/README.md) for packaging commands.
+
+## Browser and CLI development
+
+To work on the shared UI in a browser, start the API server:
+
+```sh
+bun dev serve --hostname 127.0.0.1 --port 4096
+```
+
+In a second terminal, start the web app:
+
+```sh
+bun dev:web
+```
+
+Open [localhost:3000](http://localhost:3000) and connect to the local server at `http://127.0.0.1:4096`.
+
+To use the terminal interface instead:
+
+```sh
+bun dev /absolute/path/to/your/project
+```
+
+## Repository layout
+
+| Path                                                                      | Purpose                                       |
+| ------------------------------------------------------------------------- | --------------------------------------------- |
+| `packages/desktop`                                                        | Electron desktop app                          |
+| `packages/opencode`                                                       | Main CLI and server entry point               |
+| `packages/core`, `packages/llm`                                           | Sessions, tools, storage, and model execution |
+| `packages/server`, `packages/protocol`, `packages/schema`                 | Server implementation and API contracts       |
+| `packages/app`, `packages/ui`, `packages/session-ui`                      | Web app and shared interface components       |
+| `packages/cli`, `packages/tui`                                            | V2 CLI and terminal components                |
+| `packages/client`, `packages/sdk`, `packages/sdk-next`, `packages/plugin` | Clients, embedded SDK, and plugin interfaces  |
+
+The other workspace packages support these components. Existing runtime and app tests remain alongside their source.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for checks and API generation.
+
+## License
+
+This fork retains OpenCode's [MIT license](LICENSE) and copyright notice.

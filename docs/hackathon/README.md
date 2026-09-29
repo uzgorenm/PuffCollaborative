@@ -49,3 +49,7 @@ Within 45 minutes: Talha proves real session capture/input; Serhat publishes com
 One person runs two opted-in coding sessions exploring different approaches to the same frontend feature -> both see each other's current approach -> one finds a constraint relevant to both -> Flower produces a source-linked update -> the other active agent receives it at a safe boundary and visibly adapts. The person chooses an approach and approves any work-redirection instruction. Show a saved decision in a fresh session if the core flow is stable.
 
 Keep the original workers, worktrees, and credentials in place. Sharing context is not permission for arbitrary remote commands.
+
+## Repository setup
+
+The [desktop cleanup](https://github.com/uzgorenm/PuffCollaborative/commit/19076859c4d43ef59c0ec96b3b4ad565d8927c10) retains the desktop app, shared UI, runtime, server, and SDK. It removes 14 unused workspace packages, 21 translated READMEs, and upstream publishing and hosting tooling. All 21 workspace type checks, the desktop build, and 42 server/API/SDK checks passed locally. GitHub Actions workflows have been removed; run checks locally.
