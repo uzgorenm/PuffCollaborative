@@ -5,6 +5,7 @@
 - Serdar's instruction: no pull requests and no feature branches. Commit and push completed work directly to `origin/main` each time. Verify the relevant changes first, fetch the current remote state, and integrate teammates' commits. Never force-push or reset away another person's work.
 - Use `main` or `origin/main` for hackathon diffs. This workflow overrides the inherited upstream contribution/PR workflow.
 - Find team assignments and feature status in `docs/hackathon/README.md`; detailed task checklists are in `docs/hackathon/team-plan.md`, and feature acceptance criteria are in `docs/hackathon/mvp-spec.md`. Update the board when taking a task, becoming blocked, or completing verified work.
+- Before claiming a hackathon feature works, use `docs/hackathon/progress-checklist.md` and the named cases in `acceptance-workflows.md`; attach an evidence receipt at the actual tested commit. Keep source/unit/fixture/integration/live evidence distinct. Resolve shared wire/API decisions through `docs/coordination-contract.md` and `docs/hackathon/integration-gates.md`; the old `/puff/v1` design is not the implemented backend. Respect the four human owners and preserve concurrent local work.
 
 ## Shared Branch Workflow
 
