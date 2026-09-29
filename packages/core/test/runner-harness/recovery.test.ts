@@ -459,6 +459,9 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
         const active = new Set([sessionId])
         const runtimes = yield* RunnerHarnessRuntime.make({
           sessions: { get: () => Effect.succeed(setup.state.authorized.session) },
+          localExecution: {
+            get: (received) => Effect.succeed(received === runId ? setup.state.execution : undefined),
+          },
           execution: {
             active: Effect.sync(() => new Set(active)),
             resume: () => Effect.void,

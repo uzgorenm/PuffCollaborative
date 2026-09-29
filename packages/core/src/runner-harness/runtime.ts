@@ -14,7 +14,10 @@ type Dependencies = {
   ) => Effect.Effect<void, RunnerHarnessContracts.Failure>
   readonly credentials: RunnerHarnessContracts.Credentials
   readonly policy: RunnerHarnessContracts.SecurityPolicy
+  readonly localExecution: Pick<RunnerHarnessContracts.Lifecycle, "get">
   readonly runtimeFailed: RunnerHarnessContracts.Lifecycle["runtimeFailed"]
+  /** Shorter values are useful for deterministic service-double tests. */
+  readonly monitorGraceMs?: number
 }
 
 type Watch = {
@@ -114,6 +117,70 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
               ? 0
               : ("unknown" as const),
           checkedAt: Date.now(),
+        }
+      })
+
+    const monitorDrain = (execution: RunnerHarnessContracts.LocalExecution) =>
+      Effect.gen(function* () {
+        const runId = execution.run.command.runId
+        const sessionId = execution.run.command.sessionId
+        const expected = execution.runtime
+        if (!expected) return
+        const isStopped = () => state === "stopped"
+
+        while (!isStopped() && woken.get(runId) === sessionId) {
+          const active = yield* Effect.exit(deps.execution.active)
+          if (Exit.isFailure(active)) {
+            markUncertain(execution)
+            yield* reportFailure(runId, "Owned Session drain health became unavailable")
+            return
+          }
+          if (!active.value.has(sessionId)) break
+          yield* Effect.sleep(Duration.millis(100))
+        }
+        if (isStopped() || woken.get(runId) !== sessionId) return
+
+        const graceMs =
+          deps.monitorGraceMs === undefined || !Number.isFinite(deps.monitorGraceMs)
+            ? 30_000
+            : Math.min(Math.max(Math.floor(deps.monitorGraceMs), 1), 30_000)
+        const deadline = performance.now() + graceMs
+        while (!isStopped()) {
+          const result = yield* Effect.exit(
+            deps.localExecution.get(runId).pipe(Effect.timeoutOption(Duration.millis(1_000))),
+          )
+          if (Exit.isSuccess(result) && Option.isSome(result.value)) {
+            const current = result.value.value
+            if (!current) {
+              markUncertain(execution)
+              yield* reportFailure(runId, "Local Run record disappeared after the owned drain ended")
+              return
+            }
+            if (
+              current.run.command.runId !== runId ||
+              current.run.command.sessionId !== sessionId ||
+              current.run.command.runnerMessageId !== execution.run.command.runnerMessageId ||
+              current.run.attempt !== execution.run.attempt ||
+              current.workspace?.id !== execution.workspace?.id ||
+              current.runtime?.id !== expected.id ||
+              current.runtime.workerId !== expected.workerId ||
+              current.runtime.instanceId !== expected.instanceId
+            )
+              return
+            if (
+              current.phase === "completed" ||
+              current.phase === "failed" ||
+              current.phase === "cancelled" ||
+              current.phase === "recovery_required"
+            )
+              return
+          }
+          if (performance.now() >= deadline) {
+            markUncertain(execution)
+            yield* reportFailure(runId, "Owned Session drain ended without a confirmed terminal observation")
+            return
+          }
+          yield* Effect.sleep(Duration.millis(Math.max(1, Math.min(1_000, deadline - performance.now()))))
         }
       })
 
@@ -326,7 +393,19 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
           // A new wake starts a fresh owned drain; earlier interruption evidence does not describe it.
           uncertainRuns.delete(execution.run.command.runId)
           const started = yield* Effect.exit(deps.execution.wake(execution.run.command.sessionId))
-          if (Exit.isSuccess(started)) return
+          if (Exit.isSuccess(started)) {
+            yield* monitorDrain(execution).pipe(
+              Effect.catchCause((cause) =>
+                Cause.hasInterruptsOnly(cause)
+                  ? Effect.void
+                  : Effect.sync(() => markUncertain(execution)).pipe(
+                      Effect.andThen(reportFailure(execution.run.command.runId, Cause.pretty(cause))),
+                    ),
+              ),
+              Effect.forkIn(scope),
+            )
+            return
+          }
           woken.delete(execution.run.command.runId)
           markUncertain(execution)
           state = "failed"
