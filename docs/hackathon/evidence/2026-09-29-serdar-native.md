@@ -58,3 +58,14 @@ This command assumes predev resources exist and Electron is installed; don't run
 ## Integration handoff
 
 Ready UI commit `f4c8ad9ee4f9c9e411e161e6ea6980099ecc85c0`. Coordinator owns any later main integration; this lead publishes only `serdar/ui`. The frozen original server composition fix is outside this commit; newer backend dependencies and hashes are in [desktop handoff](../serdar-desktop-handoff.md). Panel ownership and props: [panel handoff](../serdar-context-panel-handoff.md). Review/QA drafts and R1's separately reserved integration test are excluded from this code commit until their owners finish and results are reviewed.
+
+## Independent target QA addendum — September 29, 13:43 PDT
+
+Agent3 completed a bounded pass on the intended native Electron renderer5175/CDP9223 with a dedicated agent-browser session. Reviewed source hashes remained those of code `f4c8ad9ee4`; HEAD's later changes were documentation only. Input control was released back to the lead, and the initial1280×800/DPR2 renderer geometry was restored.
+
+- QA-N02 passes in both local and shared760×800 renderer layouts: keyboard-focused Send and its ring stay visible with context open; center hit-testing confirmed the control is exposed. This is native-renderer viewport emulation, **not** an OS minimum-window-size test. [Narrow focus capture](assets/2026-09-29-serdar-native-narrow-focus.png), also visually inspected by the lead.
+- Local A/B preserved the lead's original distinct unsent drafts, and the exact Session context updated after loading. The expanded static inline patch survived navigation and toggles. Traversing from the original composer into context, then pressing Escape, closed the panel and returned focus to Team context.
+- Shared A's temporary unsent marker survived A→B→A while B stayed empty. QA cleared its marker. The normal review pane opened beside coding with context stacked; this fixture has no tracked repository changes, so only the static inline diff was exercised.
+- QA restored compact local Session, original unsent A/B drafts, expanded inline patch, open context, expanded sidebar, closed review and composer focus. No sends, Session creation, backend controls, process restarts or OS-preference changes.
+
+Still untested: exact source-citation/receipt navigation, long-history restoration, native minimum window geometry, OS reduced motion and offline failure behavior. There was no fresh integrated-main launch, installer test or Flower execution. These bounded passes do not close all D01–D06 subcases or WF02/WF10. The detailed Agent3 receipt remains separately owned while its final write completes.

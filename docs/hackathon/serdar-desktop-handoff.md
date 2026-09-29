@@ -1,3 +1,7 @@
+## Native QA update
+
+Agent3 has completed its bounded intended-target pass and released input control. QA-N02 (focused Send obscured at narrow width) is verified fixed at760×800 in the Electron renderer; A/B drafts, bound context, inline patch retention and Escape focus return passed. Native minimum size, OS reduced motion, long-history/citation/offline cases remain untested. Original1280×800/DPR2 restored, both apps idle. See the independent-QA addendum in the native receipt. No code changed after f4c8ad9ee4.
+
 ## Ready code checkpoint
 
 `f4c8ad9ee4f9c9e411e161e6ea6980099ecc85c0` is the coherent verified UI/native-startup commit on `serdar/ui`. App and desktop typechecks/builds pass; focused app27/27, desktop48/48, browser41/41. Full app758pass plus known Punjabi locale failure. Production before/after session/review benchmark passed. [Full receipt](evidence/2026-09-29-serdar-native.md). No main push or backend merge by this lead. The native target is now exclusively released to Agent3 QA (Electron41738/profile `/tmp/puff-serdar-ui-desktop`, renderer5175/CDP9223); lead will not interact during its bounded retest. Original9222 is idle and no longer under active QA.
