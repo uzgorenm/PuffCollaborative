@@ -315,10 +315,15 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
     }),
   )
 
-  it.effect("reconciles lost submission acknowledgment and wakes only a reserved unpromoted input", () =>
+  it.effect("reconciles lost submission acknowledgment while the same coordinator Run remains active", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("admitted")
       yield* setup.admit()
+      setup.state.coordinatorRun = {
+        ...setup.state.coordinatorRun,
+        state: "running",
+        startedAt: "2026-09-29T00:00:01.000Z",
+      }
       expect(yield* setup.make().reconcile(setup.command.runnerMessageId)).toBe("admitted")
       yield* setup.make().recover
       expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
