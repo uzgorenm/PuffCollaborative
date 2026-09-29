@@ -1,5 +1,15 @@
 # Puff Collaborative Implementation Plan
 
+Ferit's isolated activity/Jev slice (`hackathon/flower/activity/`):
+
+- [x] Deterministic event reduction, queued/start distinction, current-only summaries.
+- [x] Injected Jev classification, real TypeSafe request path, debounce and bounded fallback.
+- [x] Eight synthetic histories, selected/capped evidence, 16 passing unit tests.
+- [ ] Serhat confirms C2/C3 sequence/selection mapping and C8 Flower input format.
+- [ ] Agent 1 consumes the same evidence in a real Flower chain; no live claim yet.
+
+See the activity README and `evidence/2026-09-29-activity-intelligence.md` receipt.
+
 > **For agentic workers:** Use superpowers:subagent-driven-development or superpowers:executing-plans when implementing an approved owned slice. Steps use checkboxes. This plan assigns four human owners; coordinator review agents do not replace those owners.
 
 **Goal:** One agent's new finding improves another agent's ongoing work while deliberate alternative frontend experiments remain separate.

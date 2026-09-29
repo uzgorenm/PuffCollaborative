@@ -4,6 +4,12 @@ This is the coordinator's working checklist. A feature counts as progress when i
 
 ## Current checkpoint
 
+Activity/Jev component checkpoint (Ferit): 16 Python unit tests and eight
+synthetic histories pass from `hackathon/flower`. This supports component controls
+for WF01/WF04/WF05/WF06; none of those live workflows is marked complete.
+C2/C3/C8 mapping and real chain/backend handoff remain open. See
+`evidence/2026-09-29-activity-intelligence.md` for the tested commit receipt.
+
 Baseline reviewed on September 29 at source commit `e42a799cf6aefe1cc6d6907310b3ff8bf467ed43`, with incoming-source updates through `5c8e111931`. The [baseline receipt](evidence/2026-09-29-coordinator-baseline.md) distinguishes those inspections. Later changes need their own evidence.
 
 | Area | Evidence available at the baseline | Next demonstrable result |

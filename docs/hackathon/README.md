@@ -24,6 +24,13 @@ Status distinguishes merged work, explicitly observed local work and unverified 
 
 ## Our features
 
+Ferit's activity/Jev slice: **unit/fixture verified, integration pending**. Separate
+implementation in `hackathon/flower/activity/` includes deterministic cards,
+bounded refresh scheduling, injected/real Jev clients, and selected evidence.
+See its README for C2/C3/C8 contract questions. This does not close G2/WF10 or
+claim Agent 1's Flower chain is integrated. Exact receipt follows in
+`evidence/2026-09-29-activity-intelligence.md`.
+
 | ID | Feature | Main contributors | Priority | Status |
 | --- | --- | --- | --- | --- |
 | F1 | Selected related sessions and activity | Talha, Serhat, Serdar | Required | Planned |
