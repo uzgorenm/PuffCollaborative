@@ -65,3 +65,53 @@ and explicit human handoffs.
 
 Defer automatic task assignment, automatic merging, and migration of
 running sessions between machines.
+
+## Task Delegation
+
+### Teammate 1 — Shared server and request coordination
+Owns the source of truth: projects, threads, messages, request ordering, and execution state.
+Build:
+- Shared projects and threads, with contributor attribution and basic access control.
+- A persistent queue per thread: one active agent turn per thread, different threads run concurrently.
+- Duplicate-submission protection, live event broadcasting, and reconnect replay.
+- Stop and approval controls that bypass the instruction queue.
+Boundary: Decides what runs next, but does not implement agent execution or summaries.
+Demo test: Two teammates submit to the same thread. Both see the same queue, the second turn waits, and another thread continues independently.
+### Teammate 2 — OpenCode execution and workspaces
+Owns turning an authorized run into actual coding work.
+Build:
+- The adapter connecting each shared thread to its OpenCode session.
+- A separate worktree and branch for each independently executing thread.
+- Execution of the entire agent turn, including model calls and tool use.
+- Reporting of streamed output, tool activity, changed files, diffs, and final status to the server.
+- Cancellation and approval handling connected to the server’s controls.
+Boundary: Executes the server’s assignments; does not create a separate queue or independently decide execution order.
+Demo test: Two threads edit the same filename in separate workspaces without overwriting one another. Both expose their progress and diffs.
+### Teammate 3 — Multiplayer interface and activity dashboard
+Owns everything teammates see and interact with.
+Build:
+- A project view showing everyone’s shared threads.
+- Live conversations with contributor names, running turns, queued instructions, tool activity, and diffs.
+- Instruction submission, comments, stop controls, and approval controls.
+- Teammate activity cards with Working now, Up next, and Last 60 minutes.
+- Navigation from an activity summary directly into its source thread.
+Boundary: Displays server state and generated summaries; does not determine execution order or write summaries itself.
+Demo test: Two browsers can watch and contribute to the same thread. The dashboard distinguishes active work from queued work and recent completed work.
+### Teammate 4 — Activity intelligence, Jev, and Flower
+Owns understanding what everyone is working on and keeping summaries current.
+Build:
+- Event processing that produces a compact work card for each thread: objective, current step, blocker, recent outcome, and contributors.
+- Jev classification for continuation, added scope, pivot, meaningful progress, and blocker changes.
+- Summary generation, debouncing, and a fallback refresh when classification fails.
+- Version checks so older summary results cannot overwrite newer ones.
+- The Flower job adapter for executing the analysis workflow, starting with an early end-to-end integration test.
+Keep factual execution statuses deterministic. Classification should affect summary refreshes—not permissions, locks, or whether coding can proceed.
+Boundary: Returns versioned work cards to the server; does not own thread execution or the dashboard.
+Demo test: Adding another feature expands the summary; abandoning the current objective changes it. Queued instructions remain “up next” until they start.
+### How the four pieces connect
+Handoff	Contract
+Server → Runner	Start, cancel, or approve a specific run.
+Runner → Server	Output, tool events, workspace changes, and execution status.
+Server → Intelligence	Meaningful events with authoritative sequence numbers.
+Intelligence → Server	Updated work card with the source event sequence it covers.
+UI ↔ Server	User actions in; shared events and activity cards out.
