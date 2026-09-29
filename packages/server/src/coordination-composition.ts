@@ -8,6 +8,7 @@ import { CoordinationEvents } from "@opencode-ai/core/coordination/events/events
 import { CoordinationProjects } from "@opencode-ai/core/coordination/projects/index"
 import { CoordinationQueue } from "@opencode-ai/core/coordination/queue/queue"
 import { RunnerAdapter } from "@opencode-ai/core/coordination/runner/adapter"
+import type { ApprovalStore } from "@opencode-ai/core/coordination/runner/adapter"
 import { MockRunner } from "@opencode-ai/core/coordination/runner/mock"
 import { CoordinationSnapshot } from "@opencode-ai/core/coordination/snapshot"
 import { WorkCard } from "@opencode-ai/core/coordination/work-card/work-card"
@@ -19,13 +20,32 @@ import { CoordinationConfig } from "./coordination-config"
 import { loadProjectAdmission, mockSessionBinding } from "./coordination-dev-adapters"
 import { CoordinationRuntime } from "./coordination-runtime"
 
-export interface CoordinationPorts {
+export interface CoordinationRunnerFactoryInput {
+  readonly db: Database.Interface["db"]
+  readonly authentication: CoordinationContracts.Authentication
+  readonly access: CoordinationContracts.Access
+  readonly queue: CoordinationContracts.Queue
+  readonly approvals: ApprovalStore
+  readonly events: CoordinationContracts.Events
+}
+
+export interface CoordinationRunnerFactoryResult {
+  readonly sessionBinding: CoordinationContracts.SessionBinding
+  readonly runnerPort: CoordinationContracts.RunnerPort
+  /** Bind callbacks and finish recovery before coordination routes become ready. */
+  readonly ready: (runner: CoordinationContracts.Runner) => Effect.Effect<void, CoordinationContracts.Failure>
+}
+
+export interface CoordinationPorts<R = never> {
   readonly projectAdmission?: CoordinationContracts.ProjectAdmission
   readonly sessionBinding?: CoordinationContracts.SessionBinding
   readonly runnerPort?: CoordinationContracts.RunnerPort
+  readonly runnerFactory?: (
+    input: CoordinationRunnerFactoryInput,
+  ) => Effect.Effect<CoordinationRunnerFactoryResult, CoordinationContracts.Failure, R>
 }
 
-export const coordinationLayer = (ports: CoordinationPorts = {}) =>
+export const coordinationLayer = <R = never>(ports: CoordinationPorts<R> = {}) =>
   Layer.effect(
     CoordinationRuntime,
     Effect.gen(function* () {
@@ -43,21 +63,40 @@ export const coordinationLayer = (ports: CoordinationPorts = {}) =>
               Effect.match({ onFailure: () => undefined, onSuccess: (value) => value }),
             )
           : undefined)
-      const mockWorker =
-        !ports.runnerPort && CoordinationConfig.mockRunner() ? CoordinationConfig.mockWorker() : undefined
-      const workerId = mockWorker as Parameters<CoordinationContracts.Runner["claim"]>[2]["workerId"] | undefined
-      const binding = ports.sessionBinding ?? (workerId ? mockSessionBinding(database.db, workerId) : undefined)
-      const missing = [
-        ...(!identity ? ["identity roster"] : []),
-        ...(!admission ? ["trusted project admission"] : []),
-        ...(!binding ? ["Session binding"] : []),
-        ...(!ports.runnerPort && !workerId ? ["runner port"] : []),
-      ]
-      if (!identity || !admission || !binding || (!ports.runnerPort && !workerId))
-        return CoordinationRuntime.of({ missing, authentication: identity })
-
+      if (ports.runnerFactory && (ports.sessionBinding || ports.runnerPort || CoordinationConfig.mockRunner()))
+        return CoordinationRuntime.of({
+          missing: ["conflicting runner configuration"],
+          authentication: identity,
+        })
+      if (!identity || !admission)
+        return CoordinationRuntime.of({
+          missing: [...(!identity ? ["identity roster"] : []), ...(!admission ? ["trusted project admission"] : [])],
+          authentication: identity,
+        })
       const access = CoordinationAccess.make(database.db)
       const queue = CoordinationQueue.make({ db: database.db, access, events })
+      const approvals = CoordinationApproval.make({ db: database.db, events, access, queue })
+      const assembled = ports.runnerFactory
+        ? yield* ports
+            .runnerFactory({ db: database.db, authentication: identity, access, queue, approvals, events })
+            .pipe(Effect.match({ onFailure: () => undefined, onSuccess: (value) => value }))
+        : undefined
+      const mockWorker =
+        !ports.runnerFactory && !ports.runnerPort && CoordinationConfig.mockRunner()
+          ? CoordinationConfig.mockWorker()
+          : undefined
+      const workerId = mockWorker as Parameters<CoordinationContracts.Runner["claim"]>[2]["workerId"] | undefined
+      const binding =
+        ports.sessionBinding ??
+        assembled?.sessionBinding ??
+        (workerId ? mockSessionBinding(database.db, workerId) : undefined)
+      const port = ports.runnerPort ?? assembled?.runnerPort
+      const missing = [
+        ...(!binding ? ["Session binding"] : []),
+        ...(!port && !workerId ? [ports.runnerFactory ? "runner factory" : "runner port"] : []),
+      ]
+      if (!binding || (!port && !workerId)) return CoordinationRuntime.of({ missing, authentication: identity })
+
       const projects = CoordinationProjects.make({
         db: database.db,
         access,
@@ -68,7 +107,6 @@ export const coordinationLayer = (ports: CoordinationPorts = {}) =>
         members: identity,
       })
       const comments = CoordinationComments.make({ db: database.db, access, events })
-      const approvals = CoordinationApproval.make({ db: database.db, events, access, queue })
       let runner: CoordinationContracts.Runner
       const mock = workerId
         ? MockRunner.createMockRunner({
@@ -103,7 +141,13 @@ export const coordinationLayer = (ports: CoordinationPorts = {}) =>
             ],
           })
         : undefined
-      runner = RunnerAdapter.make({ access, queue, port: ports.runnerPort ?? mock!.port, approvals })
+      runner = RunnerAdapter.make({ access, queue, port: port ?? mock!.port, approvals })
+      if (assembled) {
+        const ready = yield* assembled
+          .ready(runner)
+          .pipe(Effect.match({ onFailure: () => false, onSuccess: () => true }))
+        if (!ready) return CoordinationRuntime.of({ missing: ["runner startup"], authentication: identity })
+      }
       const workCards = yield* WorkCard.make({
         access,
         events,
