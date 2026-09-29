@@ -11,7 +11,7 @@ import type { CoordinationContracts } from "@opencode-ai/core/coordination/contr
 import { eq } from "drizzle-orm"
 import { testEffect } from "../../lib/effect"
 
-// The journal and SQLite are real. Thread-to-project lookup is a fixture until Access lands.
+// The journal and SQLite are real; this suite injects thread lookup to isolate journal behavior.
 const threadProjects = new Map<string, Coordination.ProjectID>()
 const it = testEffect(
   AppNodeBuilder.build(LayerNode.group([Database.node, EventV2.node, CoordinationEvents.node]), [

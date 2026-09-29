@@ -1,5 +1,6 @@
 import { describe, expect } from "bun:test"
-import { Effect, Fiber, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Stream } from "effect"
+import { eq } from "drizzle-orm"
 import { Coordination } from "@opencode-ai/schema/coordination"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { Database } from "@opencode-ai/core/database/database"
@@ -19,7 +20,7 @@ import { testEffect } from "../../lib/effect"
 const it = testEffect(AppNodeBuilder.build(LayerNode.group([Database.node, EventV2.node, CoordinationEvents.node])))
 
 describe("coordination events with real thread storage and access", () => {
-  it.effect("replays and streams only for project members", () =>
+  it.effect("replays for members and stops an open stream after membership revocation", () =>
     Effect.gen(function* () {
       const { db } = yield* Database.Service
       yield* DatabaseMigration.applyOnly(db, [accessMigration])
@@ -103,12 +104,28 @@ describe("coordination events with real thread storage and access", () => {
       expect(deniedProject.code).toBe("forbidden")
 
       const live = yield* CoordinationEvents.authorizedSubscribeThread(access, journal, alice, threadId, first.seq)
-      const observer = yield* live.pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
+      const seen: Coordination.Event[] = []
+      const firstSeen = yield* Deferred.make<void>()
+      const observer = yield* live.pipe(
+        Stream.take(2),
+        Stream.runForEach((event) =>
+          Effect.sync(() => seen.push(event)).pipe(Effect.andThen(Deferred.succeed(firstSeen, undefined)), Effect.asVoid),
+        ),
+        Effect.exit,
+        Effect.forkScoped,
+      )
       const second = yield* journal.append(
         { projectId, threadId, kind: "run.tool", occurredAt: new Date(now + 1).toISOString(), payload: { status: "finished" } },
         () => Effect.void,
       )
-      expect(Array.from(yield* Fiber.join(observer))).toEqual([second])
+      yield* Deferred.await(firstSeen)
+      yield* db.delete(MembershipTable).where(eq(MembershipTable.project_id, projectId)).run()
+      yield* journal.append(
+        { projectId, threadId, kind: "run.tool", occurredAt: new Date(now + 2).toISOString(), payload: { status: "after revocation" } },
+        () => Effect.void,
+      )
+      expect(Exit.isFailure(yield* Fiber.join(observer))).toBe(true)
+      expect(seen).toEqual([second])
     }),
   )
 })

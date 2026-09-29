@@ -53,7 +53,9 @@ export const authorizedSubscribeProject = (
   Effect.gen(function* () {
     yield* access.authorize(auth, projectId, undefined, "read")
     yield* journal.replayProject(projectId, after, 1)
-    return journal.subscribeProject(projectId, after)
+    return journal.subscribeProject(projectId, after).pipe(
+      Stream.mapEffect((event) => access.authorize(auth, projectId, undefined, "read").pipe(Effect.as(event))),
+    )
   })
 
 export const authorizedSubscribeThread = (
@@ -66,7 +68,9 @@ export const authorizedSubscribeThread = (
   Effect.gen(function* () {
     yield* access.getThread(auth, threadId, "read")
     yield* journal.replayThread(threadId, after, 1)
-    return journal.subscribeThread(threadId, after)
+    return journal.subscribeThread(threadId, after).pipe(
+      Stream.mapEffect((event) => access.getThread(auth, threadId, "read").pipe(Effect.as(event))),
+    )
   })
 
 export const layerWith = (options?: LayerOptions) =>
