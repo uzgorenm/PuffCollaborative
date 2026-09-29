@@ -1,12 +1,15 @@
 import { expect, test } from "bun:test"
 import { DateTime, Effect } from "effect"
 import { Coordination } from "@opencode-ai/schema/coordination"
+import { Permission } from "@opencode-ai/schema/permission"
 import { Session } from "@opencode-ai/schema/session"
 import { SessionInput } from "@opencode-ai/schema/session-input"
 import { AbsolutePath } from "@opencode-ai/schema/schema"
 import { Database } from "@opencode-ai/core/database/database"
 import { RunnerLifecycle } from "@opencode-ai/core/runner-harness/lifecycle"
+import { ExecutionTable } from "@opencode-ai/core/runner-harness/sql"
 import type { RunnerHarnessContracts } from "@opencode-ai/core/runner-harness/contracts"
+import { eq } from "drizzle-orm"
 
 function command(name: string, thread = name): RunnerHarnessContracts.StartCommand {
   return {
@@ -43,6 +46,7 @@ function setup(db: Database.Interface["db"]) {
   const calls = { prompts: 0, workspaces: 0, watches: 0, wakes: 0, order: [] as string[] }
   const state = {
     promptFailure: false,
+    workspaceFailure: false,
     reconciliation: "missing" as RunnerHarnessContracts.Reconciliation,
     activeTools: 0,
   }
@@ -59,8 +63,7 @@ function setup(db: Database.Interface["db"]) {
       prompt: (input) => {
         calls.prompts++
         calls.order.push("prompt")
-        if (state.promptFailure)
-          return Effect.fail({ _tag: "Session.NotFoundError", sessionID: input.sessionID } as never)
+        if (state.promptFailure) return Effect.die(new Error("Prompt timed out after possible admission"))
         return Effect.succeed(
           SessionInput.Admitted.make({
             id: input.id!,
@@ -104,8 +107,10 @@ function setup(db: Database.Interface["db"]) {
     },
     workspaces: {
       ensure: (run) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
           calls.workspaces++
+          if (state.workspaceFailure)
+            return yield* Effect.fail({ code: "conflict" as const, message: "Workspace binding changed" })
           return {
             id: `workspace_${run.command.threadId}`,
             threadId: run.command.threadId,
@@ -138,9 +143,11 @@ function setup(db: Database.Interface["db"]) {
         Effect.succeed({
           runtime: execution.runtime!,
           sessionId: execution.run.session.id,
+          abort: "acknowledged",
           state: "stopped",
           checkedAt: 0,
         }),
+      startDelivery: () => Effect.void,
       shutdown: () => Effect.void,
     },
     ingestion: {
@@ -243,7 +250,56 @@ test("holds an ambiguous prompt submission for reconciliation without resubmitti
       expect((yield* harness.service.get(first.runId))?.phase).toBe("recovery_required")
       const retry = yield* harness.service.start(first).pipe(Effect.flip)
       expect(retry.code).toBe("unavailable")
+      harness.state.reconciliation = "admitted"
+      const knownAdmission = yield* harness.service.start(first).pipe(Effect.flip)
+      expect(knownAdmission.code).toBe("unavailable")
       expect(harness.calls.prompts).toBe(1)
+      expect(harness.calls.wakes).toBe(0)
+    }),
+  ))
+
+test("holds a prepared retry when durable admission exists but scheduling is unverified", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("prepared")
+      const bound = session(first)
+      yield* harness.service.accept({ command: first, projectId: bound.projectID, attempt: 1, session: bound })
+      yield* harness.service.prepared({
+        runId: first.runId,
+        workspace: {
+          id: `workspace_${first.threadId}`,
+          threadId: first.threadId,
+          projectId: bound.projectID,
+          directory: bound.location.directory,
+        },
+        runtime: { id: `runtime_${first.threadId}`, ...first.executionOwner },
+        sessionId: first.sessionId,
+      })
+      harness.state.reconciliation = "admitted"
+      const retry = yield* harness.service.start(first).pipe(Effect.flip)
+      expect(retry.code).toBe("unavailable")
+      expect((yield* harness.service.get(first.runId))?.phase).toBe("recovery_required")
+      expect(harness.calls.prompts).toBe(0)
+      expect(harness.calls.wakes).toBe(0)
+    }),
+  ))
+
+test("records a deterministic preparation failure before prompt side effects", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("bad-workspace")
+      harness.state.workspaceFailure = true
+      const rejected = yield* harness.service.start(first).pipe(Effect.flip)
+      expect(rejected.code).toBe("conflict")
+      expect((yield* harness.service.get(first.runId))?.phase).toBe("failed")
+      expect(harness.calls.prompts).toBe(0)
+      expect(harness.drafts.at(-1)?.callback).toMatchObject({
+        kind: "state",
+        expectedState: "reserved",
+        nextState: "failed",
+      })
     }),
   ))
 
@@ -351,6 +407,39 @@ test("waits for outstanding tools before accepting settled turn evidence", () =>
     }),
   ))
 
+test("ignores an older Session observation for the same Run", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("older-event")
+      yield* harness.service.start(first)
+      yield* harness.emit(first.runId, {
+        kind: "promoted",
+        runId: first.runId,
+        messageId: first.runnerMessageId,
+        sourceKey: "promoted",
+        sourceSessionSeq: 10,
+      })
+      yield* harness.emit(first.runId, {
+        kind: "settled",
+        runId: first.runId,
+        messageId: first.runnerMessageId,
+        sourceKey: "stale-settled",
+        sourceSessionSeq: 9,
+      })
+      expect((yield* harness.service.get(first.runId))?.phase).toBe("running")
+      expect(harness.drafts.some((draft) => draft.producerKey === "stale-settled")).toBe(false)
+      yield* harness.emit(first.runId, {
+        kind: "settled",
+        runId: first.runId,
+        messageId: first.runnerMessageId,
+        sourceKey: "settled",
+        sourceSessionSeq: 11,
+      })
+      expect((yield* harness.service.get(first.runId))?.phase).toBe("completed")
+    }),
+  ))
+
 test("records a runtime failure before preparation and refuses unauthenticated acceptance", () =>
   withDatabase((db) =>
     Effect.gen(function* () {
@@ -385,5 +474,69 @@ test("records a runtime failure before preparation and refuses unauthenticated a
         expectedState: "reserved",
         nextState: "recovery_required",
       })
+    }),
+  ))
+
+test("records tool activity before the approval state callback", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("approval")
+      yield* harness.service.start(first)
+      yield* harness.emit(first.runId, {
+        kind: "promoted",
+        runId: first.runId,
+        messageId: first.runnerMessageId,
+        sourceKey: "promoted",
+      })
+      yield* harness.service.approvalRequested({
+        runId: first.runId,
+        sessionId: first.sessionId,
+        permissionRequestId: Permission.ID.make("per_approval"),
+        toolCallId: "tool_call",
+        toolName: "shell",
+        summary: "Needs permission",
+        approvalId: "approval_one",
+        delivery: "pending",
+      })
+      expect(harness.drafts.slice(-2).map((draft) => draft.producerKey)).toEqual([
+        "approval:approval_one:tool",
+        "approval:approval_one:requested",
+      ])
+      expect(harness.drafts.at(-1)?.callback).toMatchObject({
+        kind: "state",
+        expectedState: "running",
+        nextState: "waiting_approval",
+      })
+    }),
+  ))
+
+test("persists exact cancellation evidence and rejects an older observation", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("cancel")
+      yield* harness.service.start(first)
+      yield* harness.service.cancellationRequested(first.runId)
+      const result = {
+        runId: first.runId,
+        result: {
+          runtime: { id: `runtime_${first.threadId}`, ...first.executionOwner },
+          sessionId: first.sessionId,
+          abort: "acknowledged" as const,
+          state: "uncertain" as const,
+          checkedAt: 10,
+        },
+      }
+      expect((yield* harness.service.cancellationObserved(result)).phase).toBe("cancelling")
+      expect((yield* harness.service.cancellationObserved(result)).phase).toBe("cancelling")
+      const stale = yield* harness.service
+        .cancellationObserved({ ...result, result: { ...result.result, checkedAt: 9 } })
+        .pipe(Effect.flip)
+      expect(stale.code).toBe("conflict")
+      const row = yield* db.select().from(ExecutionTable).where(eq(ExecutionTable.run_id, first.runId)).get()
+      expect(row?.interrupt_abort).toBe("acknowledged")
+      expect(row?.interrupt_state).toBe("uncertain")
+      expect(row?.interrupt_checked_at).toBe(10)
     }),
   ))

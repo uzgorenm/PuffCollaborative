@@ -9,8 +9,6 @@ import type { Database } from "../database/database"
 import { KeyedMutex } from "../effect/keyed-mutex"
 import { ExecutionTable } from "./sql"
 import type {
-  ApprovalMapping,
-  ApprovalResult,
   AuthorizedRun,
   CallbackDraft,
   Credentials,
@@ -65,6 +63,7 @@ type Row = typeof ExecutionTable.$inferSelect
 export function make(input: Dependencies): Lifecycle {
   const now = input.now ?? Date.now
   const starts = KeyedMutex.makeUnsafe<Coordination.RunID>()
+  const observations = KeyedMutex.makeUnsafe<Coordination.RunID>()
 
   const load = (row: Row) =>
     Effect.gen(function* () {
@@ -307,6 +306,15 @@ export function make(input: Dependencies): Lifecycle {
             if (!current) return yield* Effect.fail(failure("not_found", "Local Run is missing"))
             if (current.phase !== expected)
               return yield* Effect.fail(failure("conflict", "Stale local Run observation"))
+            if (
+              callbacks.some(
+                (draft) =>
+                  draft.sourceSessionSeq !== undefined &&
+                  current.last_session_seq !== null &&
+                  draft.sourceSessionSeq <= current.last_session_seq,
+              )
+            )
+              return yield* Effect.fail(failure("conflict", "Stale Session observation"))
             const sourceSeq = callbacks.reduce(
               (latest, draft) => Math.max(latest, draft.sourceSessionSeq ?? latest),
               current.last_session_seq ?? -1,
@@ -350,6 +358,20 @@ export function make(input: Dependencies): Lifecycle {
         expected: "running",
         next: "waiting_approval",
         callbacks: [
+          {
+            runId: mapping.runId,
+            producerKey: `approval:${mapping.approvalId}:tool`,
+            callback: {
+              kind: "activity",
+              state: "running",
+              activity: {
+                kind: "run.tool",
+                toolName: mapping.toolName,
+                status: "started",
+                summary: mapping.summary,
+              },
+            },
+          },
           {
             runId: mapping.runId,
             producerKey: `approval:${mapping.approvalId}:requested`,
@@ -403,6 +425,67 @@ export function make(input: Dependencies): Lifecycle {
       return yield* transition({ runId, expected: current.phase, next: "cancelling", callbacks: [] })
     })
 
+  const cancellationObserved: Lifecycle["cancellationObserved"] = ({ runId, result }) =>
+    Effect.gen(function* () {
+      const current = yield* get(runId)
+      if (!current) return yield* Effect.fail(failure("not_found", "Local Run is missing"))
+      if (terminal.has(current.phase)) return current
+      if (
+        current.phase !== "cancelling" ||
+        current.run.session.id !== result.sessionId ||
+        current.runtime?.id !== result.runtime.id ||
+        current.runtime.workerId !== result.runtime.workerId ||
+        current.runtime.instanceId !== result.runtime.instanceId
+      )
+        return yield* Effect.fail(failure("conflict", "Cancellation observation belongs to another execution"))
+      if (!Number.isSafeInteger(result.checkedAt) || result.checkedAt < 0)
+        return yield* Effect.fail(failure("invalid", "Cancellation observation has an invalid timestamp"))
+      const row = yield* input.db
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            const stored = yield* tx
+              .select()
+              .from(ExecutionTable)
+              .where(eq(ExecutionTable.run_id, runId))
+              .get()
+              .pipe(Effect.orDie)
+            if (!stored || stored.phase !== "cancelling" || stored.runtime_id !== result.runtime.id)
+              return yield* Effect.fail(failure("conflict", "Cancellation observation is stale"))
+            if (stored.interrupt_checked_at !== null) {
+              if (result.checkedAt < stored.interrupt_checked_at)
+                return yield* Effect.fail(
+                  failure("conflict", "Older cancellation observation cannot replace newer evidence"),
+                )
+              if (result.checkedAt === stored.interrupt_checked_at) {
+                if (stored.interrupt_abort === result.abort && stored.interrupt_state === result.state) return stored
+                return yield* Effect.fail(failure("conflict", "Cancellation evidence changed at the same timestamp"))
+              }
+            }
+            const updated = yield* tx
+              .update(ExecutionTable)
+              .set({
+                interrupt_abort: result.abort,
+                interrupt_state: result.state,
+                interrupt_checked_at: result.checkedAt,
+                updated_at: now(),
+              })
+              .where(and(eq(ExecutionTable.run_id, runId), eq(ExecutionTable.phase, "cancelling")))
+              .returning()
+              .get()
+              .pipe(Effect.orDie)
+            if (!updated)
+              return yield* Effect.fail(failure("conflict", "Cancellation observation raced with terminal state"))
+            return updated
+          }),
+        )
+        .pipe(
+          Effect.catchTag("SqlError", () =>
+            Effect.fail(failure("unavailable", "Local execution database unavailable")),
+          ),
+        )
+      return yield* load(row)
+    })
+
   const runtimeFailed: Lifecycle["runtimeFailed"] = ({ runId, runtime }) =>
     Effect.gen(function* () {
       const current = yield* get(runId)
@@ -447,44 +530,85 @@ export function make(input: Dependencies): Lifecycle {
     })
 
   const onObservation = (observed: Observation) =>
-    Effect.gen(function* () {
-      const current = yield* get(observed.runId)
-      if (!current || terminal.has(current.phase)) return
-      if (current.phase === "recovery_required" && observed.kind !== "promoted") return
-      if (observed.kind !== "activity" && observed.kind !== "permission") {
-        if (observed.messageId !== current.run.command.runnerMessageId) return
-      }
-      if (observed.kind === "activity") {
-        if (current.phase !== "running" && current.phase !== "waiting_approval") return
+    observations.withLock(observed.runId)(
+      Effect.gen(function* () {
+        if (observed.kind !== "permission" && observed.sourceSessionSeq !== undefined) {
+          const row = yield* input.db
+            .select()
+            .from(ExecutionTable)
+            .where(eq(ExecutionTable.run_id, observed.runId))
+            .get()
+            .pipe(Effect.orDie)
+          if (
+            row?.last_session_seq !== null &&
+            row?.last_session_seq !== undefined &&
+            observed.sourceSessionSeq <= row.last_session_seq
+          )
+            return
+        }
+        const current = yield* get(observed.runId)
+        if (!current || terminal.has(current.phase)) return
+        if (current.phase === "recovery_required" && observed.kind !== "promoted") return
+        if (observed.kind !== "activity" && observed.kind !== "permission") {
+          if (observed.messageId !== current.run.command.runnerMessageId) return
+        }
+        if (observed.kind === "activity") {
+          if (current.phase !== "running" && current.phase !== "waiting_approval") return
+          yield* transition({
+            runId: observed.runId,
+            expected: current.phase,
+            next: current.phase,
+            callbacks: [
+              {
+                runId: observed.runId,
+                producerKey: observed.sourceKey,
+                sourceSessionSeq: observed.sourceSessionSeq,
+                callback: { kind: "activity", state: current.phase, activity: observed.activity },
+              },
+            ],
+          })
+          yield* input.delivery.flush(observed.runId)
+          return
+        }
+        if (observed.kind === "permission") {
+          if (current.phase !== "running") return
+          const mapping = yield* input.approvals.requested({ execution: current, request: observed.request })
+          yield* approvalRequested(mapping)
+          yield* input.delivery.flush(observed.runId)
+          return
+        }
+        if (observed.kind === "promoted") {
+          if (current.phase !== "admitted" && current.phase !== "recovery_required") return
+          yield* transition({
+            runId: observed.runId,
+            expected: current.phase,
+            next: "running",
+            callbacks: [
+              {
+                runId: observed.runId,
+                producerKey: observed.sourceKey,
+                sourceSessionSeq: observed.sourceSessionSeq,
+                callback: {
+                  kind: "state",
+                  expectedState: current.phase === "recovery_required" ? "recovery_required" : "reserved",
+                  nextState: "running",
+                },
+              },
+            ],
+          })
+          yield* input.delivery.flush(observed.runId)
+          return
+        }
+        if (current.phase !== "running" && !(observed.kind === "failed" && current.phase === "admitted")) return
+        if (!current.runtime) return
+        const inspection = yield* input.runtimes.inspect(current)
+        if (inspection.sessionId !== current.run.session.id || inspection.runtime.id !== current.runtime.id) return
+        if (inspection.state !== "idle" || inspection.activeTools !== 0) return
+        const next = observed.kind === "settled" ? "completed" : "failed"
         yield* transition({
           runId: observed.runId,
           expected: current.phase,
-          next: current.phase,
-          callbacks: [
-            {
-              runId: observed.runId,
-              producerKey: observed.sourceKey,
-              sourceSessionSeq: observed.sourceSessionSeq,
-              callback: { kind: "activity", state: current.phase, activity: observed.activity },
-            },
-          ],
-        })
-        yield* input.delivery.flush(observed.runId)
-        return
-      }
-      if (observed.kind === "permission") {
-        if (current.phase !== "running") return
-        const mapping = yield* input.approvals.requested({ execution: current, request: observed.request })
-        yield* approvalRequested(mapping)
-        yield* input.delivery.flush(observed.runId)
-        return
-      }
-      if (observed.kind === "promoted") {
-        if (current.phase !== "admitted" && current.phase !== "recovery_required") return
-        yield* transition({
-          runId: observed.runId,
-          expected: current.phase,
-          next: "running",
+          next,
           callbacks: [
             {
               runId: observed.runId,
@@ -492,41 +616,16 @@ export function make(input: Dependencies): Lifecycle {
               sourceSessionSeq: observed.sourceSessionSeq,
               callback: {
                 kind: "state",
-                expectedState: current.phase === "recovery_required" ? "recovery_required" : "reserved",
-                nextState: "running",
+                expectedState: current.phase === "admitted" ? "reserved" : "running",
+                nextState: next,
               },
             },
           ],
         })
         yield* input.delivery.flush(observed.runId)
-        return
-      }
-      if (current.phase !== "running" && !(observed.kind === "failed" && current.phase === "admitted")) return
-      if (!current.runtime) return
-      const inspection = yield* input.runtimes.inspect(current)
-      if (inspection.sessionId !== current.run.session.id || inspection.runtime.id !== current.runtime.id) return
-      if (inspection.state !== "idle" || inspection.activeTools !== 0) return
-      const next = observed.kind === "settled" ? "completed" : "failed"
-      yield* transition({
-        runId: observed.runId,
-        expected: current.phase,
-        next,
-        callbacks: [
-          {
-            runId: observed.runId,
-            producerKey: observed.sourceKey,
-            sourceSessionSeq: observed.sourceSessionSeq,
-            callback: {
-              kind: "state",
-              expectedState: current.phase === "admitted" ? "reserved" : "running",
-              nextState: next,
-            },
-          },
-        ],
-      })
-      yield* input.delivery.flush(observed.runId)
-      yield* input.approvals.invalidate({ runId: observed.runId, reason: "terminal" })
-    })
+        yield* input.approvals.invalidate({ runId: observed.runId, reason: "terminal" })
+      }),
+    )
 
   const start: Lifecycle["start"] = (command) =>
     starts.withLock(command.runId)(
@@ -540,10 +639,10 @@ export function make(input: Dependencies): Lifecycle {
         if (accepted.phase === "recovery_required") {
           if (accepted.workspace && accepted.runtime) {
             yield* watch(accepted)
-            const reconciled = yield* input.recovery
-              .reconcile(command.runnerMessageId)
-              .pipe(Effect.catch(() => Effect.succeed("missing" as const)))
-            if (reconciled !== "missing") return { messageId: command.runnerMessageId }
+            yield* input.recovery.reconcile(command.runnerMessageId).pipe(Effect.catch(() => Effect.void))
+            const observed = yield* get(command.runId)
+            if (observed && (observed.phase === "running" || terminal.has(observed.phase)))
+              return { messageId: command.runnerMessageId }
           }
           return yield* Effect.fail(failure("unavailable", "Run requires reconciliation"))
         }
@@ -553,65 +652,86 @@ export function make(input: Dependencies): Lifecycle {
           if (accepted.runtime) yield* watch(accepted)
           return { messageId: command.runnerMessageId }
         }
-        const workspace = yield* input.workspaces.ensure(run)
-        yield* input.policy.workspace({ run, workspace })
-        const runtime = yield* input.runtimes.ensure({
-          run,
-          workspace,
-          readinessTimeoutMs: input.readinessTimeoutMs ?? 30_000,
-        })
-        const session = yield* input.binding.attach({ run, workspace, runtime })
-        if (session.id !== command.sessionId || session.projectID !== run.projectId)
-          return yield* Effect.fail(failure("conflict", "Attached Session differs from authorized Run"))
-        if (
-          accepted.phase === "prepared" &&
-          (accepted.workspace?.id !== workspace.id ||
-            accepted.workspace.directory !== workspace.directory ||
-            accepted.runtime?.id !== runtime.id)
-        )
-          return yield* Effect.fail(failure("conflict", "Prepared Run binding changed before retry"))
-        const ready = { ...accepted, workspace, runtime }
-        if (accepted.phase === "accepted") {
-          const inspection = yield* input.runtimes.inspect(ready)
+        const setup = yield* Effect.gen(function* () {
+          const workspace = yield* input.workspaces.ensure(run)
+          yield* input.policy.workspace({ run, workspace })
+          const runtime = yield* input.runtimes.ensure({
+            run,
+            workspace,
+            readinessTimeoutMs: input.readinessTimeoutMs ?? 30_000,
+          })
+          const session = yield* input.binding.attach({ run, workspace, runtime })
+          if (session.id !== command.sessionId || session.projectID !== run.projectId)
+            return yield* Effect.fail(failure("conflict", "Attached Session differs from authorized Run"))
           if (
-            inspection.sessionId !== session.id ||
-            inspection.runtime.id !== runtime.id ||
-            inspection.state !== "idle" ||
-            inspection.activeTools !== 0
-          ) {
+            accepted.phase === "prepared" &&
+            (accepted.workspace?.id !== workspace.id ||
+              accepted.workspace.directory !== workspace.directory ||
+              accepted.runtime?.id !== runtime.id)
+          )
+            return yield* Effect.fail(failure("conflict", "Prepared Run binding changed before retry"))
+          const ready = { ...accepted, workspace, runtime }
+          if (accepted.phase === "accepted") {
+            const inspection = yield* input.runtimes.inspect(ready)
+            if (
+              inspection.sessionId !== session.id ||
+              inspection.runtime.id !== runtime.id ||
+              inspection.state !== "idle" ||
+              inspection.activeTools !== 0
+            )
+              return yield* Effect.fail(failure("unavailable", "OpenCode Session is already active or uncertain"))
+          }
+          yield* watch(ready)
+          return { workspace, runtime, session, ready }
+        }).pipe(Effect.exit)
+        if (Exit.isFailure(setup)) {
+          const error = Cause.findErrorOption(setup.cause)
+          const code = Option.isSome(error) && isFailure(error.value) ? error.value.code : "unavailable"
+          const current = yield* get(command.runId)
+          if (current && (current.phase === "accepted" || current.phase === "prepared")) {
+            const next =
+              current.phase === "accepted" && ["conflict", "forbidden", "invalid"].includes(code)
+                ? ("failed" as const)
+                : ("recovery_required" as const)
             yield* transition({
               runId: command.runId,
-              expected: "accepted",
-              next: "recovery_required",
-              callbacks: [recoveryDraft(ready, `runtime:${runtime.id}:busy`)],
+              expected: current.phase,
+              next,
+              callbacks: [
+                {
+                  runId: command.runId,
+                  producerKey: `preparation:${command.runId}:${next}`,
+                  callback: { kind: "state", expectedState: "reserved", nextState: next },
+                },
+              ],
             })
-            return yield* Effect.fail(failure("unavailable", "OpenCode Session is already active or uncertain"))
           }
+          return yield* Effect.fail(failure(code, "Runner preparation failed"))
         }
-        yield* watch(ready)
         if (accepted.phase === "prepared") {
           const status = yield* input.recovery
             .reconcile(command.runnerMessageId)
             .pipe(Effect.catch(() => Effect.succeed("unknown" as const)))
           if (status !== "missing") {
-            if (status === "admitted" || status === "running" || status === "terminal") {
-              yield* admitted({ runId: command.runId, messageId: command.runnerMessageId })
-              return { messageId: command.runnerMessageId }
-            }
             yield* transition({
               runId: command.runId,
               expected: "prepared",
               next: "recovery_required",
-              callbacks: [recoveryDraft(ready, `submission:${command.runnerMessageId}:unknown`)],
+              callbacks: [recoveryDraft(setup.value.ready, `submission:${command.runnerMessageId}:unknown`)],
             })
             return yield* Effect.fail(failure("unavailable", "Prompt submission is uncertain"))
           }
         }
-        yield* prepared({ runId: command.runId, workspace, runtime, sessionId: session.id })
+        yield* prepared({
+          runId: command.runId,
+          workspace: setup.value.workspace,
+          runtime: setup.value.runtime,
+          sessionId: setup.value.session.id,
+        })
         const admission = yield* input.sessions
           .prompt({
             id: SessionMessage.ID.make(command.runnerMessageId),
-            sessionID: session.id,
+            sessionID: setup.value.session.id,
             prompt: { text: command.text },
             delivery: "queue",
             resume: false,
@@ -623,7 +743,7 @@ export function make(input: Dependencies): Lifecycle {
             runId: command.runId,
             expected: "prepared",
             next: "recovery_required",
-            callbacks: [recoveryDraft(ready, `submission:${command.runnerMessageId}:uncertain`)],
+            callbacks: [recoveryDraft(setup.value.ready, `submission:${command.runnerMessageId}:uncertain`)],
           })
           if (Option.isSome(typed) && typed.value instanceof SessionV2.PromptConflictError)
             return yield* Effect.fail(failure("conflict", "OpenCode message ID was reused with different input"))
@@ -631,7 +751,7 @@ export function make(input: Dependencies): Lifecycle {
         }
         if (
           admission.value.id !== command.runnerMessageId ||
-          admission.value.sessionID !== session.id ||
+          admission.value.sessionID !== setup.value.session.id ||
           admission.value.delivery !== "queue" ||
           admission.value.prompt.text !== command.text
         ) {
@@ -639,14 +759,14 @@ export function make(input: Dependencies): Lifecycle {
             runId: command.runId,
             expected: "prepared",
             next: "recovery_required",
-            callbacks: [recoveryDraft(ready, `submission:${command.runnerMessageId}:mismatched`)],
+            callbacks: [recoveryDraft(setup.value.ready, `submission:${command.runnerMessageId}:mismatched`)],
           })
           return yield* Effect.fail(failure("unavailable", "OpenCode returned a mismatched admission"))
         }
         const recorded = yield* admitted({ runId: command.runId, messageId: admission.value.id })
         const wake = yield* input.runtimes.wake(recorded).pipe(Effect.exit)
         if (Exit.isFailure(wake)) {
-          yield* runtimeFailed({ runId: command.runId, runtime, reason: "wake_failed" })
+          yield* runtimeFailed({ runId: command.runId, runtime: setup.value.runtime, reason: "wake_failed" })
           return yield* Effect.fail(failure("unavailable", "OpenCode wake is uncertain; reconcile it"))
         }
         return { messageId: admission.value.id }
@@ -657,7 +777,7 @@ export function make(input: Dependencies): Lifecycle {
     Effect.gen(function* () {
       if (!execution.workspace || !execution.runtime)
         return yield* Effect.fail(failure("unavailable", "Run has no prepared workspace or runtime"))
-      yield* input.runtimes.watch({
+      return yield* input.runtimes.watch({
         execution,
         session: execution.run.session,
         observe: input.ingestion.observe({ execution, session: execution.run.session, onObservation }),
@@ -673,6 +793,7 @@ export function make(input: Dependencies): Lifecycle {
     approvalRequested,
     approvalResolved,
     cancellationRequested,
+    cancellationObserved,
     runtimeFailed,
     get,
     byMessageId,
@@ -689,6 +810,11 @@ function sameCommand(left: AuthorizedRun["command"], right: AuthorizedRun["comma
     left.executionOwner.workerId === right.executionOwner.workerId &&
     left.executionOwner.instanceId === right.executionOwner.instanceId
   )
+}
+
+function isFailure(value: unknown): value is Failure {
+  if (typeof value !== "object" || value === null || !("code" in value)) return false
+  return ["invalid", "unauthorized", "forbidden", "not_found", "conflict", "unavailable"].includes(String(value.code))
 }
 
 function recoveryDraft(execution: LocalExecution, producerKey: string): CallbackDraft {
