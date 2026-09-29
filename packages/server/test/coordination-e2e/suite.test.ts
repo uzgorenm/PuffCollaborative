@@ -234,7 +234,7 @@ test("A: migrate the immediately preceding schema snapshot through registered co
     sqlite.exec("CREATE TABLE migration (id TEXT PRIMARY KEY, time_completed INTEGER NOT NULL)")
     const record = sqlite.query("INSERT INTO migration (id, time_completed) VALUES (?, ?)")
     migrations
-      .filter((migration) => !migration.id.includes("coordination"))
+      .filter((migration) => migration.id <= "20260622202450_simplify_session_input")
       .forEach((migration) => record.run(migration.id, Date.now()))
     sqlite.close()
   })
@@ -249,6 +249,8 @@ test("A: migrate the immediately preceding schema snapshot through registered co
       "20260929190020_coordination_work_card",
       "20260929193000_coordination_queue",
     ])
+    const recorded = sqlite.query("SELECT id FROM migration").all() as Array<{ id: string }>
+    expect(new Set(recorded.map((item) => item.id))).toEqual(new Set(migrations.map((migration) => migration.id)))
     const tables = sqlite
       .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'coordination_%'")
       .all() as Array<{ name: string }>
