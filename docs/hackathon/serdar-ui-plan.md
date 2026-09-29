@@ -55,7 +55,7 @@ Consumes Task 1's snapshot/API/selectors. Produces one responsive page with a co
 - [x] Run targeted tests, package typecheck and build; distinguish existing failures from new ones.
 - [x] Walk through desktop and mobile layouts, evidence inspection, edit/approve/reject, pending delivery, stale/offline states, topic/mute/unshare and accepted decisions.
 - [x] Review the final diff with a fresh reviewer and fix important findings.
-- [ ] Update only T3 status/checklist, document the hub integration requirements, commit verified work and push normally to main after fetching.
+- [x] Update only T3 status/checklist, document the hub integration requirements, commit verified work and push normally to main after fetching. See `evidence/2026-09-29-serdar-ui.md` for the code version and evidence boundary.
 
 ## Progress
 

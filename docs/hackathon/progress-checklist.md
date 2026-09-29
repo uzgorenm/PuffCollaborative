@@ -17,6 +17,12 @@ Baseline reviewed on September 29 at source commit `e42a799cf6aefe1cc6d6907310b3
 
 CI workflows have been removed. A push does not run a readiness check automatically. Earlier repository cleanup builds/typechecks are historical evidence for that earlier change, not for live coordination.
 
+## UI checkpoint — September 29, 12:32 PDT
+
+Serdar's [UI receipt](evidence/2026-09-29-serdar-ui.md) records source/unit/fixture evidence at `3f7571823468fba62e86810e16ddc0b5f13a9b44`: reachable responsive `/puff`, explicit synthetic/development labels, source inspection, review/edit/reject, sharing controls and pending/reconnect safeguards. Eighteen focused tests, 41 browser-condition tests, typecheck and build pass. Full units: 736 pass, one unchanged locale-detection failure. Desktop/mobile browser walkthroughs and screenshots are recorded.
+
+This adds implementation evidence to T3; it closes no live gate or WF01–WF07 case. G0 still needs the shared snapshot/actions/identity mapping, and G3/G5 need actual admission, promotion and agent-use receipts. The default connection checks the registered Basic-auth status route; the provisional API is development-only. A second teammate has not yet reproduced this receipt.
+
 ## Rules for checking a box
 
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.
