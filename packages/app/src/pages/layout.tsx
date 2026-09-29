@@ -82,6 +82,8 @@ import {
 } from "./layout/sidebar-workspace"
 import { ProjectDragOverlay, SortableProject, type ProjectSidebarContext } from "./layout/sidebar-project"
 import { SidebarContent } from "./layout/sidebar-shell"
+import { TeamActivitySidebar } from "./layout/team-activity"
+import { sessionHref } from "@/utils/session-route"
 
 export default function LegacyLayout(props: ParentProps) {
   const serverSDK = useServerSDK()
@@ -2182,6 +2184,15 @@ export default function LegacyLayout(props: ParentProps) {
               </div>
             </>
           )}
+        </Show>
+
+        <Show when={project()}>
+          <TeamActivitySidebar
+            serverUrl={server.current?.http.url}
+            projectId={projectId()}
+            projectName={projectName()}
+            onOpenSession={(sessionId) => navigateWithSidebarReset(sessionHref(server.key, sessionId))}
+          />
         </Show>
 
         <div
