@@ -215,6 +215,8 @@ export interface Lifecycle {
     readonly runId: Coordination.RunID
     readonly result: InterruptionResult
   }) => Effect.Effect<LocalExecution, Failure>
+  /** Rebind a persisted active Run to this process's verified runtime without changing its phase. */
+  readonly reattach: (runId: Coordination.RunID) => Effect.Effect<LocalExecution, Failure>
   readonly runtimeFailed: (input: {
     readonly runId: Coordination.RunID
     readonly runtime: RuntimeIdentity
