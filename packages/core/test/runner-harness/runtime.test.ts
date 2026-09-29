@@ -376,6 +376,43 @@ describe("embedded runtime lifecycle with service doubles", () => {
     )
   })
 
+  test("shutdown still interrupts a woken Session after its observer fails", async () => {
+    const system = fixture()
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
+          const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
+          const current = { run, phase: "running" as const, workspace, runtime }
+          const failObserver = yield* Deferred.make<void>()
+          yield* runtimes.watch({
+            execution: current,
+            session,
+            readinessTimeoutMs: 100,
+            observe: (onReady) =>
+              onReady.pipe(
+                Effect.andThen(Deferred.await(failObserver)),
+                Effect.andThen(Effect.fail({ code: "unavailable" as const, message: "Observer lost" })),
+              ),
+          })
+          yield* runtimes.wake(current)
+          yield* Deferred.succeed(failObserver, undefined)
+          yield* Effect.gen(function* () {
+            while (true) {
+              const result = yield* runtimes
+                .wake(current)
+                .pipe(Effect.match({ onFailure: (error) => error.code, onSuccess: () => "started" as const }))
+              if (result === "conflict") return
+              yield* Effect.sleep("1 millis")
+            }
+          }).pipe(Effect.timeout("1 second"))
+          yield* runtimes.shutdown(runtime)
+          expect(system.calls.interrupt).toBe(1)
+        }),
+      ),
+    )
+  })
+
   test("idle and lost abort responses do not prove tool cleanup", async () => {
     const system = fixture({ interrupt: () => Effect.die(new Error("abort response lost")) })
     await Effect.runPromise(
