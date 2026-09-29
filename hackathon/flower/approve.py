@@ -29,16 +29,17 @@ def main():
         if log.exists()
         else []
     )
-    decided = {row["runId"] for row in rows if row.get("sent") or row.get("decision")}
-    pending = [row for row in rows if row["runId"] not in decided]
+    key = lambda row: row.get("id") or row["runId"]
+    decided = {key(row) for row in rows if row.get("sent") or row.get("decision")}
+    pending = [row for row in rows if key(row) not in decided]
     if not args.run_id:
         for row in pending:
             print(
-                f"{row['runId']}  -> {row['threadId']}  (overlaps {row.get('overlapWith')})\n    {row['text']}\n"
+                f"{key(row)}  [{row.get('kind', 'correction')}] -> {row['threadId']}\n    {row['text']}\n"
             )
         print(f"{len(pending)} pending")
         return
-    row = next((item for item in pending if item["runId"] == args.run_id), None)
+    row = next((item for item in pending if args.run_id in (key(item), item["runId"])), None)
     if row is None:
         sys.exit("No pending correction with that run ID")
     decision = {**row, "decision": "rejected" if args.reject else "approved"}
@@ -48,7 +49,7 @@ def main():
         if not user or not password:
             sys.exit("Set PUFF_MEMBER_USER and PUFF_MEMBER_PASSWORD (environment or .env)")
         Server(config["serverUrl"], user, password).submit_instruction(
-            row["threadId"], f"guardian-{row['runId']}", row["text"]
+            row["threadId"], f"guardian-{key(row)}".replace(":", "-"), row["text"]
         )
         decision["sent"] = True
     with log.open("a", encoding="utf-8") as output:

@@ -190,9 +190,10 @@ class Worker:
         self.feed = {}  # threadId -> guardian feed items
         self.objective = {}  # threadId -> latest non-guardian instruction text
         self.board = {}  # threadId -> latest guardian card (richer than the server card)
-        self.sent = {}  # threadId -> (overlapWith, monotonic time) of last correction
+        self.delivered = set()  # (threadId, sourceThreadId, text) of findings already sent
         self.burst = {}  # session key -> card before the current burst of events
         self.flagged = {}  # threadId -> event seqs inside bursts Jev called meaningful
+        self.guardian_instructions = set()  # instructionIds of guardian corrections
         self.retry = {}  # threadId -> (due monotonic time, attempts) after a failed guardian run
 
     # -- setup ---------------------------------------------------------------
@@ -265,8 +266,14 @@ class Worker:
         self.feed[thread_id] = [*self.feed.get(thread_id, []), item][-30:]
         if event["kind"] == "instruction.submitted":
             if item["text"].startswith(GUARDIAN_TAG):
+                self.guardian_instructions.add(event.get("instructionId"))
                 return
+            # The latest task a person assigned is the objective; guardian notes
+            # returned above and never redefine it.
             self.objective[thread_id] = item["text"]
+        if event.get("instructionId") in self.guardian_instructions:
+            # The agent's run of a guardian correction must not re-trigger the guardian.
+            return
         thread = self.threads[thread_id]
         if event["kind"] in ADVANCING:
             thread["activitySeq"] = max(thread["activitySeq"], event["seq"])
@@ -393,6 +400,10 @@ class Worker:
         try:
             board = await asyncio.to_thread(self.board_view, thread_id)
             payload = self.guardian_input(thread_id, board)
+            if self.config.get("guardianStub"):
+                payload["stub"] = True
+            if self.config.get("guardianModel"):
+                payload["model"] = self.config["guardianModel"]
             log(
                 "guardian start",
                 thread=thread_id,
@@ -423,15 +434,15 @@ class Worker:
                 supergridStartup=round(startup, 1),
                 modelSeconds=round(model_seconds, 1),
                 fallback=";".join(meta.get("fallbackReasons") or []) or "none",
-                overlap=result.get("overlap"),
+                finding=bool(result.get("finding")),
+                proposal=bool(result.get("proposal")),
             )
             result["model"] = meta.get("model") or "unknown"
             card = result.get("myCard") or {}
             self.board[thread_id] = card
             self.record("board.jsonl", {"threadId": thread_id, "runId": run_id, **result})
             await asyncio.to_thread(self.write_card, thread_id, card, run_id, result)
-            if result.get("overlap") and result.get("instruction"):
-                await asyncio.to_thread(self.correct, thread_id, run_id, result)
+            await asyncio.to_thread(self.deliver, thread_id, run_id, result)
             self.retry.pop(thread_id, None)
         except Exception as error:  # noqa: BLE001 - coding sessions never wait on us
             attempts = self.retry.get(thread_id, (0, 0))[1] + 1
@@ -459,6 +470,14 @@ class Worker:
                 "filesTouched": [str(path)[:120] for path in (card.get("filesTouched") or [])][:10]
                 or PATH.findall(str(card.get("progress") or ""))[:10],
                 "workState": card.get("workState") or card.get("status") or "unknown",
+                "discoveries": [
+                    {
+                        "text": str(item.get("text") or "")[:300],
+                        "evidenceEventIds": list(item.get("evidenceEventIds") or [])[:3],
+                    }
+                    for item in (card.get("discoveries") or [])
+                    if isinstance(item, dict)
+                ][-3:],
             }
             for tid, card in board.items()
         ][:8]
@@ -508,8 +527,14 @@ class Worker:
         ]
         files = ", ".join(str(item) for item in (card.get("filesTouched") or [])[:10])
         model = result.get("model", "unknown")
+        found = "; ".join(
+            str(item.get("text") or "")[:200]
+            for item in (card.get("discoveries") or [])
+            if isinstance(item, dict)
+        )[:600]
         progress = (
             str(card.get("progress") or "")[:1400]
+            + (f" | Found: {found}" if found else "")
             + (f" | Files: {files}" if files else "")
             + f" | Model: {model}"
         )
@@ -536,24 +561,45 @@ class Worker:
         except RuntimeError as error:
             log("board card rejected", thread=thread_id, error=error)
 
-    def correct(self, thread_id, run_id, result):
-        """Propose, or with autoSend submit, the guardian's correction to its own agent."""
-        other, now = result.get("overlapWith"), time.monotonic()
-        last = self.sent.get(thread_id)
-        cooldown = self.config.get("correctionCooldownSeconds", 300)
-        if last and last[0] == other and now - last[1] < cooldown:
-            log("correction suppressed (cooldown)", thread=thread_id, overlapWith=other)
-            return
-        text = f"{GUARDIAN_TAG} {result['instruction']} (Reason: {result.get('reason', '')})"
-        proposal = {"threadId": thread_id, "runId": run_id, "overlapWith": other, "text": text}
-        proposal["sent"] = bool(self.auto_send and self.member)
-        if proposal["sent"]:
-            self.member.submit_instruction(thread_id, f"guardian-{run_id}", text)
-            self.sent[thread_id] = (other, now)
-            log("CORRECTION SENT", thread=thread_id, text=json.dumps(text))
-        else:
-            log("CORRECTION PROPOSED (owner approval)", thread=thread_id, text=json.dumps(text))
-        self.record("corrections.jsonl", proposal)
+    def deliver(self, thread_id, run_id, result):
+        """Deliver an informational finding (autoSend) and queue a redirect for approval."""
+        finding, proposal = result.get("finding"), result.get("proposal")
+        if isinstance(finding, dict) and finding.get("text"):
+            key = (thread_id, finding.get("sourceThreadId"), finding["text"])
+            if key in self.delivered:
+                log("finding already delivered", thread=thread_id)
+            else:
+                refs = ", ".join(finding.get("sourceEventIds") or [])
+                text = f"{GUARDIAN_TAG} FYI: {finding['text']} (source: {finding.get('sourceThreadId')} {refs})"
+                row = {
+                    "id": f"{run_id}:finding",
+                    "kind": "finding",
+                    "threadId": thread_id,
+                    "runId": run_id,
+                    "sourceThreadId": finding.get("sourceThreadId"),
+                    "text": text,
+                }
+                row["sent"] = bool(self.auto_send and self.member)
+                if row["sent"]:
+                    self.member.submit_instruction(thread_id, f"guardian-{run_id}-finding", text)
+                    self.delivered.add(key)
+                    log("FINDING DELIVERED", thread=thread_id, text=json.dumps(text))
+                else:
+                    log("FINDING PENDING (owner approval)", thread=thread_id, text=json.dumps(text))
+                self.record("corrections.jsonl", row)
+        if isinstance(proposal, dict) and proposal.get("text"):
+            # Redirects never auto-send; a person approves them with approve.py.
+            text = f"{GUARDIAN_TAG} Proposal: {proposal['text']} (Reason: {proposal.get('reason', '')})"
+            row = {
+                "id": f"{run_id}:proposal",
+                "kind": "proposal",
+                "threadId": thread_id,
+                "runId": run_id,
+                "text": text,
+                "sent": False,
+            }
+            self.record("corrections.jsonl", row)
+            log("PROPOSAL PENDING (owner approval)", thread=thread_id, text=json.dumps(text))
 
     def capture(self, source_id, target_id):
         """Build one bridge job pinned to the server's current activitySeq for both threads."""
