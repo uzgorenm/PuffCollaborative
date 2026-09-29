@@ -12,7 +12,7 @@ type TestData = {
   run: { id: string }
   thread: { activitySeq: number }
   workCard?: { version: number }
-  runs: Array<{ state: string }>
+  runs: Array<{ id: string; state: string }>
   approvals: Array<{ id: string; version: number }>
   events: Array<{ id: string; seq: number; kind: string }>
   cursor: number
@@ -150,7 +150,7 @@ test("two members share queued turns, replay, approval, activity, and stale-card
       }),
       request(`/api/coordination/v1/threads/${threads[0]}/instructions`, "bob", "POST", {
         requestId: "second",
-        text: "Second turn",
+        text: "Second turn [approval]",
       }),
     ])
     expect(submissions.map((item) => item.response.status)).toEqual([200, 200])
@@ -161,6 +161,7 @@ test("two members share queued turns, replay, approval, activity, and stale-card
     })
     expect(other.response.status).toBe(200)
     const first = submissions.find((item) => item.data!.instruction.queueSeq === 1)!
+    const second = submissions.find((item) => item.data!.instruction.queueSeq === 2)!
     const reserved = await request(`/api/coordination/v1/runner/threads/${threads[0]}/reserve`, "worker", "POST")
     expect(reserved.response.status).toBe(200)
     expect(reserved.data?.run?.id).toBe(first.data?.run.id)
@@ -170,17 +171,17 @@ test("two members share queued turns, replay, approval, activity, and stale-card
 
     const snapshot = async (threadId: string) =>
       (await request(`/api/coordination/v1/threads/${threadId}`, "alice")).data!
-    const waitFor = async (threadId: string, state: string) => {
+    const waitFor = async (threadId: string, state: string, runId: string) => {
       for (let attempt = 0; attempt < 100; attempt++) {
         const value = await snapshot(threadId)
-        if (value.runs?.some((run: { state: string }) => run.state === state)) return value
+        if (value.runs?.some((run) => run.id === runId && run.state === state)) return value
         await Bun.sleep(20)
       }
-      throw new Error(`Run did not reach ${state}`)
+      throw new Error(`Run ${runId} did not reach ${state}`)
     }
     const [waiting, waitingOther] = await Promise.all([
-      waitFor(threads[0], "waiting_approval"),
-      waitFor(threads[1], "waiting_approval"),
+      waitFor(threads[0], "waiting_approval", first.data!.run.id),
+      waitFor(threads[1], "waiting_approval", other.data!.run.id),
     ])
     expect(waiting.approvals.length).toBe(1)
     expect(waitingOther.approvals.length).toBe(1)
@@ -253,7 +254,7 @@ test("two members share queued turns, replay, approval, activity, and stale-card
       },
     )
     expect(decision.response.status).toBe(200)
-    await waitFor(threads[0], "completed")
+    await waitFor(threads[0], "completed", first.data!.run.id)
     expect(
       (
         await request(`/api/coordination/v1/threads/${threads[0]}/comments`, "alice", "POST", {
@@ -275,10 +276,25 @@ test("two members share queued turns, replay, approval, activity, and stale-card
       "POST",
     )
     expect(cancelled.response.status).toBe(200)
-    await waitFor(threads[1], "cancelled")
+    await waitFor(threads[1], "cancelled", other.data!.run.id)
     const secondReserve = await request(`/api/coordination/v1/runner/threads/${threads[0]}/reserve`, "worker", "POST")
     expect(secondReserve.response.status).toBe(200)
-    await waitFor(threads[0], "completed")
+    expect(secondReserve.data?.run?.id).toBe(second.data?.run.id)
+    const secondWaiting = await waitFor(threads[0], "waiting_approval", second.data!.run.id)
+    const secondApproval = secondWaiting.approvals.find((item) => item.id !== approvalId)!
+    expect(secondApproval).toBeDefined()
+    const secondDecision = await request(
+      `/api/coordination/v1/threads/${threads[0]}/approvals/${secondApproval.id}/decision`,
+      "alice",
+      "POST",
+      {
+        expectedVersion: secondApproval.version,
+        decisionId: "decision-2",
+        decision: "approve",
+      },
+    )
+    expect(secondDecision.response.status).toBe(200)
+    await waitFor(threads[0], "completed", second.data!.run.id)
     await app.dispose()
     app = webHandler()
     const restored = await snapshot(threads[0])
