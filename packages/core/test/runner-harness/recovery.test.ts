@@ -225,6 +225,21 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
     }),
   )
 
+  it.effect("holds an unpromoted input while scoped tool cleanup is unknown", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.activeTools = "unknown"
+      const unknown = yield* setup
+        .make()
+        .reconcile(setup.command.runnerMessageId)
+        .pipe(Effect.catch((error) => Effect.succeed(error)))
+      expect(unknown).toMatchObject({ code: "unavailable" })
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
   it.effect("holds a prepared command when submission may be in flight", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("prepared")

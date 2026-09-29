@@ -191,7 +191,11 @@ export function make(input: Dependencies): Recovery {
         return { kind: "admitted" as const, execution, unpromoted: false }
       return { kind: "uncertain" as const, execution, reason: "Runtime cannot establish whether scoped work is active" }
     }
-    if (admitted.promotedSeq === undefined) return { kind: "admitted" as const, execution, unpromoted: true }
+    if (admitted.promotedSeq === undefined) {
+      if (inspection.state.state === "idle" && inspection.state.activeTools !== 0)
+        return { kind: "uncertain" as const, execution, reason: "Scoped tools have not been proved idle before wake" }
+      return { kind: "admitted" as const, execution, unpromoted: true }
+    }
     if (
       inspection.state.state === "active" &&
       (execution.phase === "running" || execution.phase === "waiting_approval" || execution.phase === "cancelling")
