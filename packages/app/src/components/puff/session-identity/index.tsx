@@ -16,11 +16,6 @@ export function SessionIdentity(props: SessionIdentityProps) {
       title={view().accessibleLabel}
     >
       <span class="puff-session-identity__title" aria-hidden="true">{view().title}</span>
-      <span class="puff-session-identity__meta" aria-hidden="true">
-        <span>{props.labels.session} {view().session}</span>
-        <Show when={view().worker}>{(worker) => <span>{props.labels.worker} {worker()}</span>}</Show>
-        <Show when={view().owner}>{(owner) => <span>{props.labels.owner} {owner()}</span>}</Show>
-      </span>
       <Show when={view().state}>
         {(state) => <span class="puff-session-identity__state" aria-hidden="true">{state()}</span>}
       </Show>

@@ -155,6 +155,29 @@ test("WF03 separates tentative overlap from unrelated topics and isolates projec
   expect(unrelated).not.toContain("PRIVATE-DEMO7")
 })
 
+test("before-start completed work and remaining tasks cite one exact synthetic result", async () => {
+  const manifest = await (await get("/api/coordination/v1/simulation")).json()
+  const start = manifest.taskStart
+  expect(start.projectId).toBe("sim-wf03")
+  expect(start.completed.matchPhrases).toContain("map database migration navigation")
+  const snapshot = await (await get(`/api/coordination/v1/threads/${start.completed.threadId}`)).json()
+  assertCard(snapshot.workCard)
+  expect(snapshot.workCard.status).toBe("done")
+  expect(snapshot.workCard.recentVerifiedOutcome).toBe(start.completed.result)
+  expect(snapshot.workCard.evidenceRefs).toContainEqual(start.completed.sourceRef)
+  expect(snapshot.workCard.contributors).toContain(start.completed.reportedBy)
+  const ref = start.completed.sourceRef
+  const page = await (await get(`/api/coordination/v1/projects/${start.projectId}/events?after=${ref.seq - 1}&limit=1`)).json()
+  expect(page.events).toHaveLength(1)
+  expect(page.events[0]).toMatchObject({ id: ref.eventId, threadId: ref.threadId, seq: ref.seq, actorId: start.completed.reportedBy })
+  for (const next of start.remaining) {
+    expect(next.sourceRef).toEqual(ref)
+    expect(page.events[0].payload.text.toLowerCase()).toContain(next.title.toLowerCase())
+  }
+  const bob = await (await get("/api/coordination/v1/simulation", "bob")).json()
+  expect(bob.taskStart).toBeUndefined()
+})
+
 test("demo identity and project boundaries fail closed", async () => {
   expect((await fetch(origin + "/api/coordination/v1/projects")).status).toBe(401)
   expect((await get("/api/coordination/v1/projects", "alice", "bad")).status).toBe(401)

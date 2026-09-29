@@ -6,7 +6,6 @@ import { useTeam } from "./team-context"
 import { ContextPanel } from "@/components/puff/context-panel"
 import { SessionIdentity, type SessionIdentityProps } from "@/components/puff/session-identity"
 import { teamEventText } from "./team-state"
-import { ProjectHome } from "./project-overview/project-home"
 
 export default function TeamThreadPage() {
   const params = useParams<{ threadId: string }>()
@@ -377,8 +376,4 @@ export default function TeamThreadPage() {
       </div>
     </section>
   )
-}
-
-export function TeamHome() {
-  return <ProjectHome />
 }

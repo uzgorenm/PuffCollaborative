@@ -1,10 +1,10 @@
 .puff-simulation-guide {
   flex: none;
   overflow: auto;
-  max-height: min(50vh, 510px);
-  padding: 20px clamp(18px, 3vw, 42px);
-  border-bottom: 1px solid color-mix(in srgb, #d19b4c 40%, transparent);
-  background: color-mix(in srgb, #d19b4c 7%, var(--background-base));
+  max-height: min(38vh, 380px);
+  padding: 11px clamp(18px, 3vw, 42px);
+  border-bottom: 1px solid color-mix(in srgb, var(--text-base) 12%, transparent);
+  background: var(--background-base);
 }
 .puff-simulation-guide > header,
 .puff-simulation-guide nav,
@@ -20,12 +20,12 @@
 }
 .puff-simulation-guide h2,
 .puff-simulation-guide h3 { margin: 0; color: var(--text-strong); }
-.puff-simulation-guide h2 { font-size: 18px; }
+.puff-simulation-guide h2 { font-size: 14px; }
 .puff-simulation-guide h3 { font-size: 17px; margin-top: 4px; }
-.puff-simulation-guide p { margin: 5px 0 0; line-height: 1.45; }
+.puff-simulation-guide p { margin: 3px 0 0; line-height: 1.4; font-size: 11px; }
 .puff-simulation-tag {
   flex: none;
-  padding: 5px 8px;
+  padding: 4px 7px;
   border-radius: 6px;
   background: #b47b31;
   color: #fff;
@@ -38,11 +38,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 9px;
 }
+.puff-simulation-details { max-width: 1500px; margin: 8px auto 0; }
+.puff-simulation-details > summary { cursor: pointer; color: var(--text-weak); font-size: 11px; }
 .puff-simulation-guide button {
-  min-height: 44px;
-  padding: 8px 12px;
+  min-height: 36px;
+  padding: 6px 10px;
   border: 1px solid color-mix(in srgb, var(--text-base) 25%, transparent);
   border-radius: 8px;
   background: var(--background-base);
@@ -86,7 +88,7 @@
 .puff-simulation-comparisons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .puff-simulation-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; font-size: 12px; }
 @media (max-width: 750px) {
-  .puff-simulation-guide { max-height: 55vh; }
+  .puff-simulation-guide { max-height: 48vh; }
   .puff-simulation-timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .puff-simulation-comparisons { grid-template-columns: 1fr; }
 }

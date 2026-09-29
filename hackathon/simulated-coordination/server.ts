@@ -1,4 +1,4 @@
-import { activeBInstruction, activeBRun, actors, buildData, phases, projectMembership, projects, sourceRef, targetThreadId } from "./fixtures"
+import { activeBInstruction, activeBRun, actors, buildData, completedOutcome, completedSourceRef, phases, projectMembership, projects, sourceRef, targetThreadId } from "./fixtures"
 
 const prefix = "/api/coordination/v1"
 const timestamp = "2026-09-29T19:00:00.000Z"
@@ -95,6 +95,19 @@ export function createSimulationServer({ port = 4187 }: { port?: number } = {}) 
         ? selectedScenarioId : scenarios[0]?.id,
       scenarios,
       actors,
+      ...(allowed.includes("sim-wf03") ? { taskStart: {
+        projectId: "sim-wf03",
+        completed: {
+          id: "migration-navigation-map", task: "Map database migration navigation",
+          matchPhrases: ["map database migration navigation", "migration navigation map"],
+          threadId: completedSourceRef.threadId, reportedBy: "usr_cara",
+          result: completedOutcome, sourceRef: completedSourceRef,
+        },
+        remaining: [
+          { id: "check-migration-links", title: "Check migration links", rationale: "The completed map lists link destinations, but their links have not been checked.", sourceRef: completedSourceRef },
+          { id: "test-migration-keyboard", title: "Test migration keyboard access", rationale: "The completed map leaves keyboard access untested.", sourceRef: completedSourceRef },
+        ],
+      } } : {}),
       ...(canSeeWf02 ? {
         wf02: {
           stage, phase: phases[stage], sourceRef, targetThreadId,
