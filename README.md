@@ -66,5 +66,3 @@ and explicit human handoffs.
 Defer automatic task assignment, automatic merging, and migration of
 running sessions between machines.
 
-
-### there is the some of the change that this is direclty proceed under the format and information etc. - Aydn 
