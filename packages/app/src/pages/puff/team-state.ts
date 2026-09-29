@@ -47,7 +47,8 @@ export function teamEventText(event: Coordination.Event) {
 
 type Draft = { text: string; kind: "instruction" | "comment" }
 type Position = { top: number; followTail: boolean }
-type Decision = { approval: Coordination.Approval; decisionId: string }
+type Decision = { approval: Coordination.Approval; decisionId: string; account: string }
+type SourceRef = { threadId: string; eventId: string; seq: number }
 type Compartment = {
   drafts: Record<string, Draft>
   pending: Record<string, Submission | undefined>
@@ -67,6 +68,7 @@ export function createTeamController(transport?: ProjectTransport) {
     projectId: "",
     threadId: "",
     serviceUrl: "",
+    sourceScope: "",
     snapshot: undefined as TeamThread | undefined,
     events: [] as Coordination.Event[],
     cursor: 0,
@@ -87,6 +89,7 @@ export function createTeamController(transport?: ProjectTransport) {
   let api: ReturnType<typeof createTeamApi> | undefined
   let connection = 0
   let selection = 0
+  let sourceSelection = 0
   let connecting: AbortController | undefined
   let reading: Read | undefined
   let roster: Read | undefined
@@ -119,6 +122,7 @@ export function createTeamController(transport?: ProjectTransport) {
         }),
       )
     connection++
+    sourceSelection++
     invalidateThread()
     roster?.controller.abort()
     roster = undefined
@@ -133,6 +137,7 @@ export function createTeamController(transport?: ProjectTransport) {
         connected: false,
         connecting: false,
         serviceUrl: "",
+        sourceScope: "",
         projects: [],
         threads: [],
         projectId: "",
@@ -182,7 +187,14 @@ export function createTeamController(transport?: ProjectTransport) {
         set("drafts", reconcile(saved.drafts))
         set("pending", reconcile(saved.pending))
         set("positions", reconcile(saved.positions))
-        set({ connected: true, projects, serviceUrl: url, loading: !!state.threadId, lastSuccess: 0 })
+        set({
+          connected: true,
+          projects,
+          serviceUrl: url,
+          sourceScope: crypto.randomUUID(),
+          loading: !!state.threadId,
+          lastSuccess: 0,
+        })
       })
       if (projects[0]) await loadProject(projects[0].id)
       if (ticket !== connection) return false
@@ -206,6 +218,7 @@ export function createTeamController(transport?: ProjectTransport) {
 
   function loadProject(id: string) {
     if (!api) return Promise.resolve()
+    sourceSelection++
     roster?.controller.abort()
     roster = undefined
     set({ projectId: id, threads: [] })
@@ -230,7 +243,11 @@ export function createTeamController(transport?: ProjectTransport) {
         const threads = project ? await current.threads(project.id, read.controller.signal) : []
         if (!valid()) return
         if (threads.some((thread) => thread.projectId !== project?.id)) throw new ProjectApiError("invalid")
-        set({ projects, projectId: project?.id ?? "", threads })
+        batch(() => {
+          set("projects", reconcile(projects))
+          set("threads", reconcile(threads))
+          set("projectId", project?.id ?? "")
+        })
         errors.roster = ""
         showError()
       } catch (error) {
@@ -244,6 +261,7 @@ export function createTeamController(transport?: ProjectTransport) {
 
   function selectThread(id: string) {
     if (state.threadId === id) return
+    sourceSelection++
     invalidateThread()
     errors.thread = errors.action = ""
     set({ threadId: id, snapshot: undefined, events: [], cursor: 0, lastSuccess: 0, loading: !!id && state.connected })
@@ -286,9 +304,13 @@ export function createTeamController(transport?: ProjectTransport) {
         }
         if (!valid()) return
         for (const approval of snapshot.approvals) {
-          if (approval.state === "approved" || approval.state === "rejected") delete decisions[approval.id]
+          if (approval.deliveryState === "delivered") delete decisions[approval.id]
         }
-        set({ snapshot, events, cursor, lastSuccess: more ? 0 : Date.now(), loading: more })
+        batch(() => {
+          // Preserve keyed row identity so routine polling does not replace focused controls.
+          set("snapshot", reconcile(snapshot))
+          set({ events, cursor, lastSuccess: more ? 0 : Date.now(), loading: more })
+        })
         errors.thread = errors.action = ""
         showError()
       } catch (error) {
@@ -313,6 +335,48 @@ export function createTeamController(transport?: ProjectTransport) {
 
   async function refresh() {
     await Promise.all([refreshRoster(), refreshThread()])
+  }
+
+  async function resolveSource(ref: SourceRef, signal: AbortSignal): Promise<Coordination.Event> {
+    const current = api
+    const visible = state.snapshot?.thread
+    const projectId = visible?.projectId
+    const rosterProject = state.projectId
+    const target = state.threadId
+    const scope = state.sourceScope
+    const identity = account
+    const ticket = connection
+    const generation = sourceSelection
+    if (
+      !current ||
+      !state.connected ||
+      !projectId ||
+      !target ||
+      visible?.id !== target ||
+      !scope ||
+      !identity ||
+      signal.aborted
+    )
+      throw new ProjectApiError("invalid")
+    const event = await current.source(projectId, ref, signal)
+    if (
+      signal.aborted ||
+      current !== api ||
+      ticket !== connection ||
+      identity !== account ||
+      scope !== state.sourceScope ||
+      generation !== sourceSelection ||
+      rosterProject !== state.projectId ||
+      target !== state.threadId ||
+      state.snapshot?.thread.id !== target ||
+      state.snapshot.thread.projectId !== projectId ||
+      event.projectId !== projectId ||
+      event.threadId !== ref.threadId ||
+      event.id !== ref.eventId ||
+      event.seq !== ref.seq
+    )
+      throw new ProjectApiError("invalid")
+    return event
   }
 
   async function send() {
@@ -346,9 +410,41 @@ export function createTeamController(transport?: ProjectTransport) {
     }
   }
 
+  function canRetryDecision(value: Coordination.Approval): boolean {
+    const attempt = decisions[value.id]
+    const visible = state.snapshot?.approvals.find((approval) => approval.id === value.id)
+    return !!(
+      api &&
+      account &&
+      attempt?.account === account &&
+      writable() &&
+      !state.action &&
+      value.threadId === state.threadId &&
+      visible?.threadId === state.threadId &&
+      visible.version === value.version &&
+      visible.decisionId === attempt.decisionId &&
+      visible.decision === "reject" &&
+      visible.state === "rejected" &&
+      visible.deliveryState === value.deliveryState &&
+      (visible.deliveryState === "pending" || visible.deliveryState === "failed")
+    )
+  }
+
+  async function retryDecision(value: Coordination.Approval): Promise<void> {
+    if (!canRetryDecision(value)) return
+    await control("reject", value)
+  }
+
   async function control(kind: "cancel" | "approve" | "reject", value: Coordination.Run | Coordination.Approval) {
     // This API exposes only tool IDs, not reviewable permission details.
     if (kind === "approve" || !api || !writable() || state.action || value.threadId !== state.threadId) return
+    if (
+      kind === "reject" &&
+      "toolCallId" in value &&
+      (value.state === "approved" || value.state === "rejected") &&
+      !canRetryDecision(value)
+    )
+      return
     const current = api
     const id = state.threadId
     const ticket = connection
@@ -361,12 +457,12 @@ export function createTeamController(transport?: ProjectTransport) {
           if (value.state === "approved" || value.state === "rejected") return
           const approval = await current.claim(id, value)
           if (ticket !== connection) return
-          attempt = { approval, decisionId: crypto.randomUUID() }
+          attempt = { approval, decisionId: crypto.randomUUID(), account }
           decisions[value.id] = attempt
         }
         // An uncertain decision retries the original claimed version and ID directly.
-        await current.decide(id, attempt.approval, "reject", attempt.decisionId)
-        if (ticket === connection) delete decisions[value.id]
+        const result = await current.decide(id, attempt.approval, "reject", attempt.decisionId)
+        if (ticket === connection && result.deliveryState === "delivered") delete decisions[value.id]
       }
     } catch (error) {
       if (ticket === connection) fail(error, "action")
@@ -386,8 +482,11 @@ export function createTeamController(transport?: ProjectTransport) {
     loadProject,
     selectThread,
     refresh,
+    resolveSource,
     send,
     control,
+    canRetryDecision,
+    retryDecision,
     writable,
     dispose: () => {
       clearConnection()

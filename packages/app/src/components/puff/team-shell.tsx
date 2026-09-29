@@ -13,6 +13,7 @@ import { useTeam } from "@/pages/puff/team-context"
 import { loadHomeSessionIndex, type HomeSessionEvents } from "@/context/global-sync/home-session-index"
 import { sessionHref } from "@/utils/session-route"
 import { ContextPanel } from "./context-panel"
+import { SessionIdentity, sessionIdentityView, type SessionIdentityProps } from "./session-identity"
 import "./team.css"
 
 export function TeamShell(props: ParentProps) {
@@ -27,6 +28,12 @@ export function TeamShell(props: ParentProps) {
   const [filter, setFilter] = createStore({ text: "" })
   const openConnection = () => void dialog.show(() => <TeamConnection team={team} />)
   const matches = (title: string) => title.toLowerCase().includes(filter.text.toLowerCase())
+  const identityLabels = (): SessionIdentityProps["labels"] => ({
+    session: language.t("puff.session"),
+    worker: language.t("puff.worker"),
+    owner: language.t("puff.owner"),
+    runState: (state) => language.t(`puff.team.run.${state}`),
+  })
   const createSession = () => {
     const conn = server.current
     if (!conn) return
@@ -103,7 +110,7 @@ export function TeamShell(props: ParentProps) {
               const ctx = global.ensureServerCtx(conn)
               return (
                 <QueryClientProvider client={ctx.queryClient}>
-                  <PersonalSessions ctx={ctx} conn={conn} filter={filter.text} />
+                  <PersonalSessions ctx={ctx} conn={conn} filter={filter.text} labels={identityLabels()} />
                 </QueryClientProvider>
               )
             }}
@@ -139,19 +146,36 @@ export function TeamShell(props: ParentProps) {
               fallback={<p class="team-empty-text">{language.t("puff.team.noShared")}</p>}
             >
               <For each={team.state.threads.filter((thread) => matches(thread.title))}>
-                {(thread) => (
-                  <A
-                    class="team-session-item"
-                    activeClass="team-session-active"
-                    href={`/puff/thread/${encodeURIComponent(thread.id)}`}
-                  >
-                    <span class="team-avatar">{thread.createdBy.replace(/^usr_/, "").slice(0, 2).toUpperCase()}</span>
-                    <span class="team-session-copy">
-                      <strong>{thread.title}</strong>
-                      <small>{thread.createdBy}</small>
-                    </span>
-                  </A>
-                )}
+                {(thread) => {
+                  const identity = (): SessionIdentityProps => ({
+                    title: thread.title,
+                    sessionId: thread.sessionId,
+                    workerId: thread.workerId,
+                    ownerId: thread.createdBy,
+                    threadId: thread.id,
+                    run:
+                      team.writable() && team.state.snapshot?.thread.id === thread.id
+                        ? team.state.snapshot.runs.find(
+                            (run) =>
+                              run.threadId === thread.id && !["completed", "failed", "cancelled"].includes(run.state),
+                          )
+                        : undefined,
+                    labels: identityLabels(),
+                  })
+                  return (
+                    <A
+                      class="team-session-item"
+                      activeClass="team-session-active"
+                      href={`/puff/thread/${encodeURIComponent(thread.id)}`}
+                      aria-label={sessionIdentityView(identity()).accessibleLabel}
+                    >
+                      <span class="team-avatar" aria-hidden="true">
+                        {thread.createdBy.replace(/^usr_/, "").slice(0, 2).toUpperCase()}
+                      </span>
+                      <SessionIdentity {...identity()} density="rail" />
+                    </A>
+                  )
+                }}
               </For>
             </Show>
           </Show>
@@ -244,6 +268,10 @@ export function TeamShell(props: ParentProps) {
               busy={!!team.state.action}
               onCancel={(run) => void team.control("cancel", run)}
               onReject={(approval) => void team.control("reject", approval)}
+              sourceScope={team.state.sourceScope}
+              resolveSource={team.resolveSource}
+              canRetryDecision={team.canRetryDecision}
+              onRetryDecision={team.retryDecision}
             />
           </aside>
         </div>
@@ -252,7 +280,12 @@ export function TeamShell(props: ParentProps) {
   )
 }
 
-function PersonalSessions(props: { ctx: ServerCtx; conn: ServerConnection.Any; filter: string }) {
+function PersonalSessions(props: {
+  ctx: ServerCtx
+  conn: ServerConnection.Any
+  filter: string
+  labels: SessionIdentityProps["labels"]
+}) {
   const language = useLanguage()
   const tabs = useTabs()
   const cache = props.ctx.sync.homeSessions
@@ -313,6 +346,9 @@ function PersonalSessions(props: { ctx: ServerCtx; conn: ServerConnection.Any; f
               "team-session-active": location.pathname === sessionHref(ServerConnection.key(props.conn), session.id),
             }}
             type="button"
+            aria-label={
+              sessionIdentityView({ title: session.title, sessionId: session.id, labels: props.labels }).accessibleLabel
+            }
             onClick={() => {
               props.ctx.projects.open(session.directory)
               props.ctx.projects.touch(session.directory)
@@ -323,7 +359,7 @@ function PersonalSessions(props: { ctx: ServerCtx; conn: ServerConnection.Any; f
               ◌
             </span>
             <span class="team-session-copy">
-              <strong>{session.title}</strong>
+              <SessionIdentity title={session.title} sessionId={session.id} labels={props.labels} density="rail" />
               <small>{session.directory.split(/[\\/]/).filter(Boolean).at(-1) || serverName(props.conn)}</small>
             </span>
           </button>

@@ -150,6 +150,7 @@
 }
 .team-session-copy {
   min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -357,6 +358,19 @@
 }
 .team-thread-heading {
   min-width: 0;
+  flex: 1;
+}
+.team-session-item .puff-session-identity__meta,
+.team-thread-heading .puff-session-identity__meta {
+  max-width: 100%;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+.team-session-item .puff-session-identity__meta > span,
+.team-thread-heading .puff-session-identity__meta > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .team-eyebrow {
   display: block;
@@ -384,6 +398,7 @@
 }
 .team-context-toggle {
   display: flex;
+  flex-shrink: 0;
   gap: 10px;
   font-size: 11px;
   align-items: center;

@@ -305,6 +305,266 @@ test("an_uncertain_rejection_retries_the_identical_decision_without_reclaiming",
   team.dispose()
 })
 
+test("committed_rejection_with_pending_delivery_retries_the_remembered_decision_without_reclaiming", async () => {
+  let current: Coordination.Approval = approval
+  let claims = 0
+  const decisions: { expectedVersion: number; decision: string; decisionId: string }[] = []
+  const team = await connected(
+    service((path, init) => {
+      if (path === "/threads/a") return Response.json({ ...snapshot(), approvals: [current] })
+      if (path.endsWith("/claim")) {
+        claims++
+        current = { ...approval, state: "claimed", version: 2, claimedBy: "alice" as Coordination.UserID }
+        return Response.json(current)
+      }
+      if (path.endsWith("/decision")) {
+        const body = JSON.parse(String(init.body)) as (typeof decisions)[number]
+        decisions.push(body)
+        current = {
+          ...current,
+          state: "rejected",
+          version: 3,
+          decision: "reject",
+          decisionId: body.decisionId,
+          decidedBy: "alice" as Coordination.UserID,
+          deliveryState: decisions.length === 1 ? "pending" : "delivered",
+        }
+        if (decisions.length === 1) return Promise.reject(new Error("Runner delivery failed after commit"))
+        return Response.json(current)
+      }
+    }),
+  )
+  team.selectThread("a")
+  await settle()
+  await team.control("reject", approval)
+  await settle()
+  expect(team.state.snapshot?.approvals[0]?.deliveryState).toBe("pending")
+  expect(team.canRetryDecision(team.state.snapshot!.approvals[0]!)).toBe(true)
+  await team.retryDecision(team.state.snapshot!.approvals[0]!)
+  await settle()
+  expect(claims).toBe(1)
+  expect(decisions).toHaveLength(2)
+  expect(decisions[1]).toEqual(decisions[0])
+  expect(decisions[1]?.expectedVersion).toBe(2)
+  expect(team.state.snapshot?.approvals[0]?.deliveryState).toBe("delivered")
+  expect(team.canRetryDecision(team.state.snapshot!.approvals[0]!)).toBe(false)
+  team.dispose()
+})
+
+test("only_the_original_connected_account_can_retry_an_undelivered_decision", async () => {
+  let current: Coordination.Approval = approval
+  const team = await connected(
+    service((path, init) => {
+      if (path === "/threads/a") return Response.json({ ...snapshot(), approvals: [current] })
+      if (path.endsWith("/claim"))
+        return Response.json({ ...approval, state: "claimed", version: 2, claimedBy: "alice" })
+      if (path.endsWith("/decision")) {
+        const body = JSON.parse(String(init.body)) as { decisionId: string }
+        current = {
+          ...approval,
+          state: "rejected",
+          version: 3,
+          decision: "reject",
+          decisionId: body.decisionId,
+          decidedBy: "alice" as Coordination.UserID,
+          deliveryState: "failed",
+        }
+        return Promise.reject(new Error("Delivery failed"))
+      }
+    }),
+  )
+  team.selectThread("a")
+  await settle()
+  await team.control("reject", approval)
+  await settle()
+  expect(team.canRetryDecision(team.state.snapshot!.approvals[0]!)).toBe(true)
+  team.disconnect()
+  expect(await team.connect("https://team.example", "bob", "test-only")).toBe(true)
+  await settle()
+  expect(team.canRetryDecision(team.state.snapshot!.approvals[0]!)).toBe(false)
+  team.disconnect()
+  expect(await team.connect("https://team.example", "alice", "test-only")).toBe(true)
+  await settle()
+  expect(team.canRetryDecision(team.state.snapshot!.approvals[0]!)).toBe(true)
+  team.dispose()
+  const afterReload = await connected(
+    service((path) => (path === "/threads/a" ? Response.json({ ...snapshot(), approvals: [current] }) : undefined)),
+  )
+  afterReload.selectThread("a")
+  await settle()
+  expect(afterReload.canRetryDecision(afterReload.state.snapshot!.approvals[0]!)).toBe(false)
+  afterReload.dispose()
+})
+
+test("worker_delivery_observed_on_refresh_clears_the_remembered_decision", async () => {
+  let current: Coordination.Approval = approval
+  const team = await connected(
+    service((path, init) => {
+      if (path === "/threads/a") return Response.json({ ...snapshot(), approvals: [current] })
+      if (path.endsWith("/claim")) return Response.json({ ...approval, state: "claimed", version: 2 })
+      if (path.endsWith("/decision")) {
+        const body = JSON.parse(String(init.body)) as { decisionId: string }
+        current = {
+          ...approval,
+          state: "rejected",
+          version: 3,
+          decision: "reject",
+          decisionId: body.decisionId,
+          deliveryState: "pending",
+        }
+        return Promise.reject(new Error("Delivery failed"))
+      }
+    }),
+  )
+  team.selectThread("a")
+  await settle()
+  await team.control("reject", approval)
+  await settle()
+  expect(team.canRetryDecision(team.state.snapshot!.approvals[0]!)).toBe(true)
+  current = { ...current, deliveryState: "delivered" }
+  await team.refresh()
+  expect(team.canRetryDecision(team.state.snapshot!.approvals[0]!)).toBe(false)
+  team.disconnect()
+  expect(await team.connect("https://team.example", "alice", "test-only")).toBe(true)
+  await settle()
+  expect(team.canRetryDecision(team.state.snapshot!.approvals[0]!)).toBe(false)
+  team.dispose()
+})
+
+test("resolving_an_exact_source_keeps_the_target_thread_and_draft", async () => {
+  const source = { ...event("source", 7, "a"), projectId: "prj_test" as Coordination.ProjectID }
+  const team = await connected(
+    service((path) => {
+      if (path === "/threads/b") return Response.json(snapshot("b"))
+      if (path.startsWith("/projects/prj_test/events?"))
+        return Response.json({ events: [source], cursor: 7, hasMore: false })
+    }),
+  )
+  team.selectThread("b")
+  await settle()
+  team.set("drafts", "b", { text: "Continue B", kind: "instruction" })
+  const found = await team.resolveSource({ threadId: "a", eventId: "source", seq: 7 }, new AbortController().signal)
+  expect(found).toEqual(source)
+  expect(team.state.threadId).toBe("b")
+  expect(team.state.drafts.b?.text).toBe("Continue B")
+  team.dispose()
+})
+
+test("source_lookup_uses_the_visible_A_thread_after_the_roster_switches_to_project_B", async () => {
+  const source = { ...event("source", 7, "a"), projectId: "prj_test" as Coordination.ProjectID }
+  const requests: string[] = []
+  const team = await connected(
+    service((path) => {
+      if (path === "/projects")
+        return Response.json([
+          { id: "prj_test", name: "A", createdBy: "alice", createdAt: "2026-09-29T19:00:00Z" },
+          { id: "prj_other", name: "B", createdBy: "alice", createdAt: "2026-09-29T19:00:00Z" },
+        ])
+      if (path === "/projects/prj_other/threads") return Response.json([])
+      if (path.startsWith("/projects/prj_test/events?")) {
+        requests.push(path)
+        return Response.json({ events: [source], cursor: 7, hasMore: false })
+      }
+      if (path.startsWith("/projects/prj_other/events?")) {
+        requests.push(path)
+        return new Response(null, { status: 404 })
+      }
+    }),
+  )
+  team.selectThread("a")
+  await settle()
+  team.set("drafts", "a", { text: "Keep A's draft", kind: "instruction" })
+  await team.loadProject("prj_other")
+  expect(team.state.projectId).toBe("prj_other")
+  expect(String(team.state.snapshot?.thread.projectId)).toBe("prj_test")
+  const found = await team.resolveSource({ threadId: "a", eventId: "source", seq: 7 }, new AbortController().signal)
+  expect(found).toEqual(source)
+  expect(requests).toEqual(["/projects/prj_test/events?after=6&limit=1"])
+  expect(team.state.threadId).toBe("a")
+  expect(team.state.drafts.a?.text).toBe("Keep A's draft")
+  team.dispose()
+})
+
+test("a_project_switch_during_source_lookup_rejects_the_late_A_event", async () => {
+  const response = Promise.withResolvers<Response>()
+  const source = { ...event("source", 7, "a"), projectId: "prj_test" as Coordination.ProjectID }
+  const team = await connected(
+    service((path) => {
+      if (path === "/projects")
+        return Response.json([
+          { id: "prj_test", name: "A", createdBy: "alice", createdAt: "2026-09-29T19:00:00Z" },
+          { id: "prj_other", name: "B", createdBy: "alice", createdAt: "2026-09-29T19:00:00Z" },
+        ])
+      if (path === "/projects/prj_other/threads") return Response.json([])
+      if (path.startsWith("/projects/prj_test/events?")) return response.promise
+    }),
+  )
+  team.selectThread("a")
+  await settle()
+  const pending = team.resolveSource({ threadId: "a", eventId: "source", seq: 7 }, new AbortController().signal)
+  await team.loadProject("prj_other")
+  response.resolve(Response.json({ events: [source], cursor: 7, hasMore: false }))
+  await expect(pending).rejects.toMatchObject({ code: "invalid" })
+  team.dispose()
+})
+
+test("cancelled_or_wrong_target_late_evidence_never_resolves", async () => {
+  const source = { ...event("source", 7, "a"), projectId: "prj_test" as Coordination.ProjectID }
+  const responses = [Promise.withResolvers<Response>(), Promise.withResolvers<Response>()]
+  let requests = 0
+  const team = await connected(
+    service((path) => {
+      if (path === "/threads/b") return Response.json(snapshot("b"))
+      if (path.startsWith("/projects/prj_test/events?")) return responses[requests++]?.promise
+    }),
+  )
+  team.selectThread("a")
+  await settle()
+  const abort = new AbortController()
+  const cancelled = team.resolveSource({ threadId: "a", eventId: "source", seq: 7 }, abort.signal)
+  abort.abort()
+  responses[0]!.resolve(Response.json({ events: [source], cursor: 7, hasMore: false }))
+  await expect(cancelled).rejects.toThrow()
+  const switched = team.resolveSource({ threadId: "a", eventId: "source", seq: 7 }, new AbortController().signal)
+  team.selectThread("b")
+  responses[1]!.resolve(Response.json({ events: [source], cursor: 7, hasMore: false }))
+  await expect(switched).rejects.toMatchObject({ code: "invalid" })
+  team.dispose()
+})
+
+test("evidence_started_under_one_account_cannot_finish_after_reconnect_as_another", async () => {
+  const response = Promise.withResolvers<Response>()
+  const source = { ...event("source", 7, "a"), projectId: "prj_test" as Coordination.ProjectID }
+  const team = await connected(
+    service((path) => {
+      if (path.startsWith("/projects/prj_test/events?")) return response.promise
+    }),
+  )
+  team.selectThread("a")
+  await settle()
+  const pending = team.resolveSource({ threadId: "a", eventId: "source", seq: 7 }, new AbortController().signal)
+  team.disconnect()
+  expect(await team.connect("https://team.example", "bob", "test-only")).toBe(true)
+  response.resolve(Response.json({ events: [source], cursor: 7, hasMore: false }))
+  await expect(pending).rejects.toMatchObject({ code: "invalid" })
+  team.dispose()
+})
+
+test("source_scope_changes_on_every_connection_and_clears_on_disconnect", async () => {
+  const team = await connected(service(() => undefined))
+  const first = team.state.sourceScope
+  expect(first).not.toBe("")
+  team.disconnect()
+  expect(team.state.sourceScope).toBe("")
+  expect(await team.connect("https://team.example", "alice", "test-only")).toBe(true)
+  expect(team.state.sourceScope).not.toBe(first)
+  const second = team.state.sourceScope
+  team.disconnect()
+  expect(await team.connect("https://team.example", "bob", "test-only")).toBe(true)
+  expect(team.state.sourceScope).not.toBe(second)
+  team.dispose()
+})
+
 test("tool_approval_is_unavailable_without_reviewable_permission_details", async () => {
   const mutations: string[] = []
   const team = await connected(

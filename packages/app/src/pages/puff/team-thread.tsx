@@ -4,6 +4,7 @@ import { Button } from "@opencode-ai/ui/button"
 import { useLanguage } from "@/context/language"
 import { useTeam } from "./team-context"
 import { ContextPanel } from "@/components/puff/context-panel"
+import { SessionIdentity, type SessionIdentityProps } from "@/components/puff/session-identity"
 import { teamEventText } from "./team-state"
 
 export default function TeamThreadPage() {
@@ -42,6 +43,12 @@ export default function TeamThreadPage() {
   const pending = () => team.state.pending[params.threadId]
   const runs = () => snapshot()?.runs ?? []
   const active = () => runs().filter((run) => !["completed", "failed", "cancelled"].includes(run.state))
+  const identityLabels = (): SessionIdentityProps["labels"] => ({
+    session: language.t("puff.session"),
+    worker: language.t("puff.worker"),
+    owner: language.t("puff.owner"),
+    runState: (state) => language.t(`puff.team.run.${state}`),
+  })
   const visible = createMemo(() =>
     team.state.events.filter((event) =>
       [
@@ -104,14 +111,20 @@ export default function TeamThreadPage() {
       <header class="team-thread-header">
         <div class="team-thread-heading">
           <span class="team-eyebrow">{language.t("puff.team.sharedConversation")}</span>
-          <h1>{snapshot()?.thread.title ?? language.t("puff.team.conversation")}</h1>
-          <Show when={snapshot()}>
+          <Show when={snapshot()} fallback={<h1>{language.t("puff.team.conversation")}</h1>}>
             {(value) => (
-              <p>
-                {value().thread.createdBy}
-                <span>·</span>
-                {value().thread.workerId}
-              </p>
+              <h1>
+                <SessionIdentity
+                  title={value().thread.title}
+                  sessionId={value().thread.sessionId}
+                  workerId={value().thread.workerId}
+                  ownerId={value().thread.createdBy}
+                  threadId={value().thread.id}
+                  run={team.writable() ? active().find((run) => run.threadId === value().thread.id) : undefined}
+                  labels={identityLabels()}
+                  density="header"
+                />
+              </h1>
             )}
           </Show>
         </div>
@@ -352,6 +365,10 @@ export default function TeamThreadPage() {
             busy={!!team.state.action}
             onCancel={(run) => void team.control("cancel", run)}
             onReject={(approval) => void team.control("reject", approval)}
+            sourceScope={team.state.sourceScope}
+            resolveSource={team.resolveSource}
+            canRetryDecision={team.canRetryDecision}
+            onRetryDecision={team.retryDecision}
           />
         </aside>
       </div>

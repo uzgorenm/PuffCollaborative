@@ -21,10 +21,16 @@
 .puff-context-notice { border-left: 2px solid var(--text-weak); padding-left: 9px; }
 .puff-context-sources summary { cursor: pointer; color: var(--text-base); font-size: 11px; }
 .puff-context-sources summary:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 3px; }
-.puff-context-sources a { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin: 12px 0; color: var(--text-weak); font-size: 10px; overflow-wrap: anywhere; }
-.puff-context-sources a:hover, .puff-context-sources a:focus-visible { color: var(--text-strong); }
-.puff-context-sources a code { min-width: 0; }
-.puff-context-sources a small { flex-basis: 100%; padding-left: 16px; }
+.puff-context-source-row { display: flex; flex-wrap: wrap; gap: 4px 7px; margin: 12px 0; color: var(--text-weak); font-size: 10px; overflow-wrap: anywhere; }
+.puff-context-source-row button { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-width: 0; color: var(--text-base); text-align: left; cursor: pointer; }
+.puff-context-source-row button:hover { color: var(--text-strong); }
+.puff-context-source-row button:focus-visible, .puff-context-peek-close:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 3px; }
+.puff-context-source-row code { min-width: 0; }
+.puff-context-source-row small { flex-basis: 100%; padding-left: 16px; }
+.puff-context-peek { margin-top: 12px; padding: 12px; border: 1px solid var(--team-border); border-radius: 8px; background: var(--surface-raised-base); overflow-wrap: anywhere; }
+.puff-context-peek-close { display: block; margin-left: auto; color: var(--text-base); font-size: 11px; cursor: pointer; }
+.puff-context-source-detail { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; font-size: 10px; }
+.puff-context-source-detail p { margin-top: 6px; white-space: pre-wrap; }
 .puff-context-queue { border: 1px solid var(--team-border); border-radius: 8px; padding: 12px; margin-top: 12px; }
 .puff-context-queue > span { font-size: 10px; color: var(--text-weak); }
 .puff-context-queue p { max-height: 100px; overflow: auto; }

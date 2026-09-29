@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import type { Coordination } from "@opencode-ai/schema/coordination"
 import type { TeamThread } from "@/pages/puff/team-api"
-import { selectContext } from "./model"
+import { canOfferDecisionRetry, selectContext } from "./model"
 
 // Synthetic UI fixtures: these do not represent a live Flower or OpenCode receipt.
 const thread = (id: string, sessionId: string, workerId = "worker-one") => ({
@@ -108,4 +108,37 @@ test("a card without source receipts cannot advertise a verified outcome", () =>
   })
   expect(view.verifiedOutcome).toBeUndefined()
   expect(view.sources).toEqual([])
+})
+
+test("decided tool approvals keep pending and failed delivery visible without calling them completed", () => {
+  const a = snapshot()
+  const approval = (id: string, threadId: string, deliveryState: "pending" | "failed" | "delivered") => ({
+    id, threadId, runId: "run-a", toolCallId: "tool-a", version: 2, state: "rejected",
+    requestedAt: "2026-09-29T20:00:00Z", deliveryState,
+  }) as unknown as Coordination.Approval
+  const view = selectContext({
+    target: { threadId: "thread-a", sessionId: "session-a", workerId: "worker-one" },
+    snapshot: { ...a, approvals: [
+      approval("pending", "thread-a", "pending"), approval("failed", "thread-a", "failed"),
+      approval("delivered", "thread-a", "delivered"), approval("other", "thread-b", "pending"),
+    ] },
+    connected: true, loading: false,
+  })
+  expect(view.deliveryIssues.map((item) => [item.id, item.deliveryState])).toEqual([
+    ["pending", "pending"], ["failed", "failed"],
+  ])
+  expect(view.approvals).toEqual([])
+})
+
+test("retry requires a decided unresolved approval and an exact-attempt capability", () => {
+  const pending = {
+    id: "approval-a", threadId: "thread-a", runId: "run-a", toolCallId: "tool-a", version: 2,
+    state: "rejected", requestedAt: "2026-09-29T20:00:00Z", deliveryState: "pending",
+  } as unknown as Coordination.Approval
+  const action = () => {}
+  expect(canOfferDecisionRetry(pending, () => true, action)).toBe(true)
+  expect(canOfferDecisionRetry(pending, () => false, action)).toBe(false)
+  expect(canOfferDecisionRetry(pending, () => true, undefined)).toBe(false)
+  expect(canOfferDecisionRetry({ ...pending, deliveryState: "delivered" }, () => true, action)).toBe(false)
+  expect(canOfferDecisionRetry({ ...pending, state: "pending" }, () => true, action)).toBe(false)
 })

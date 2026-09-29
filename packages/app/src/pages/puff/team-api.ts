@@ -95,6 +95,40 @@ export function createTeamApi(config: {
     thread: (id: string, signal?: AbortSignal) => request(thread(id), TeamThread, undefined, signal),
     events: (id: string, after = 0, signal?: AbortSignal) =>
       request(`${thread(id)}/events?after=${after}&limit=200`, Replay, undefined, signal),
+    async source(
+      projectId: string,
+      ref: { threadId: string; eventId: string; seq: number },
+      signal?: AbortSignal,
+    ): Promise<Coordination.Event> {
+      const expected = { threadId: ref.threadId, eventId: ref.eventId, seq: ref.seq }
+      if (
+        !projectId ||
+        !expected.threadId ||
+        !expected.eventId ||
+        !Number.isSafeInteger(expected.seq) ||
+        expected.seq < 1
+      )
+        throw new ProjectApiError("invalid")
+      signal?.throwIfAborted()
+      const page = await request(
+        `/projects/${encodeURIComponent(projectId)}/events?after=${expected.seq - 1}&limit=1`,
+        Replay,
+        undefined,
+        signal,
+      )
+      signal?.throwIfAborted()
+      const event = page.events[0]
+      if (
+        page.events.length !== 1 ||
+        !event ||
+        event.projectId !== projectId ||
+        event.threadId !== expected.threadId ||
+        event.id !== expected.eventId ||
+        event.seq !== expected.seq
+      )
+        throw new ProjectApiError("invalid")
+      return event
+    },
     comments: (id: string, signal?: AbortSignal) =>
       request(`${thread(id)}/comments`, Schema.Array(Coordination.Comment), undefined, signal),
     submit: (id: string, text: string, requestId: string) =>
