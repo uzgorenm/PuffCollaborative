@@ -5,6 +5,7 @@ import { Permission } from "@opencode-ai/schema/permission"
 import { Session } from "@opencode-ai/schema/session"
 import { SessionInput } from "@opencode-ai/schema/session-input"
 import { AbsolutePath } from "@opencode-ai/schema/schema"
+import { WorkspaceID } from "@opencode-ai/schema/workspace-id"
 import { Database } from "@opencode-ai/core/database/database"
 import { RunnerLifecycle } from "@opencode-ai/core/runner-harness/lifecycle"
 import { ExecutionTable } from "@opencode-ai/core/runner-harness/sql"
@@ -35,7 +36,10 @@ function session(command: RunnerHarnessContracts.StartCommand) {
     cost: 0,
     tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
     time: { created: DateTime.makeUnsafe(0), updated: DateTime.makeUnsafe(0) },
-    location: { directory: AbsolutePath.make(`/tmp/runner-${command.threadId}`) },
+    location: {
+      directory: AbsolutePath.make(`/tmp/runner-${command.threadId}`),
+      workspaceID: WorkspaceID.make(`wrk_${command.threadId}`),
+    },
   })
 }
 
@@ -72,6 +76,8 @@ function setup(db: Database.Interface["db"]) {
     reconciliation: "missing" as RunnerHarnessContracts.Reconciliation,
     activeTools: 0,
     artifactActivities: [] as Coordination.RunnerActivity[],
+    runtimeId: undefined as string | undefined,
+    authorizedAttempt: 1,
   }
   const sessions = new Map<string, Session.Info>()
   const principal: Extract<Coordination.AuthContext, { kind: "runner" }> = {
@@ -103,7 +109,12 @@ function setup(db: Database.Interface["db"]) {
       authorize: (value) => {
         const bound = session(value)
         sessions.set(value.sessionId, bound)
-        return Effect.succeed({ command: value, projectId: bound.projectID, attempt: 1, session: bound })
+        return Effect.succeed({
+          command: value,
+          projectId: bound.projectID,
+          attempt: state.authorizedAttempt,
+          session: bound,
+        })
       },
       attach: ({ run }) => Effect.succeed(run.session),
       coordinator: {
@@ -135,7 +146,7 @@ function setup(db: Database.Interface["db"]) {
           if (state.workspaceFailure)
             return yield* Effect.fail({ code: "conflict" as const, message: "Workspace binding changed" })
           return {
-            id: `workspace_${run.command.threadId}`,
+            id: `wrk_${run.command.threadId}`,
             threadId: run.command.threadId,
             projectId: run.projectId,
             directory: run.session.location.directory,
@@ -143,7 +154,8 @@ function setup(db: Database.Interface["db"]) {
         }),
     },
     runtimes: {
-      ensure: ({ run }) => Effect.succeed({ id: `runtime_${run.command.threadId}`, ...run.command.executionOwner }),
+      ensure: ({ run }) =>
+        Effect.succeed({ id: state.runtimeId ?? `runtime_${run.command.threadId}`, ...run.command.executionOwner }),
       health: (runtime) => Effect.succeed({ runtime, state: "ready", checkedAt: 0 }),
       watch: ({ observe }) =>
         Effect.gen(function* () {
@@ -338,7 +350,7 @@ test("holds a prepared retry when durable admission exists but scheduling is unv
         session: bound,
       })
       const workspace = {
-        id: `workspace_${first.threadId}`,
+        id: `wrk_${first.threadId}`,
         threadId: first.threadId,
         projectId: bound.projectID,
         directory: bound.location.directory,
@@ -380,6 +392,29 @@ test("records a deterministic preparation failure before prompt side effects", (
         expectedState: "reserved",
         nextState: "failed",
       })
+    }),
+  ))
+
+test("reattaches only the same authorized Run to this process's runtime", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("reattach")
+      yield* harness.service.start(first)
+      harness.state.runtimeId = "runtime_after_restart"
+      harness.state.authorizedAttempt = 2
+      const changedAttempt = yield* harness.service.reattach(first.runId).pipe(Effect.flip)
+      expect(changedAttempt.code).toBe("conflict")
+      expect((yield* harness.service.get(first.runId))?.runtime?.id).toBe(`runtime_${first.threadId}`)
+      harness.state.authorizedAttempt = 1
+      const restored = yield* harness.service.reattach(first.runId)
+      expect(restored.phase).toBe("admitted")
+      expect(restored.runtime?.id).toBe("runtime_after_restart")
+      expect(restored.admittedMessageId).toBe(first.runnerMessageId)
+      expect(restored.artifactBaseline?.runId).toBe(first.runId)
+      expect((yield* harness.service.reattach(first.runId)).runtime?.id).toBe("runtime_after_restart")
+      expect(harness.calls.prompts).toBe(1)
+      expect(harness.calls.wakes).toBe(1)
     }),
   ))
 
@@ -654,5 +689,13 @@ test("persists exact cancellation evidence and rejects an older observation", ()
       expect(row?.interrupt_abort).toBe("acknowledged")
       expect(row?.interrupt_state).toBe("uncertain")
       expect(row?.interrupt_checked_at).toBe(10)
+      harness.state.runtimeId = "runtime_after_cancel_restart"
+      const restored = yield* harness.service.reattach(first.runId)
+      expect(restored.phase).toBe("cancelling")
+      const after = yield* db.select().from(ExecutionTable).where(eq(ExecutionTable.run_id, first.runId)).get()
+      expect(after?.runtime_id).toBe("runtime_after_cancel_restart")
+      expect(after?.interrupt_abort).toBe("acknowledged")
+      expect(after?.interrupt_state).toBe("uncertain")
+      expect(after?.interrupt_checked_at).toBe(10)
     }),
   ))

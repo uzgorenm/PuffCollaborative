@@ -57,7 +57,13 @@ describe("coordination events with real thread storage and access", () => {
         .run()
       yield* db
         .insert(SharedProjectTable)
-        .values({ id: projectId, name: "Shared test project", created_by: alice.userId, created_at: now, request_id: threadId })
+        .values({
+          id: projectId,
+          name: "Shared test project",
+          created_by: alice.userId,
+          created_at: now,
+          request_id: threadId,
+        })
         .run()
       yield* db
         .insert(MembershipTable)
@@ -80,9 +86,22 @@ describe("coordination events with real thread storage and access", () => {
 
       const access = CoordinationAccess.make(db)
       const first = yield* journal.append(
-        { projectId, threadId, kind: "run.tool", occurredAt: new Date(now).toISOString(), payload: { status: "started" } },
+        {
+          projectId,
+          threadId,
+          kind: "run.tool",
+          occurredAt: new Date(now).toISOString(),
+          payload: { status: "started" },
+        },
         () => Effect.void,
       )
+      expect(
+        (yield* db
+          .select({ seq: ThreadTable.activity_seq })
+          .from(ThreadTable)
+          .where(eq(ThreadTable.id, threadId))
+          .get())?.seq,
+      ).toBe(first.seq)
       const page = yield* CoordinationEvents.authorizedReplayThread(access, journal, alice, threadId, -1, 10)
       expect(page.events).toEqual([first])
 
@@ -109,23 +128,56 @@ describe("coordination events with real thread storage and access", () => {
       const observer = yield* live.pipe(
         Stream.take(2),
         Stream.runForEach((event) =>
-          Effect.sync(() => seen.push(event)).pipe(Effect.andThen(Deferred.succeed(firstSeen, undefined)), Effect.asVoid),
+          Effect.sync(() => seen.push(event)).pipe(
+            Effect.andThen(Deferred.succeed(firstSeen, undefined)),
+            Effect.asVoid,
+          ),
         ),
         Effect.exit,
         Effect.forkScoped,
       )
       const second = yield* journal.append(
-        { projectId, threadId, kind: "run.tool", occurredAt: new Date(now + 1).toISOString(), payload: { status: "finished" } },
+        {
+          projectId,
+          threadId,
+          kind: "run.output",
+          occurredAt: new Date(now + 1).toISOString(),
+          payload: { status: "finished" },
+        },
         () => Effect.void,
       )
       yield* Deferred.await(firstSeen)
+      expect(
+        (yield* db
+          .select({ seq: ThreadTable.activity_seq })
+          .from(ThreadTable)
+          .where(eq(ThreadTable.id, threadId))
+          .get())?.seq,
+      ).toBe(second.seq)
       yield* db.delete(MembershipTable).where(eq(MembershipTable.project_id, projectId)).run()
-      yield* journal.append(
-        { projectId, threadId, kind: "run.tool", occurredAt: new Date(now + 2).toISOString(), payload: { status: "after revocation" } },
+      const third = yield* journal.append(
+        {
+          projectId,
+          threadId,
+          kind: "run.tool",
+          occurredAt: new Date(now + 2).toISOString(),
+          payload: { status: "after revocation" },
+        },
         () => Effect.void,
       )
       expect(Exit.isFailure(yield* Fiber.join(observer))).toBe(true)
       expect(seen).toEqual([second])
+      yield* journal.append(
+        { projectId, threadId, kind: "work-card.updated", occurredAt: new Date(now + 3).toISOString(), payload: {} },
+        () => Effect.void,
+      )
+      expect(
+        (yield* db
+          .select({ seq: ThreadTable.activity_seq })
+          .from(ThreadTable)
+          .where(eq(ThreadTable.id, threadId))
+          .get())?.seq,
+      ).toBe(third.seq)
     }),
   )
 })
