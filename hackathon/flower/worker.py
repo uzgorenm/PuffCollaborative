@@ -27,6 +27,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 import sys
 import time
 from datetime import UTC, datetime
@@ -48,6 +49,10 @@ ADVANCING = {"comment.created", "run.tool", "run.output"}
 MAX_EVENTS_PER_THREAD = 20
 # Marks instructions the guardian itself submitted, so they never re-trigger it.
 GUARDIAN_TAG = "[Puff guardian]"
+# Guardian input budget: Jev-flagged events only, paths not diffs, summarized cards.
+GUARDIAN_MAX_BYTES = 6000
+GUARDIAN_MAX_EVENTS = 12
+PATH = re.compile(r"[\w./-]+\.[A-Za-z0-9]{1,6}")
 
 
 def log(message, **fields):
@@ -135,20 +140,19 @@ def content_for(event):
 def feed_item(event):
     """Compact, model-visible view of one server event for the guardian."""
     payload, kind = event.get("payload") or {}, event["kind"]
-    parts = {
-        "run.tool": (payload.get("toolName"), payload.get("status"), payload.get("summary")),
-        "run.diff": (payload.get("ref"), payload.get("summary")),
-    }
     text = {
-        "instruction.submitted": payload.get("text"),
-        "comment.created": payload.get("body"),
-        "run.output": payload.get("text"),
-    }.get(kind)
-    if kind in parts:
-        text = " ".join(str(part) for part in parts[kind] if part)
-    if text is None:
-        text = kind.removeprefix("run.")
-    return {"eventId": event["id"], "seq": event["seq"], "kind": kind, "text": str(text)[:2000]}
+        "instruction.submitted": str(payload.get("text") or "")[:500],
+        "comment.created": str(payload.get("body") or "")[:300],
+        "run.output": str(payload.get("text") or "")[:300],
+        # Tools and diffs carry only the file paths they touched, never diff bodies.
+        "run.tool": " ".join(
+            [str(payload.get("toolName") or "tool"), str(payload.get("status") or "")]
+            + PATH.findall(str(payload.get("summary") or ""))[:5]
+        ),
+        "run.diff": "diff "
+        + " ".join(PATH.findall(f"{payload.get('ref') or ''} {payload.get('summary') or ''}")[:10]),
+    }.get(kind, kind.removeprefix("run."))
+    return {"eventId": event["id"], "seq": event["seq"], "kind": kind, "text": text}
 
 
 def card_status(card):
@@ -180,15 +184,21 @@ class Worker:
         self.mode = config.get("mode", "guardian")
         self.auto_send = config.get("autoSend", False)
         self.member = None  # Server logged in as a member, for submitting instructions
+        # Reads (events, threads) go through the member login when one is configured:
+        # the server grants the analysis identity only work-card updates.
+        self.reader = server
         self.feed = {}  # threadId -> guardian feed items
         self.objective = {}  # threadId -> latest non-guardian instruction text
         self.board = {}  # threadId -> latest guardian card (richer than the server card)
         self.sent = {}  # threadId -> (overlapWith, monotonic time) of last correction
+        self.burst = {}  # session key -> card before the current burst of events
+        self.flagged = {}  # threadId -> event seqs inside bursts Jev called meaningful
+        self.retry = {}  # threadId -> (due monotonic time, attempts) after a failed guardian run
 
     # -- setup ---------------------------------------------------------------
     def load_threads(self):
         for thread_id in self.selected:
-            thread = self.server.thread(thread_id)["thread"]
+            thread = self.reader.thread(thread_id)["thread"]
             if thread["projectId"] != self.project_id:
                 raise ValueError(f"Thread {thread_id} belongs to another project")
             self.threads[thread_id] = thread
@@ -234,7 +244,7 @@ class Worker:
     # -- ingest ----------------------------------------------------------------
     async def poll(self):
         while True:
-            page = await asyncio.to_thread(self.server.replay, self.project_id, self.cursor)
+            page = await asyncio.to_thread(self.reader.replay, self.project_id, self.cursor)
             for event in page["events"]:
                 try:
                     await self.ingest(event)
@@ -274,16 +284,51 @@ class Worker:
         revision = self.activity.card(key)["revision"]
         if self.refresh.observe(key, revision, time.monotonic()):
             log("activity", thread=thread_id, seq=event["seq"], kind=event["kind"])
-            state = self.activity.classifier_state(key, previous)
-            asyncio.create_task(self.classify(key, revision, state))
+            if key not in self.burst:
+                self.burst[key] = previous
+                asyncio.create_task(self.classify(key))
 
-    async def classify(self, key, revision, state):
+    async def classify(self, key):
+        """Ask Jev once per burst: wait until the session is quiet, then classify it whole."""
+        while True:
+            revision = self.activity.card(key)["revision"]
+            await asyncio.sleep(self.config.get("burstQuietSeconds", 0.7))
+            if self.activity.card(key)["revision"] == revision:
+                break
+        previous = self.burst.pop(key)
+        state = self.activity.classifier_state(key, previous)
         label = await self.jev.classify(state)
-        self.refresh.classified(key, revision, label)
+        latest = self.activity.card(key)["revision"]
+        if latest != revision and label not in (None, "continuation"):
+            # New events arrived while Jev answered; the meaningful change is still
+            # unanalyzed, so it carries over to the newest revision.
+            revision = latest
         log("jev", session=key[1], revision=revision, label=label or "fallback")
+        thread_id = next(tid for tid in self.threads if self.key(tid) == key)
+        if (
+            self.mode == "guardian"
+            and thread_id not in self.board
+            and label in (None, "continuation")
+        ):
+            # An agent with no board card yet always gets a first guardian run, so the
+            # other guardians can see it; Jev decides every refresh after that.
+            label = "meaningful_progress"
+        if label not in (None, "continuation"):
+            # Only the events of a burst Jev flagged become guardian input.
+            self.flagged.setdefault(thread_id, set()).update(
+                item["seq"]
+                for item in self.feed.get(thread_id, [])
+                if previous["revision"] < item["seq"] <= revision
+            )
+        self.refresh.classified(key, revision, label)
 
     # -- chain -----------------------------------------------------------------
     async def run_due(self):
+        now = time.monotonic()
+        for thread_id, (due, _) in list(self.retry.items()):
+            if now >= due and thread_id not in self.busy:
+                self.busy.add(thread_id)
+                asyncio.create_task(self.run_guardian(thread_id, "retry"))
         for intent in self.refresh.due(time.monotonic()):
             thread_id = next(
                 t for t in self.threads if self.key(t) == (intent["workerId"], intent["sessionId"])
@@ -347,17 +392,16 @@ class Worker:
     async def run_guardian(self, thread_id, reason):
         try:
             board = await asyncio.to_thread(self.board_view, thread_id)
-            payload = {
-                "schemaVersion": 1,
-                "me": {
-                    "threadId": thread_id,
-                    "objective": self.objective.get(thread_id, self.threads[thread_id]["title"]),
-                    "events": self.feed.get(thread_id, [])[-30:],
-                },
-                "others": [{"threadId": tid, **card} for tid, card in board.items()][:8],
-            }
-            log("guardian start", thread=thread_id, reason=reason, others=len(board))
-            started = time.monotonic()
+            payload = self.guardian_input(thread_id, board)
+            log(
+                "guardian start",
+                thread=thread_id,
+                reason=reason,
+                others=len(board),
+                events=len(payload["me"]["events"]),
+                bytes=len(json.dumps(payload)),
+            )
+            started, submitted_at = time.monotonic(), time.time()
             envelope = await asyncio.to_thread(
                 run_agent,
                 str(HERE / "guardian"),
@@ -366,23 +410,70 @@ class Worker:
                 f"guardian:{thread_id}",
             )
             result, run_id = envelope["result"], envelope["runId"]
+            meta = result.pop("meta", {}) or {}
+            total = time.monotonic() - started
+            model_seconds = float(meta.get("modelSeconds") or 0)
+            startup = float(meta.get("startedAt") or submitted_at) - submitted_at
             log(
                 "guardian done",
                 thread=thread_id,
                 run=run_id,
-                seconds=round(time.monotonic() - started, 1),
+                model=meta.get("model"),
+                total=round(total, 1),
+                supergridStartup=round(startup, 1),
+                modelSeconds=round(model_seconds, 1),
+                fallback=";".join(meta.get("fallbackReasons") or []) or "none",
                 overlap=result.get("overlap"),
             )
+            result["model"] = meta.get("model") or "unknown"
             card = result.get("myCard") or {}
             self.board[thread_id] = card
             self.record("board.jsonl", {"threadId": thread_id, "runId": run_id, **result})
             await asyncio.to_thread(self.write_card, thread_id, card, run_id, result)
             if result.get("overlap") and result.get("instruction"):
                 await asyncio.to_thread(self.correct, thread_id, run_id, result)
+            self.retry.pop(thread_id, None)
         except Exception as error:  # noqa: BLE001 - coding sessions never wait on us
-            log("guardian error", thread=thread_id, error=f"{type(error).__name__}: {error}")
+            attempts = self.retry.get(thread_id, (0, 0))[1] + 1
+            if attempts <= 3:
+                self.retry[thread_id] = (time.monotonic() + 10 * attempts, attempts)
+            else:
+                self.retry.pop(thread_id, None)
+            log(
+                "guardian error",
+                thread=thread_id,
+                attempt=attempts,
+                error=f"{type(error).__name__}: {error}",
+            )
         finally:
             self.busy.discard(thread_id)
+
+    def guardian_input(self, thread_id, board):
+        """Bounded guardian payload: flagged events, path-only activity, summarized cards."""
+        flagged = self.flagged.get(thread_id, set())
+        events = [item for item in self.feed.get(thread_id, []) if item["seq"] in flagged]
+        others = [
+            {
+                "threadId": tid,
+                "currentTask": str(card.get("currentTask") or "")[:200],
+                "filesTouched": [str(path)[:120] for path in (card.get("filesTouched") or [])][:10]
+                or PATH.findall(str(card.get("progress") or ""))[:10],
+                "workState": card.get("workState") or card.get("status") or "unknown",
+            }
+            for tid, card in board.items()
+        ][:8]
+        payload = {
+            "schemaVersion": 1,
+            "me": {
+                "threadId": thread_id,
+                "objective": self.objective.get(thread_id, self.threads[thread_id]["title"])[:500],
+                "events": events[-GUARDIAN_MAX_EVENTS:],
+            },
+            "others": others,
+        }
+        while len(json.dumps(payload)) > GUARDIAN_MAX_BYTES and len(payload["me"]["events"]) > 1:
+            payload["me"]["events"] = payload["me"]["events"][1:]
+        return payload
 
     def board_view(self, thread_id):
         """Other agents' cards: their guardian's richer card, else the server's work card."""
@@ -393,7 +484,7 @@ class Worker:
             if tid in self.board:
                 view[tid] = self.board[tid]
                 continue
-            server_card = self.server.thread(tid).get("workCard")
+            server_card = self.reader.thread(tid).get("workCard")
             if server_card:
                 view[tid] = {
                     k: server_card[k] for k in ("currentTask", "progress", "blockers", "status")
@@ -407,7 +498,7 @@ class Worker:
 
     def write_card(self, thread_id, card, run_id, result):
         """Publish this agent's guardian card to the shared board (server work card)."""
-        snapshot = self.server.thread(thread_id)
+        snapshot = self.reader.thread(thread_id)
         seq, existing = snapshot["thread"]["activitySeq"], snapshot.get("workCard")
         seqs = {item["eventId"]: item["seq"] for item in self.feed.get(thread_id, [])}
         refs = [
@@ -416,7 +507,12 @@ class Worker:
             if event_id in seqs and seqs[event_id] <= seq
         ]
         files = ", ".join(str(item) for item in (card.get("filesTouched") or [])[:10])
-        progress = str(card.get("progress") or "")[:1500] + (f" | Files: {files}" if files else "")
+        model = result.get("model", "unknown")
+        progress = (
+            str(card.get("progress") or "")[:1400]
+            + (f" | Files: {files}" if files else "")
+            + f" | Model: {model}"
+        )
         activity_card = self.activity.card(self.key(thread_id))
         update = {
             "threadId": thread_id,
@@ -427,7 +523,7 @@ class Worker:
                 "progress": progress,
                 "blockers": [str(item)[:500] for item in (card.get("blockers") or [])][:10],
                 "status": card_status(activity_card),
-                "summaryJobId": run_id,
+                "summaryJobId": f"{run_id}:{model}",
                 "recentVerifiedOutcome": None,
                 "contributors": activity_card["contributors"][:16],
                 "evidenceRefs": refs,
@@ -461,7 +557,7 @@ class Worker:
 
     def capture(self, source_id, target_id):
         """Build one bridge job pinned to the server's current activitySeq for both threads."""
-        snapshots = {tid: self.server.thread(tid) for tid in (source_id, target_id)}
+        snapshots = {tid: self.reader.thread(tid) for tid in (source_id, target_id)}
         threads = {tid: snap["thread"] for tid, snap in snapshots.items()}
         activity = self._activity(threads)
         source_refs, bindings = [], []
@@ -562,6 +658,7 @@ def main():
     member_user, member_password = env("PUFF_MEMBER_USER"), env("PUFF_MEMBER_PASSWORD")
     if member_user and member_password:
         worker.member = Server(config["serverUrl"], member_user, member_password)
+        worker.reader = worker.member
     try:
         asyncio.run(worker.run(args.interval))
     except KeyboardInterrupt:
