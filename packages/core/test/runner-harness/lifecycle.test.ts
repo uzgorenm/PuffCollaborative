@@ -305,6 +305,9 @@ test("deduplicates exact starts and rejects changed Run payloads", () =>
       expect(harness.calls.order.slice(0, 4)).toEqual(["baseline", "watch", "ready", "prompt"])
       const conflict = yield* harness.service.start({ ...first, text: "Changed text" }).pipe(Effect.flip)
       expect(conflict.code).toBe("conflict")
+      harness.state.authorizedAttempt = 2
+      const changedAttempt = yield* harness.service.start(first).pipe(Effect.flip)
+      expect(changedAttempt.code).toBe("conflict")
       expect(harness.calls.prompts).toBe(1)
     }),
   ))
@@ -421,6 +424,22 @@ test("rejects a coordinator Run that is no longer reserved before acceptance", (
       const rejected = yield* harness.service.start(first).pipe(Effect.flip)
       expect(rejected.code).toBe("conflict")
       expect(yield* harness.service.get(first.runId)).toBeUndefined()
+      expect(harness.calls.workspaces).toBe(0)
+      expect(harness.calls.prompts).toBe(0)
+    }),
+  ))
+
+test("does not prepare an accepted Run after its reservation is revoked", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("revoked-after-accept")
+      const bound = session(first)
+      yield* harness.service.accept({ command: first, projectId: bound.projectID, attempt: 1, session: bound })
+      harness.state.coordinatorState = "cancelling"
+      const rejected = yield* harness.service.start(first).pipe(Effect.flip)
+      expect(rejected.code).toBe("conflict")
+      expect((yield* harness.service.get(first.runId))?.phase).toBe("accepted")
       expect(harness.calls.workspaces).toBe(0)
       expect(harness.calls.prompts).toBe(0)
     }),

@@ -37,6 +37,8 @@ This is backend integration evidence against external simulators. It does not ch
 
 ## Rules for checking a box
 
+**Later backend quality checkpoint:** [receipt at `dec2fb31c0`](evidence/2026-09-29-backend-quality.md) records 17 passing local integration tests, 177 assertions, core typecheck and independent source review for atomic activity revisions and overlapping comment retry. The same checks passed again in a clean publication checkout. This is partial implementation evidence for G4/F2; live gates remain open, and `run.output` inclusion in the separate activity feed is a follow-up.
+
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.
 - `NOT RUN`: no matching evidence. Leave unchecked even if code or fixtures exist.
 - `FAIL`: a run contradicted the expectation. Record actual behavior and the next fix.
