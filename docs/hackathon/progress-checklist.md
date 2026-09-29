@@ -51,6 +51,8 @@ These checkpoints do not close G0 through G7 or WF01 through WF10. Selected acti
 
 **Later source-inspection checkpoint:** [receipt at `e332cbf539`](evidence/2026-09-29-source-inspection.md) records exact inline citation lookup, original-attempt tool-decision retry and real Session identity. Coordinator checks passed 67 focused tests, 46 browser tests, app/desktop typechecks and app build. Native N1/N2/N3 acceptance and live WF02/WF10 remain open; a synthetic HTTP response is not a Flower delivery receipt.
 
+**Native backend preview:** [receipt at `3147b79f2f`](evidence/2026-09-29-desktop-backend-preview.md) records the Electron desktop connected to the registered coordination service. Two shared Session records appeared separately; an instruction submitted from the desktop queued and completed through the mock runner, and its exact source event was inspected. App, desktop and server typechecks passed; 56 focused app tests and the 51-assertion server integration passed. This preview does not close WF01–WF10 or G0–G7. Live awareness and Flower exchange remain open.
+
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.
 - `NOT RUN`: no matching evidence. Leave unchecked even if code or fixtures exist.
 - `FAIL`: a run contradicted the expectation. Record actual behavior and the next fix.
