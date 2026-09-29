@@ -968,7 +968,7 @@ test("I: versioned analysis cards and activity derive execution from Run state",
   }
 }, 120_000)
 
-test("I regression: runner output must advance the citable activity revision", async () => {
+test("I regression: runner output advances the citable revision and recent activity", async () => {
   const testbed = await startHarness()
   try {
     const [thread] = await shared(testbed, 1)
@@ -997,6 +997,19 @@ test("I regression: runner output must advance the citable activity revision", a
     )!
     const activitySeq = (await testbed.snapshot(thread)).thread.activitySeq
     expect(output.seq).toBeLessThanOrEqual(activitySeq)
+    const activity = good(
+      await testbed.request<{
+        recent: Array<{ id: string; kind: string; outcome: string | null; eventSeq: number }>
+      }>("/api/coordination/v1/projects/prj_e2e_main/activity", "bob"),
+    )
+    expect(activity.recent).toContainEqual(
+      expect.objectContaining({
+        id: output.id,
+        kind: "run.output",
+        outcome: "Fixture output to cite",
+        eventSeq: output.seq,
+      }),
+    )
     const response = await testbed.request(`/api/coordination/v1/threads/${thread}/work-card`, "analysis", "PUT", {
       expectedVersion: 0,
       sourceActivitySeq: activitySeq,
