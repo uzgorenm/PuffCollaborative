@@ -1106,10 +1106,12 @@ test("J: seeded 4-user, 20-thread, 100-instruction drain with duplicate delivery
       (state) => state.polls.some((poll) => poll.threadId === threads[0] && poll.status === 503),
       "failed worker poll after disconnect",
     )
-    expect((await testbed.snapshot(threads[0])).runs[1].state).toBe("queued")
+    expect((await testbed.snapshot(threads[0])).runs[1].state).toBe("reserved")
+    expect((await testbed.state()).starts.filter((command) => command.runId === ordered[0].runs[1].id)).toHaveLength(0)
     await testbed.admin("options", { connected: true })
-    expect(good(await testbed.reserve(threads[0])).run?.id).toBe(ordered[0].runs[1].id)
+    expect(good(await testbed.reserve(threads[0])).run).toBeFalsy()
     await running(testbed, threads[0], ordered[0].runs[1].id, 25_000)
+    expect((await testbed.state()).starts.filter((command) => command.runId === ordered[0].runs[1].id)).toHaveLength(1)
     for (let turn = 0; turn < 5; turn++) {
       const current = ordered.flatMap((snapshot, index) => {
         const run = snapshot.runs[turn]
