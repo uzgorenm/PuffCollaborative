@@ -9,7 +9,7 @@ The first durable slice is an owner-managed project brief and self-authored pers
 | Layer                          | R1-owned file                                                                         |
 | ------------------------------ | ------------------------------------------------------------------------------------- |
 | Append-only revision migration | `packages/core/src/database/migration/20260929210000_coordination_project_context.ts` |
-| Drizzle tables                 | `packages/core/src/coordination/overview/context-sql.ts`                              |
+| Drizzle tables                 | `packages/core/src/coordination/overview/context.sql.ts`                              |
 | Read/write service             | `packages/core/src/coordination/overview/context.ts`                                  |
 | Public shapes and event kinds  | `packages/schema/src/coordination.ts`                                                 |
 | Service interface              | `packages/core/src/coordination/contracts.ts`                                         |

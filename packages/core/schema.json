@@ -1,13 +1,21 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "67fdca1e-afc3-4662-bffa-c34025f9f78b",
+  "id": "c1ce6990-c860-4890-a83b-43c98041c8c8",
   "prevIds": [
-    "4ec74f26-06eb-45e7-9ca2-6e1f12bd1dc9"
+    "67fdca1e-afc3-4662-bffa-c34025f9f78b"
   ],
   "ddl": [
     {
       "name": "workspace",
+      "entityType": "tables"
+    },
+    {
+      "name": "coordination_person_focus_revision",
+      "entityType": "tables"
+    },
+    {
+      "name": "coordination_project_brief_revision",
       "entityType": "tables"
     },
     {
@@ -213,6 +221,146 @@
       "name": "time_used",
       "entityType": "columns",
       "table": "workspace"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_id",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "focus_text",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "request_id",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "event_seq",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_id",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "content",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_by",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "request_id",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "event_seq",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
     },
     {
       "type": "text",
@@ -2911,6 +3059,36 @@
     },
     {
       "columns": [
+        "project_id"
+      ],
+      "tableTo": "coordination_project",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_coordination_person_focus_revision_project_id_coordination_project_id_fk",
+      "entityType": "fks",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "columns": [
+        "project_id"
+      ],
+      "tableTo": "coordination_project",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_coordination_project_brief_revision_project_id_coordination_project_id_fk",
+      "entityType": "fks",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "columns": [
         "run_id"
       ],
       "tableTo": "runner_harness_execution",
@@ -3211,6 +3389,27 @@
     },
     {
       "columns": [
+        "project_id",
+        "user_id",
+        "version"
+      ],
+      "nameExplicit": false,
+      "name": "coordination_person_focus_revision_pk",
+      "entityType": "pks",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "columns": [
+        "project_id",
+        "version"
+      ],
+      "nameExplicit": false,
+      "name": "coordination_project_brief_revision_pk",
+      "entityType": "pks",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "columns": [
         "email",
         "url"
       ],
@@ -3500,6 +3699,50 @@
       "name": "session_share_pk",
       "table": "session_share",
       "entityType": "pks"
+    },
+    {
+      "columns": [
+        {
+          "value": "project_id",
+          "isExpression": false
+        },
+        {
+          "value": "user_id",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_person_focus_request_idx",
+      "entityType": "indexes",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "columns": [
+        {
+          "value": "project_id",
+          "isExpression": false
+        },
+        {
+          "value": "updated_by",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_project_brief_request_idx",
+      "entityType": "indexes",
+      "table": "coordination_project_brief_revision"
     },
     {
       "columns": [

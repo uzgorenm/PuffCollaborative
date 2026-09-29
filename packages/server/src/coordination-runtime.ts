@@ -12,6 +12,7 @@ export interface CoordinationServices {
   readonly runner: CoordinationContracts.Runner
   readonly workCards: CoordinationContracts.WorkCards
   readonly activity: CoordinationActivity.Interface
+  readonly projectContext: CoordinationContracts.ProjectContext
 }
 
 export interface CoordinationRuntimeValue {

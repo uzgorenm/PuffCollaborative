@@ -18,6 +18,32 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`coordination_person_focus_revision\` (
+          \`project_id\` text NOT NULL,
+          \`user_id\` text NOT NULL,
+          \`version\` integer NOT NULL,
+          \`focus_text\` text,
+          \`updated_at\` integer NOT NULL,
+          \`request_id\` text NOT NULL,
+          \`event_seq\` integer NOT NULL,
+          CONSTRAINT \`coordination_person_focus_revision_pk\` PRIMARY KEY(\`project_id\`, \`user_id\`, \`version\`),
+          CONSTRAINT \`fk_coordination_person_focus_revision_project_id_coordination_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`coordination_project\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_project_brief_revision\` (
+          \`project_id\` text NOT NULL,
+          \`version\` integer NOT NULL,
+          \`content\` text NOT NULL,
+          \`updated_by\` text NOT NULL,
+          \`updated_at\` integer NOT NULL,
+          \`request_id\` text NOT NULL,
+          \`event_seq\` integer NOT NULL,
+          CONSTRAINT \`coordination_project_brief_revision_pk\` PRIMARY KEY(\`project_id\`, \`version\`),
+          CONSTRAINT \`fk_coordination_project_brief_revision_project_id_coordination_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`coordination_project\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`data_migration\` (
           \`name\` text PRIMARY KEY,
           \`time_completed\` integer NOT NULL
@@ -433,6 +459,12 @@ export default {
           CONSTRAINT \`fk_session_share_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
         );
       `)
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_person_focus_request_idx\` ON \`coordination_person_focus_revision\` (\`project_id\`,\`user_id\`,\`request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_project_brief_request_idx\` ON \`coordination_project_brief_revision\` (\`project_id\`,\`updated_by\`,\`request_id\`);`,
+      )
       yield* tx.run(
         `CREATE UNIQUE INDEX \`runner_harness_approval_permission_idx\` ON \`runner_harness_approval\` (\`permission_request_id\`);`,
       )

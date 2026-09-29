@@ -7,7 +7,7 @@ import type { Coordination } from "@opencode-ai/schema/coordination"
 import type { Database } from "../../database/database"
 import type { CoordinationContracts } from "../contracts"
 import { MembershipTable } from "../projects/sql"
-import { PersonFocusRevisionTable, ProjectBriefRevisionTable } from "./context-sql"
+import { PersonFocusRevisionTable, ProjectBriefRevisionTable } from "./context.sql"
 
 export type BriefContent = Coordination.ProjectBriefContent
 export type Brief = Coordination.ProjectBrief

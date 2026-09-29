@@ -9,6 +9,7 @@ import type { CoordinationContracts } from "@opencode-ai/core/coordination/contr
 import { CoordinationEvents } from "@opencode-ai/core/coordination/events/events"
 import { CoordinationProjects } from "@opencode-ai/core/coordination/projects/index"
 import { CoordinationQueue } from "@opencode-ai/core/coordination/queue/queue"
+import { ProjectContext } from "@opencode-ai/core/coordination/overview/context"
 import { RunnerAdapter } from "@opencode-ai/core/coordination/runner/adapter"
 import type { ApprovalStore } from "@opencode-ai/core/coordination/runner/adapter"
 import { MockRunner } from "@opencode-ai/core/coordination/runner/mock"
@@ -175,11 +176,12 @@ export const coordinationLayer = <R = never>(ports: CoordinationPorts<R> = {}) =
             ),
       })
       const activity = CoordinationActivity.make({ access, projects, queue, runner, events, cards: workCards })
+      const projectContext = ProjectContext.make({ db: database.db, access, events })
       const snapshot = CoordinationSnapshot.make({ database, access, queue, runner, workCards, events })
       return CoordinationRuntime.of({
         missing: [],
         authentication: identity,
-        services: { access, projects, comments, snapshot, events, queue, runner, workCards, activity },
+        services: { access, projects, comments, snapshot, events, queue, runner, workCards, activity, projectContext },
       })
     }),
   )

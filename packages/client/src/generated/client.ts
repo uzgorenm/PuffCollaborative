@@ -118,6 +118,14 @@ import type {
   ServerCoordinationDataProjectCreateOutput,
   ServerCoordinationDataProjectGetInput,
   ServerCoordinationDataProjectGetOutput,
+  ServerCoordinationDataProjectBriefGetInput,
+  ServerCoordinationDataProjectBriefGetOutput,
+  ServerCoordinationDataProjectBriefPutInput,
+  ServerCoordinationDataProjectBriefPutOutput,
+  ServerCoordinationDataPersonFocusListInput,
+  ServerCoordinationDataPersonFocusListOutput,
+  ServerCoordinationDataPersonFocusPutInput,
+  ServerCoordinationDataPersonFocusPutOutput,
   ServerCoordinationDataMemberGrantInput,
   ServerCoordinationDataMemberGrantOutput,
   ServerCoordinationDataContributionListInput,
@@ -1077,6 +1085,56 @@ export function make(options: ClientOptions) {
           {
             method: "GET",
             path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      projectBriefGet: (input: ServerCoordinationDataProjectBriefGetInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataProjectBriefGetOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/brief`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      projectBriefPut: (input: ServerCoordinationDataProjectBriefPutInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataProjectBriefPutOutput>(
+          {
+            method: "PUT",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/brief`,
+            body: {
+              requestId: input["requestId"],
+              expectedVersion: input["expectedVersion"],
+              content: input["content"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      personFocusList: (input: ServerCoordinationDataPersonFocusListInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataPersonFocusListOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/focus`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      personFocusPut: (input: ServerCoordinationDataPersonFocusPutInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataPersonFocusPutOutput>(
+          {
+            method: "PUT",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/focus/me`,
+            body: { requestId: input["requestId"], expectedVersion: input["expectedVersion"], text: input["text"] },
             successStatus: 200,
             declaredStatuses: [400, 401, 403, 404, 409, 503],
             empty: false,

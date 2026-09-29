@@ -21,6 +21,10 @@ type TestData = {
   upNext: ReadonlyArray<unknown>
   version: number
   length: number
+  brief?: { version: number; goal: string; updatedBy: string }
+  goal?: string
+  text?: string | null
+  updatedBy?: string
 }
 
 test("two members share queued turns, replay, approval, activity, and stale-card rejection with the mock runner", async () => {
@@ -140,6 +144,86 @@ test("two members share queued turns, replay, approval, activity, and stale-card
     })
     expect(member.response.status).toBe(200)
     expect(member.data?.userId).toBe("usr_bob")
+    const briefPath = `/api/coordination/v1/projects/${projectId}/brief`
+    const focusPath = `/api/coordination/v1/projects/${projectId}/focus`
+    const brief = {
+      goal: "Compare the two navigation approaches",
+      successCriteria: ["Keyboard focus stays visible"],
+      roles: [
+        { userId: "usr_alice", label: "Coordinator" },
+        { userId: "usr_bob", label: "Reviewer" },
+      ],
+      tools: ["OpenCode"],
+      sharingDefault: "private",
+      suggestedAwarenessMode: "review-each-note",
+    }
+    expect((await request(briefPath, "eve")).response.status).toBe(403)
+    expect(
+      (await request(briefPath, "bob", "PUT", { requestId: "non-owner", expectedVersion: 0, content: brief })).response
+        .status,
+    ).toBe(403)
+    const savedBrief = await request(briefPath, "alice", "PUT", {
+      requestId: "brief-1",
+      expectedVersion: 0,
+      content: brief,
+    })
+    expect(savedBrief.response.status).toBe(200)
+    expect(savedBrief.data?.version).toBe(1)
+    expect(savedBrief.data?.updatedBy).toBe("usr_alice")
+    expect((await request(briefPath, "bob")).data?.brief?.goal).toBe(brief.goal)
+    expect(
+      (await request(briefPath, "alice", "PUT", { requestId: "brief-1", expectedVersion: 0, content: brief })).data
+        ?.version,
+    ).toBe(1)
+    expect(
+      (
+        await request(briefPath, "alice", "PUT", {
+          requestId: "brief-1",
+          expectedVersion: 0,
+          content: { ...brief, goal: "Changed" },
+        })
+      ).response.status,
+    ).toBe(409)
+    expect(
+      (await request(briefPath, "alice", "PUT", { requestId: "brief-stale", expectedVersion: 0, content: brief }))
+        .response.status,
+    ).toBe(409)
+    const savedFocus = await request(`${focusPath}/me`, "bob", "PUT", {
+      requestId: "focus-1",
+      expectedVersion: 0,
+      text: "Reviewing focus behavior",
+      userId: "usr_alice",
+    })
+    expect(savedFocus.response.status).toBe(200)
+    expect(savedFocus.data?.userId).toBe("usr_bob")
+    expect(savedFocus.data?.version).toBe(1)
+    expect((await request(focusPath, "alice")).data as unknown).toEqual([savedFocus.data])
+    expect((await request(focusPath, "eve")).response.status).toBe(403)
+    expect(
+      (
+        await request(`${focusPath}/me`, "eve", "PUT", {
+          requestId: "focus-eve",
+          expectedVersion: 0,
+          text: "Not a member",
+        })
+      ).response.status,
+    ).toBe(403)
+    expect(
+      (
+        await request(`${focusPath}/me`, "bob", "PUT", {
+          requestId: "focus-1",
+          expectedVersion: 0,
+          text: "Reviewing focus behavior",
+        })
+      ).data?.version,
+    ).toBe(1)
+    expect(
+      (await request(`${focusPath}/me`, "bob", "PUT", { requestId: "focus-stale", expectedVersion: 0, text: "Stale" }))
+        .response.status,
+    ).toBe(409)
+    const contextEvents = await request(`/api/coordination/v1/projects/${projectId}/events?after=-1`, "alice")
+    expect(contextEvents.data?.events.filter((event) => event.kind === "project.brief.updated")).toHaveLength(1)
+    expect(contextEvents.data?.events.filter((event) => event.kind === "person.focus.updated")).toHaveLength(1)
     const unselected = await request(`/api/coordination/v1/projects/${projectId}/threads`, "bob", "POST", {
       sessionId: "ses_coordination_one",
       title: "Forged selection",
@@ -334,6 +418,8 @@ test("two members share queued turns, replay, approval, activity, and stale-card
     const restored = await snapshot(threads[0])
     expect(restored.runs.filter((run: { state: string }) => run.state === "completed").length).toBe(2)
     expect(restored.workCard?.version).toBe(1)
+    expect((await request(briefPath, "bob")).data?.brief?.version).toBe(1)
+    expect((await request(focusPath, "alice")).data as unknown).toEqual([savedFocus.data])
     const restoredReplay = await request(`/api/coordination/v1/threads/${threads[0]}/events?after=${cursor}`, "bob")
     expect(restoredReplay.response.status).toBe(200)
     expect(restoredReplay.data?.events.some((event) => event.kind === "comment.created")).toBe(true)

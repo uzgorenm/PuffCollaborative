@@ -39,15 +39,7 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
         context: CoordinationContracts.ProjectContext,
         principal: AuthContext,
       ) => Effect.Effect<A, CoordinationContracts.Failure>,
-    ) =>
-      use((services, principal) => {
-        // Composition owns this service after the backend freeze; until then these routes fail closed.
-        const context =
-          "projectContext" in services ? (services.projectContext as CoordinationContracts.ProjectContext) : undefined
-        return context
-          ? invoke(context, principal)
-          : Effect.fail({ code: "unavailable", message: "Project context is not configured" })
-      })
+    ) => use((services, principal) => invoke(services.projectContext, principal))
 
     return handlers
       .handle("coordination.projectList", () => use((services, auth) => services.projects.list(auth)))
