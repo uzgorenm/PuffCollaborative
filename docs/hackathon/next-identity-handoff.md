@@ -8,14 +8,13 @@
 
 The component shows the real title plus a short stable Session ID (and Worker ID when supplied) in visible text. The full title and full IDs remain in its accessible label and tooltip. A run-state label appears only if the supplied run belongs to the supplied thread and is nonterminal. No title parsing, alternative relationship, winner or Session-completed badge. Missing owner/worker fields simply omit those claims.
 
-Suggested host inputs: shared `Coordination.Thread` supplies `title`, `sessionId`, `workerId`, `createdBy` and `id`; only a matching active `Coordination.Run` from that thread supplies `run`. Existing keys include `puff.session`, `puff.worker`, `puff.owner`, and `puff.team.run.*`. The lead should put the component in the rail link and header, and set the interactive rail link's `aria-label` to the exported full identity label if needed for the host's accessibility tree. Keep rail/header layout integration in lead-owned files.
+Suggested host inputs: shared `Coordination.Thread` supplies `title`, `sessionId`, `workerId` and `id`; only a matching active `Coordination.Run` from that thread supplies `run`. **Do not map `Thread.createdBy` to `ownerId`: it names the Thread creator, not an authoritative Session owner.** Current shared hosts omit `ownerId`; supply it only when a trusted Session-owner binding exists. Existing keys include `puff.session`, `puff.worker`, `puff.owner`, and `puff.team.run.*`. The lead should put the component in the rail link and header, and set the interactive rail link's `aria-label` to the exported full identity label if needed for the host's accessibility tree. Keep rail/header layout integration in lead-owned files.
 
 ```tsx
 const identity = {
   title: thread.title,
   sessionId: thread.sessionId,
   workerId: thread.workerId,
-  ownerId: thread.createdBy,
   threadId: thread.id,
   run: matchingActiveRun,
   labels: {

@@ -151,7 +151,6 @@ export function TeamShell(props: ParentProps) {
                     title: thread.title,
                     sessionId: thread.sessionId,
                     workerId: thread.workerId,
-                    ownerId: thread.createdBy,
                     threadId: thread.id,
                     run:
                       team.writable() && team.state.snapshot?.thread.id === thread.id

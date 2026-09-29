@@ -4,6 +4,7 @@ export interface SessionIdentityProps {
   title: string
   sessionId: string
   workerId?: string
+  // Only supply a trusted Session owner; a shared Thread's createdBy is not ownership.
   ownerId?: string
   threadId?: string
   run?: Pick<Coordination.Run, "threadId" | "state">

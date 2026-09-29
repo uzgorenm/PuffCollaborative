@@ -118,7 +118,6 @@ export default function TeamThreadPage() {
                   title={value().thread.title}
                   sessionId={value().thread.sessionId}
                   workerId={value().thread.workerId}
-                  ownerId={value().thread.createdBy}
                   threadId={value().thread.id}
                   run={team.writable() ? active().find((run) => run.threadId === value().thread.id) : undefined}
                   labels={identityLabels()}

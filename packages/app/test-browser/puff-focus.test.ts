@@ -168,6 +168,17 @@ test("reduced-motion media rules disable shell and panel movement", async () => 
   expect(panel?.style.getPropertyPriority("animation-duration")).toBe("important")
 })
 
+test("a shared Thread creator is not presented as the Session owner", async () => {
+  const view = await mountThread()
+  try {
+    const identity = view.host.querySelector<HTMLElement>(".puff-session-identity")!
+    expect(identity.getAttribute("aria-label")).toContain("ses_a")
+    expect(identity.getAttribute("aria-label")).not.toContain("puff.owner alice")
+  } finally {
+    view.cleanup()
+  }
+})
+
 test("closing context removes its controls from the active focus region", async () => {
   const view = await mountThread()
   try {
