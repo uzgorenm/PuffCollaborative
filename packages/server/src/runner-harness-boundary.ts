@@ -5,9 +5,10 @@ import { RunnerHarnessConfig } from "./runner-harness-config"
 /** A configured harness exposes only coordinator commands and liveness over HTTP. */
 export const runnerHarnessBoundaryLayer = HttpRouter.middleware()(
   Effect.gen(function* () {
+    const enabled = Boolean(RunnerHarnessConfig.path())
     return (effect) =>
       Effect.gen(function* () {
-        if (!RunnerHarnessConfig.path()) return yield* effect
+        if (!enabled) return yield* effect
         const request = yield* HttpServerRequest.HttpServerRequest
         const pathname = new URL(request.url, "http://localhost").pathname
         if (!request.headers.upgrade && pathname.startsWith("/api/coordination/v1/")) return yield* effect
