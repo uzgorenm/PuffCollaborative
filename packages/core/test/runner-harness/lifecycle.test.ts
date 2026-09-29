@@ -319,17 +319,46 @@ test("records output before the matching terminal callback", () =>
         kind: "activity",
         runId: first.runId,
         sourceKey: "output",
+        sourceSessionSeq: 12,
         activity: { kind: "run.output", text: "Finished work" },
       })
+      yield* harness.emit(first.runId, {
+        kind: "activity",
+        runId: first.runId,
+        sourceKey: "output:next-chunk",
+        sourceSessionSeq: 12,
+        activity: { kind: "run.output", text: " and more" },
+      })
+      const invalidTerminal = yield* harness.service
+        .transition({
+          runId: first.runId,
+          expected: "running",
+          next: "running",
+          callbacks: [
+            {
+              runId: first.runId,
+              producerKey: "premature-terminal",
+              callback: { kind: "state", expectedState: "running", nextState: "completed" },
+            },
+          ],
+        })
+        .pipe(Effect.flip)
+      expect(invalidTerminal.code).toBe("invalid")
       yield* harness.emit(first.runId, {
         kind: "settled",
         runId: first.runId,
         messageId: first.runnerMessageId,
         sourceKey: "settled",
+        sourceSessionSeq: 13,
       })
-      expect(harness.drafts.map((draft) => draft.producerKey)).toEqual(["promoted", "output", "settled"])
+      expect(harness.drafts.map((draft) => draft.producerKey)).toEqual([
+        "promoted",
+        "output",
+        "output:next-chunk",
+        "settled",
+      ])
       expect(harness.drafts[1]?.callback.kind).toBe("activity")
-      expect(harness.drafts[2]?.callback).toMatchObject({ kind: "state", nextState: "completed" })
+      expect(harness.drafts[3]?.callback).toMatchObject({ kind: "state", nextState: "completed" })
       expect((yield* harness.service.get(first.runId))?.phase).toBe("completed")
     }),
   ))

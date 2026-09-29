@@ -284,11 +284,14 @@ export function make(input: Dependencies): Lifecycle {
       if (callbacks.some((draft) => draft.runId !== runId))
         return yield* Effect.fail(failure("conflict", "Callback belongs to another Run"))
       if (
-        callbacks
-          .slice(0, -1)
-          .some((draft) => draft.callback.kind === "state" && terminalRun.has(draft.callback.nextState))
+        callbacks.some(
+          (draft, index) =>
+            draft.callback.kind === "state" &&
+            terminalRun.has(draft.callback.nextState) &&
+            (!terminal.has(next) || index !== callbacks.length - 1 || draft.callback.nextState !== next),
+        )
       )
-        return yield* Effect.fail(failure("invalid", "Terminal callback must be last"))
+        return yield* Effect.fail(failure("invalid", "Terminal callback must match the final local phase"))
       if (terminal.has(next)) {
         const last = callbacks.at(-1)
         if (last?.callback.kind !== "state" || last.callback.nextState !== next)
@@ -311,7 +314,7 @@ export function make(input: Dependencies): Lifecycle {
                 (draft) =>
                   draft.sourceSessionSeq !== undefined &&
                   current.last_session_seq !== null &&
-                  draft.sourceSessionSeq <= current.last_session_seq,
+                  draft.sourceSessionSeq < current.last_session_seq,
               )
             )
               return yield* Effect.fail(failure("conflict", "Stale Session observation"))
@@ -542,7 +545,7 @@ export function make(input: Dependencies): Lifecycle {
           if (
             row?.last_session_seq !== null &&
             row?.last_session_seq !== undefined &&
-            observed.sourceSessionSeq <= row.last_session_seq
+            observed.sourceSessionSeq < row.last_session_seq
           )
             return
         }
