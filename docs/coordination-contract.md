@@ -50,6 +50,8 @@ All IDs are opaque strings. `projectId` reuses the existing OpenCode `Project.ID
 | `Event`              | `id`, `projectId`, `seq`, `kind`, `occurredAt`, `payload`; optional `threadId`, `actorId`, `runId`, `instructionId`                                                              | `id` is an `EventV2.ID`. `seq` is the durable project aggregate sequence. Project and membership events have no Thread.                       |
 | `WorkCard`           | `id`, `projectId`, `threadId`, `version`, `sourceActivitySeq`, task/progress/blockers/status, outcome, contributors, evidence, generated and updated times, submitter and job ID | Version increases on each accepted update. A summary must cite current `Thread.activitySeq` and matching durable event evidence.              |
 
+For every committed event with a `threadId`, `Events.append` advances that Thread's `activitySeq` to the event's project sequence in the same transaction, except for `work-card.updated`. Runner output and tool events can therefore be cited by a work card. A card update does not make itself stale; later thread activity does.
+
 `Approval` has `id`, `threadId`, `runId`, `toolCallId`, `version`, `state`, `requestedAt`, optional claim owner/expiry and optional decision actor/time. `ExecutionOwner` has `workerId` and `instanceId`. A worker credential must match the worker bound to the Thread and owner reference.
 
 `Approval` also stores optional `decisionId` and approve/reject `decision`, plus `deliveryState` (`none`, `pending`, `delivered` or `failed`). The approval decision and pending delivery marker commit together. If forwarding loses its response, Agent 4 resends the same `decisionId`; it cannot create a second decision. Agent 4 owns this projection and its feature migration.
