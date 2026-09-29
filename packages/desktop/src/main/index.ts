@@ -15,7 +15,7 @@ import type { ServerReadyData } from "../preload/types"
 import { checkAppExists, resolveAppPath } from "./apps"
 import { CHANNEL } from "./constants"
 import { registerIpcHandlers, sendDeepLinks, sendMenuCommand } from "./ipc"
-import { forwardInitializationFailure } from "./initialization"
+import { developmentStartup, forwardInitializationFailure } from "./initialization"
 import { exportDebugLogs, initCrashReporter, initLogging, startNetLog, write as writeLog } from "./logging"
 import { createMenu } from "./menu"
 import {
@@ -113,6 +113,11 @@ function ensureLoopbackNoProxy() {
 }
 
 const main = Effect.gen(function* () {
+  const development = developmentStartup({
+    packaged: app.isPackaged,
+    serverUrl: process.env.OPENCODE_DESKTOP_SERVER_URL,
+    profilePath: process.env.OPENCODE_DESKTOP_PROFILE,
+  })
   contextMenu({ showSaveImageAs: true, showLookUpSelection: false, showSearchWithGoogle: false })
 
   // on macOS apps run in `/` which can cause issues with ripgrep
@@ -140,10 +145,14 @@ const main = Effect.gen(function* () {
   })()
   app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "OpenCode Dev")
   app.setAppUserModelId(appId)
+  if (development.profilePath) mkdirSync(development.profilePath, { recursive: true })
   app.setPath(
     "userData",
-    onboardingTestRoot ? join(onboardingTestRoot, "desktop") : join(app.getPath("appData"), appId),
+    onboardingTestRoot
+      ? join(onboardingTestRoot, "desktop")
+      : (development.profilePath ?? join(app.getPath("appData"), appId)),
   )
+  if (development.profilePath) app.setPath("sessionData", join(development.profilePath, "session"))
   if (onboardingTestRoot) app.setPath("sessionData", join(onboardingTestRoot, "session"))
   initializeOldLayoutEligibility(app.getPath("userData"))
   logger = initLogging()
@@ -193,7 +202,8 @@ const main = Effect.gen(function* () {
   app.commandLine.appendSwitch("proxy-bypass-list", "<-loopback>")
   const features = app.commandLine.getSwitchValue("enable-features")
   app.commandLine.appendSwitch("enable-features", features ? `${jsCallStackFeature},${features}` : jsCallStackFeature)
-  if (!app.isPackaged) app.commandLine.appendSwitch("remote-debugging-port", "9222")
+  if (!app.isPackaged && !app.commandLine.hasSwitch("remote-debugging-port"))
+    app.commandLine.appendSwitch("remote-debugging-port", "9222")
 
   if (!app.requestSingleInstanceLock()) {
     app.quit()
@@ -254,7 +264,7 @@ const main = Effect.gen(function* () {
 
   yield* Effect.promise(() => app.whenReady())
 
-  if (!TEST_ONBOARDING) migrate()
+  if (!TEST_ONBOARDING && !development.profilePath) migrate()
   yield* Effect.promise(() => cleanupStoreFiles(app.getPath("userData"))).pipe(
     Effect.tap((result) =>
       Effect.sync(() => {
@@ -325,6 +335,15 @@ const main = Effect.gen(function* () {
   )
 
   const loadingTask = yield* Effect.gen(function* () {
+    if (development.serverUrl) {
+      logger.log("using external development server", {
+        service: "external",
+        origin: new URL(development.serverUrl).origin,
+      })
+      setDefaultServerUrl(development.serverUrl)
+      yield* Deferred.succeed(serverReady, { url: development.serverUrl, username: null, password: null })
+      return
+    }
     logger.log("sidecar connection started", { version: SIDECAR_VERSION })
 
     ensureLoopbackNoProxy()
