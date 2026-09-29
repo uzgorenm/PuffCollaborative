@@ -44,13 +44,18 @@ function fixture(options?: {
   readonly get?: () => Effect.Effect<Session.Info>
   readonly locationReady?: () => Effect.Effect<void, RunnerHarnessContracts.Failure>
   readonly interrupt?: SessionExecution.Interface["interrupt"]
+  readonly monitorGraceMs?: number
 }) {
   const active = new Set<Session.ID>()
   const failures: string[] = []
-  const calls = { wake: 0, interrupt: 0, locationReady: 0 }
+  const local: { current?: RunnerHarnessContracts.LocalExecution } = {}
+  const calls = { wake: 0, resume: 0, interrupt: 0, locationReady: 0, localGet: 0 }
   const execution: SessionExecution.Interface = {
     active: Effect.sync(() => new Set(active)),
-    resume: () => Effect.void,
+    resume: () =>
+      Effect.sync(() => {
+        calls.resume++
+      }),
     wake: (sessionId) =>
       Effect.sync(() => {
         calls.wake++
@@ -88,16 +93,28 @@ function fixture(options?: {
       }).pipe(Effect.andThen(options?.locationReady?.() ?? Effect.void)),
     credentials,
     policy,
+    localExecution: {
+      get: () =>
+        Effect.sync(() => {
+          calls.localGet++
+          return local.current
+        }),
+    },
+    monitorGraceMs: options?.monitorGraceMs,
     runtimeFailed: (input) =>
       Effect.sync(() => {
         failures.push(input.reason)
-        return { run, phase: "failed" as const, workspace, runtime: input.runtime }
+        local.current = local.current
+          ? { ...local.current, phase: "recovery_required" }
+          : { run, phase: "recovery_required", workspace, runtime: input.runtime }
+        return local.current
       }),
   }
   return {
     active,
     calls,
     failures,
+    local,
     deps,
   }
 }
@@ -333,6 +350,77 @@ describe("embedded runtime lifecycle with service doubles", () => {
           yield* Effect.sleep("10 millis")
           system.active.delete(session.id)
           expect(yield* Fiber.join(waiting)).toMatchObject({ state: "idle", activeTools: 0 })
+        }),
+      ),
+    )
+  })
+
+  test("holds a pre-stream failure when the owned drain becomes idle without terminal evidence", async () => {
+    const system = fixture({ monitorGraceMs: 10 })
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
+          const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
+          const current = { run, phase: "running" as const, workspace, runtime }
+          system.local.current = current
+          yield* runtimes.watch({ execution: current, session, observe, readinessTimeoutMs: 100 })
+          yield* runtimes.wake(current)
+          system.active.delete(session.id)
+          yield* Effect.gen(function* () {
+            while (system.failures.length === 0) yield* Effect.sleep("1 millis")
+          }).pipe(Effect.timeout("1 second"))
+          expect(system.failures[0]).toContain("without a confirmed terminal observation")
+          expect(system.local.current?.phase).toBe("recovery_required")
+          expect(system.calls.wake).toBe(1)
+          expect(system.calls.resume).toBe(0)
+        }),
+      ),
+    )
+  })
+
+  test("accepts a normal local terminal phase before the idle grace expires", async () => {
+    const system = fixture({ monitorGraceMs: 10 })
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
+          const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
+          const current = { run, phase: "running" as const, workspace, runtime }
+          system.local.current = current
+          yield* runtimes.watch({ execution: current, session, observe, readinessTimeoutMs: 100 })
+          yield* runtimes.wake(current)
+          system.active.delete(session.id)
+          system.local.current = { ...current, phase: "completed" }
+          yield* Effect.gen(function* () {
+            while (system.calls.localGet === 0) yield* Effect.sleep("1 millis")
+          }).pipe(Effect.timeout("1 second"))
+          yield* Effect.sleep("20 millis")
+          expect(system.failures).toEqual([])
+          expect(system.calls.resume).toBe(0)
+        }),
+      ),
+    )
+  })
+
+  test("does not report a stale drain against a changed Run attempt", async () => {
+    const system = fixture({ monitorGraceMs: 10 })
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
+          const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
+          const current = { run, phase: "running" as const, workspace, runtime }
+          system.local.current = current
+          yield* runtimes.watch({ execution: current, session, observe, readinessTimeoutMs: 100 })
+          yield* runtimes.wake(current)
+          system.active.delete(session.id)
+          system.local.current = { ...current, run: { ...run, attempt: 2 } }
+          yield* Effect.gen(function* () {
+            while (system.calls.localGet === 0) yield* Effect.sleep("1 millis")
+          }).pipe(Effect.timeout("1 second"))
+          yield* Effect.sleep("20 millis")
+          expect(system.failures).toEqual([])
         }),
       ),
     )
