@@ -21,6 +21,7 @@ def analysis_for(item, run_id):
             "workState": "ongoing",
             "progress": "Keyboard focus constraint found",
             "blockers": [],
+            "recentOutcome": None,
             "warnings": [],
             "evidenceRefs": [
                 {key: event[key] for key in ("workerId", "sessionId", "eventId", "revision")}

@@ -20,7 +20,7 @@ def clean_event(event):
     result = {key: event[key] for key in fields}
     if any(not isinstance(result[key], str) or not result[key] for key in fields if key != "revision"):
         raise ValueError("Invalid event identity")
-    if type(result["revision"]) is not int or result["revision"] < 1:
+    if type(result["revision"]) is not int or result["revision"] < 0:
         raise ValueError("Invalid revision")
     stamp = datetime.fromisoformat(result["occurredAt"].replace("Z", "+00:00"))
     if stamp.utcoffset() is None or stamp.utcoffset().total_seconds() != 0:
@@ -47,7 +47,7 @@ def reference(event):
 
 
 class Activity:
-    """One project, explicit shared roster, ordered per-session event replay.
+    """One project, explicit shared roster, project-sequence replay per session.
 
     Hub authorization happens before this boundary. A registry entry alone does
     not opt a session in: `shared: true` must be supplied by the trusted caller.
@@ -105,7 +105,7 @@ class Activity:
 
     def _reduce(self, key):
         card = dict.fromkeys(TEXT_FIELDS, "")
-        card.update(workerId=key[0], sessionId=key[1], revision=0, status="unknown",
+        card.update(workerId=key[0], sessionId=key[1], revision=-1, status="unknown",
                     contributors=[], upNext=[], evidenceRefs=[])
         for event in sorted(self.events.get(key, {}).values(), key=lambda item: item["revision"]):
             content = event["content"]

@@ -36,7 +36,7 @@ def journal_events(path):
     return events
 
 
-def execute(prepared, directory, timeout=80):
+def execute(prepared, directory, timeout=300):
     source, journal = directory / "input.json", directory / "events.jsonl"
     source.write_text(json.dumps(prepared), encoding="utf-8")
     worker = str(Path(__file__).with_name("chain_worker.py"))
@@ -158,7 +158,7 @@ def coordinate(request, snapshot, *, state_dir=None, runner=execute):
         directory.mkdir(exist_ok=True)
         try:
             outcome = runner(
-                prepared, directory, timeout=max(0.1, 80 - (time.monotonic() - started))
+                prepared, directory, timeout=max(0.1, 300 - (time.monotonic() - started))
             )
         except Exception as error:  # noqa: BLE001 -- persist failures at the job boundary
             outcome = {

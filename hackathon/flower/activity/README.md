@@ -7,16 +7,23 @@ chain adapter, shared schema, hub, worker, or UI changes are included.
 `docs/coordination-contract.md` authoritative and retires the old `/puff/v1`
 proposal. The snapshot below retains the originally requested ProjectSnapshot
 shape as a **provisional Flower input only**, not a published current server wire
-contract. C2/C3/C8 owner confirmation remains required. No endpoint is implemented
+contract. C2/C3/C4/C8 owner confirmation remains required. No endpoint is implemented
 or called here. Backend WorkCards already have their own storage and CAS checks.
 
 `coordination.selected_event` offers a pure mapping for selected current journal
-events: project `seq` becomes a sparse evidence revision, and the original
-`{threadId,eventId,seq}` is returned separately as `sourceRef`. It checks the
-captured Thread.activitySeq upper bound. Keep that reference mapping alongside
-the submitted snapshot. Project cursor and WorkCard.version never become source
-revisions. The caller retains captured activitySeq and expectedVersion separately
-for the backend WorkCards.update CAS; do not infer either from the snapshot cap.
+events: the backend's project-wide `Event.seq` becomes the evidence revision
+without renumbering, and the original `{threadId,eventId,seq}` is returned
+separately as `sourceRef`. Project sequences start at 0, so revision 0 is valid;
+events for one thread are sparse in the project sequence. The local card uses
+revision -1 only as its no-event sentinel. It is not a source revision and must
+never be cited. The helper checks the captured `Thread.activitySeq` upper bound.
+Keep that reference mapping alongside the submitted snapshot. `Thread.activitySeq`
+is the captured thread summary revision, while `WorkCard.version` is a separate
+compare-and-swap version. The caller retains both `activitySeq` and
+`expectedVersion` separately for backend `WorkCards.update`; do not infer either
+from the local card revision or snapshot length. The project replay cursor is
+also separate; it is not a substitute for a cited event sequence or
+`Thread.activitySeq`.
 The adapter excludes work-card.updated and trusted awareness/acknowledgment
 provenance to prevent feedback refreshes. Unknown journal kinds are excluded,
 not interpreted as progress. Run/approval lifecycle projection remains backend
@@ -40,11 +47,15 @@ the process environment; tests use an injected async client and no credentials.
    roster. `shared: true` is a local opt-in gate on each supplied session. Worker
    presence/status is supplied by the hub, never inferred by this module.
 2. Save `previous = activity.card(key)`, then `activity.ingest(event)`. Replay is
-   deterministic in revision order, duplicate IDs are no-ops, conflicting IDs or
-   revisions fail. `key` is `(workerId, sessionId)`. The event log is in memory;
-   the hub owns durability and must replay it in full, not just the last 20 events.
-3. Immediately call `refresh.observe(key, activity.card(key)['revision'], now)`.
-   If it returns true, schedule `await jev.classify(activity.classifier_state(key,
+   deterministic in exact project-`seq` order; a thread's sequence may be sparse.
+   Revision 0 is valid. Duplicate IDs are no-ops; conflicting IDs or revisions
+   fail. `key` is `(workerId, sessionId)`. Before any event, the card revision is
+   -1. The event log is in memory; the hub owns durability and must replay it in
+   full, not just the last 20 events.
+3. After ingesting an event, call
+   `refresh.observe(key, activity.card(key)['revision'], now)`. Revision 0 is
+   valid; -1 means no event and is not an observable refresh revision. If it
+   returns true, schedule `await jev.classify(activity.classifier_state(key,
    previous))` outside the coding runner, then pass the result to
    `refresh.classified(key, revision_captured_before_await, label)`. Do not label
    an old result with the revision current after awaiting.
@@ -54,19 +65,36 @@ the process environment; tests use an injected async client and no credentials.
    deadline. Valid continuation alone needs no refresh; continuation after a
    meaningful change preserves that pending refresh. Invalid, low-confidence,
    failed, and timed-out Jev answers fall back. The API timeout defaults to 5s.
-5. For an intent, explicitly choose permitted source/target session keys and call
-   `activity.snapshot(keys)`. Pass its `snapshot` to Agent 1 and surface its
-   `warnings`. It is a ProjectSnapshot-shaped evidence projection: `sessions`,
-   `events`, and `workers`, plus empty result/delivery collections. It does not
-   copy existing hub approvals, deliveries, secrets, arbitrary files, or tool
-   inputs/outputs. Each requested shared session contributes at most 20 events;
-   omissions are reported. Relationship and feature topic are copied, not inferred.
-6. Agent 1 owns chain execution, request IDs, run deduplication, validation, and
-   source-linked results. Map returned descriptive fields and references into
-   `apply_summary(key, revision, fields, evidence_refs)`. It rejects stale/future
-   versions, unknown sources, oversized text, and status/permission fields.
-   Queue and execution status cannot be changed by a model. Duplicate summary
-   results at the same revision do not replace the accepted card.
+5. For an intent, the trusted caller explicitly chooses source/target sessions
+   and captures each backend thread's `activitySeq`, current WorkCard version,
+   deterministic status, topic/relationship/owner selection and permitted event
+   references. Call `activity.snapshot(keys)` and retain its `warnings`; also
+   retain the `sourceRef` returned by `selected_event` for every event included
+   in that snapshot. Event `seq` becomes a sparse Flower evidence revision;
+   `Thread.activitySeq` and `WorkCard.version` remain separate values.
+6. Pass the full `{snapshot,warnings}` envelope to Agent 1's
+   `bridge.coordinate_activity(...)`, along with the two trusted bindings and
+   source-reference list. The activity revision must equal the captured backend
+   `Thread.activitySeq`; otherwise the bridge refuses the stale snapshot. The
+   bridge validates citations, invokes the two
+   session-analysis AgentApps plus the coordinator AgentApp, and returns
+   WorkCard update candidates with `expectedVersion` and `sourceActivitySeq`.
+   The caller must submit those candidates through the backend's
+   `WorkCards.update` CAS, using `threadId` as the path parameter and only
+   `expectedVersion`, `sourceActivitySeq`, and `card` in the request body. Keep
+   `analysisMetadata` as a local diagnostic sidecar. A stale conflict means
+   discard and refresh. Model `workState` never sets factual status. Awareness
+   notes return as pending candidates only: the current backend has no note
+   persistence or safe-boundary delivery API, so this step does not deliver into
+   OpenCode.
+
+The evidence projection contains `sessions`, `events`, and `workers`, plus empty
+result/delivery collections. It does not copy existing approvals, deliveries,
+secrets, arbitrary files, or tool inputs/outputs. Each requested shared session
+contributes at most 20 events; omissions are reported. Relationship and topic
+must come from explicit trusted selection, never be inferred from similar text.
+`Activity.apply_summary(...)` remains a local reducer helper; it is not a
+substitute for the backend WorkCard CAS.
 
 The scheduler emits intents, **not runs**. A consumed intent is not automatically
 retried. The hub/chain adapter owns terminal-run checks, explicit retries, and
@@ -89,10 +117,14 @@ The initially inspected main (`5c8e11193`) specifies the SharedEvent envelope bu
 publish `hackathon/contracts/` or concrete `content` schemas. This module does
 not claim to define those shared schemas. Confirm these narrow mappings:
 
-* In standalone fixtures `revision` is the per-session event sequence: one immutable event per revision,
-  positive integer, with stable globally unique eventId. Sparse/reordered replay
-  is allowed. Current backend project seq is sparse per thread; use the explicit
-  mapping above, retaining Thread.activitySeq and summary version separately.
+* `revision` is the original immutable, project-wide `Event.seq`, a non-negative
+  integer with a stable event ID. Project sequences start at 0; revision 0 is
+  valid. A thread's replay is sparse in that sequence. Never renumber events into
+  a dense per-session counter. The local card revision is the latest selected
+  event sequence, or -1 before any event. Retain captured `Thread.activitySeq`
+  and `WorkCard.version` separately: the former must match the current thread
+  when submitting a summary, and the latter is the work-card compare-and-swap
+  version.
 * `message.content`: role (user/assistant), selected text, optional actorId.
   `activity.content`: toolName, toolStatus, optional actorId. Unknown fields are
   dropped. Neither message text nor tool status changes session execution state.
@@ -110,14 +142,25 @@ not claim to define those shared schemas. Confirm these narrow mappings:
   on purpose: this is input evidence, not fabricated prior chain output. Accepted
   decision retrieval is not implemented in this slice.
 
-## Agent 1 handoff questions
+## Remaining shared integration decisions
 
-Confirm the snapshot collection names and envelope (`snapshot` plus `warnings`).
-Map card objective/currentStep/recentOutcome/blocker to Summary task/progress/
-blockers while retaining the chain's real runId and exact source references.
-The chain should classify deliberate alternatives without claiming redundancy,
-and generate the keyboard finding as information, not a command to stop/switch.
-Live TypeSafe and Flower runs have not been verified by this module's tests.
+The Flower bridge now consumes this producer envelope and emits backend-shaped
+WorkCard update candidates. The remaining decisions belong at the live server /
+OpenCode boundary:
+
+* add or expose explicit per-thread share/mute/revocation, topic, relationship,
+  and trusted owner metadata so bindings are server-selected rather than
+  synthesized by the caller;
+* let the background job trigger on Jev refresh intents and invoke the bridge
+  with a durable request ID and current snapshot;
+* persist source-linked awareness notes and admit them into the exact active
+  OpenCode Session at a safe boundary, with stable message identity and separate
+  admitted/promoted/used receipts.
+
+These gaps are recorded in C2/C4/C8 of
+[`docs/hackathon/integration-gates.md`](../../../docs/hackathon/integration-gates.md).
+No live TypeSafe or SuperGrid execution or target-session delivery is claimed by
+the local fixture demo.
 
 ## Fixtures and expectations
 
