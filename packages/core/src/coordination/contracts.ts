@@ -79,6 +79,13 @@ export interface SessionBinding {
   ) => Effect.Effect<{ readonly projectId: Coordination.ProjectID; readonly workerId: Coordination.WorkerID }, Failure>
 }
 
+export interface ProjectAdmission {
+  readonly canShareExistingProject: (
+    userId: Coordination.UserID,
+    projectId: Coordination.ProjectID,
+  ) => Effect.Effect<boolean, Failure>
+}
+
 export interface Comments {
   readonly list: (
     auth: Coordination.AuthContext,

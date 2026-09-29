@@ -101,6 +101,12 @@ export class ForbiddenError extends Schema.TaggedErrorClass<ForbiddenError>()(
   { httpApiStatus: 403 },
 ) {}
 
+export class CoordinationNotFoundError extends Schema.TaggedErrorClass<CoordinationNotFoundError>()(
+  "CoordinationNotFoundError",
+  { message: Schema.String },
+  { httpApiStatus: 404 },
+) {}
+
 export class PtyNotFoundError extends Schema.TaggedErrorClass<PtyNotFoundError>()(
   "PtyNotFoundError",
   {
