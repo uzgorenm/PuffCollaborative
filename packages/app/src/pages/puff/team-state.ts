@@ -230,7 +230,11 @@ export function createTeamController(transport?: ProjectTransport) {
         const threads = project ? await current.threads(project.id, read.controller.signal) : []
         if (!valid()) return
         if (threads.some((thread) => thread.projectId !== project?.id)) throw new ProjectApiError("invalid")
-        set({ projects, projectId: project?.id ?? "", threads })
+        batch(() => {
+          set("projects", reconcile(projects))
+          set("threads", reconcile(threads))
+          set("projectId", project?.id ?? "")
+        })
         errors.roster = ""
         showError()
       } catch (error) {
@@ -288,7 +292,11 @@ export function createTeamController(transport?: ProjectTransport) {
         for (const approval of snapshot.approvals) {
           if (approval.state === "approved" || approval.state === "rejected") delete decisions[approval.id]
         }
-        set({ snapshot, events, cursor, lastSuccess: more ? 0 : Date.now(), loading: more })
+        batch(() => {
+          // Preserve keyed row identity so routine polling does not replace focused controls.
+          set("snapshot", reconcile(snapshot))
+          set({ events, cursor, lastSuccess: more ? 0 : Date.now(), loading: more })
+        })
         errors.thread = errors.action = ""
         showError()
       } catch (error) {

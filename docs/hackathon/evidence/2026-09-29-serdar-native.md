@@ -69,3 +69,15 @@ Agent3 completed a bounded pass on the intended native Electron renderer5175/CDP
 - QA restored compact local Session, original unsent A/B drafts, expanded inline patch, open context, expanded sidebar, closed review and composer focus. No sends, Session creation, backend controls, process restarts or OS-preference changes.
 
 Still untested: exact source-citation/receipt navigation, long-history restoration, native minimum window geometry, OS reduced motion and offline failure behavior. There was no fresh integrated-main launch, installer test or Flower execution. These bounded passes do not close all D01–D06 subcases or WF02/WF10. The detailed Agent3 receipt remains separately owned while its final write completes.
+
+## Polling focus regression follow-up
+
+After the independent pass, the lead reproduced its focus caveat on the same native target: focus Stop request without activating it, allow ordinary polling, then inspect the focused node. Before the fix, the saved button was disconnected, its replacement was a different node, and focus was on `BODY`. Snapshot and roster replacement remounted keyed rows on each refresh.
+
+The controller now reconciles snapshots and roster records by identity. A browser-condition regression test verifies that unchanged rows retain identity and changed approval versions still update. Solid's server store intentionally has different reconciliation behavior, so this belongs in `test-browser/puff-team-focus.test.ts`.
+
+On the existing Electron renderer5175/CDP9223 after the change, Stop request remained the same connected, focused `BUTTON` from timestamp1790715204343 through1790715228990 (24.647 seconds, spanning multiple normal two-second refresh intervals). Escape then closed context (`aria-expanded=false`, panel inert) and focused the Team context toggle. The lead reopened context and returned focus to the original Prompt; its `QA: compact draft retained` text remained unchanged. No action was submitted or canceled, and no process was restarted. HMR had cleared in-memory team credentials; the existing synthetic member was reconnected before testing.
+
+Fresh checks: app browser suite **42 passed, 0 failed, 106 assertions**; focused app controller/API/panel tests **22 passed, 0 failed, 101 assertions**; app typecheck and production build passed. Desktop production bundling also passed with `bun x --no-install electron-vite build`, using the already prepared resources. The attempted package build invoked prebuild despite `--ignore-scripts` and could not fetch models.dev in the sandbox; direct bundling avoids rebuilding the unchanged backend. No packaged installer or fresh sidecar launch was tested.
+
+The full independent [Agent3 receipt](serdar-desktop-qa.md) is now complete; its historical focus caveat is resolved only for the controlled lead retest above. All other untested boundaries remain unchanged. The lead has finished native input and explicitly releases CDP9223, renderer5175 and profile `/tmp/puff-serdar-ui-desktop` for the next coordinated owner; no automation remains active.

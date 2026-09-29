@@ -1,4 +1,8 @@
-## Native QA update
+## Latest follow-up: stable focus during polling
+
+After documentation checkpoint `90849c5365`, the lead reproduced Agent3's slower focus-loss caveat and corrected snapshot/roster replacement in `pages/puff/team-state.ts` using keyed reconciliation. The existing native target now retains the exact focused panel button for 24.647 seconds of polling; Escape closes context and focuses its toggle. Browser regression coverage is 42/42. See the final section of [the native receipt](evidence/2026-09-29-serdar-native.md) and the completed [independent QA receipt](evidence/serdar-desktop-qa.md). Compact local Session, open context and original composer draft/focus are restored. **Native input is explicitly released**: no lead automation remains active on CDP9223 / renderer5175 / profile `/tmp/puff-serdar-ui-desktop`. The panel ownership/props boundary below is unchanged. No integration-checkout or main edits were made by this lead.
+
+## Native QA update (historical checkpoint)
 
 Agent3 has completed its bounded intended-target pass and released input control. QA-N02 (focused Send obscured at narrow width) is verified fixed at760×800 in the Electron renderer; A/B drafts, bound context, inline patch retention and Escape focus return passed. Native minimum size, OS reduced motion, long-history/citation/offline cases remain untested. Original1280×800/DPR2 restored, both apps idle. See the independent-QA addendum in the native receipt. No code changed after f4c8ad9ee4.
 
