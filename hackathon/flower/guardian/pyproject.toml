@@ -14,7 +14,7 @@ dependencies = ["flwr==1.39.0", "openai>=2.16.0,<3.0.0"]
 packages = ["agent"]
 
 [tool.flwr.app]
-publisher = "puff-local"
+publisher = "fertonzi"
 flwr-version-target = "1.39.0"
 
 [tool.flwr.app.components]
