@@ -315,10 +315,15 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
     }),
   )
 
-  it.effect("reconciles lost submission acknowledgment and wakes only a reserved unpromoted input", () =>
+  it.effect("reconciles lost submission acknowledgment while the same coordinator Run remains active", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("admitted")
       yield* setup.admit()
+      setup.state.coordinatorRun = {
+        ...setup.state.coordinatorRun,
+        state: "running",
+        startedAt: "2026-09-29T00:00:01.000Z",
+      }
       expect(yield* setup.make().reconcile(setup.command.runnerMessageId)).toBe("admitted")
       yield* setup.make().recover
       expect(setup.state.starts).toEqual([setup.command.runnerMessageId])
@@ -373,6 +378,9 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
         .reconcile(setup.command.runnerMessageId)
         .pipe(Effect.catch((error) => Effect.succeed(error)))
       expect(unknown).toMatchObject({ code: "unavailable" })
+      expect(setup.state.execution.phase).toBe("admitted")
+      expect(setup.state.transitions).toHaveLength(0)
+      yield* setup.make().recover
       expect(setup.state.execution.phase).toBe("recovery_required")
       expect(setup.state.wakes).toBe(0)
     }),
@@ -387,6 +395,9 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
         .reconcile(setup.command.runnerMessageId)
         .pipe(Effect.catch((error) => Effect.succeed(error)))
       expect(unknown).toMatchObject({ code: "unavailable" })
+      expect(setup.state.execution.phase).toBe("prepared")
+      expect(setup.state.transitions).toHaveLength(0)
+      yield* setup.make().recover
       expect(setup.state.execution.phase).toBe("recovery_required")
       expect(setup.state.starts).toHaveLength(0)
       expect(setup.state.wakes).toBe(0)
@@ -490,6 +501,9 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
         .reconcile(setup.command.runnerMessageId)
         .pipe(Effect.catch((error) => Effect.succeed(error)))
       expect(unknown).toMatchObject({ code: "unavailable" })
+      expect(setup.state.execution.phase).toBe("running")
+      expect(setup.state.transitions).toHaveLength(0)
+      yield* setup.make().recover
       expect(setup.state.execution.phase).toBe("recovery_required")
       expect(setup.state.starts).toHaveLength(0)
     }),
