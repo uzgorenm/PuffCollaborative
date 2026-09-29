@@ -181,6 +181,7 @@ describe("runner cancellation control path", () => {
     const first = Effect.runPromise(item.cancel(item.command))
     await started.promise
     await Effect.runPromise(item.cancel(item.command))
+    expect(item.state.calls.filter((call) => call === "intent")).toHaveLength(2)
     expect(item.state.calls.filter((call) => call === "abort")).toHaveLength(1)
     expect(item.state.execution.phase).toBe("cancelling")
 
