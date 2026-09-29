@@ -53,6 +53,7 @@ export default function Workspace() {
   const [query, setQuery] = useState("")
   const [searching, setSearching] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [expandedPeople, setExpandedPeople] = useState<string[]>([])
   const [dockOpen, setDockOpen] = useState(true)
   const [setup, setSetup] = useState(defaults)
   const [freshSetup, setFreshSetup] = useState(false)
@@ -256,6 +257,7 @@ export default function Workspace() {
   }
 
   return <div className="shell workflow-shell">
+    {sidebarOpen && <button className="sidebar-scrim" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)} />}
     <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
       <div className="brand"><img className="workflow-brand-logo" src="/puff-logo.png" alt="" /><span>Puff</span><span className="brand-tag">collaborative</span></div>
       <button className="workspace-switch" onClick={overview}><span className="workspace-icon">{workspace.project.name[0]}</span><span>{workspace.project.name}<small>Demo team workspace</small></span><Icon name="chevron" size={16} /></button>
@@ -265,12 +267,32 @@ export default function Workspace() {
       {searching && <input className="session-search" autoFocus placeholder="Search people or tasks…" aria-label="Search sessions" value={query} onChange={event => setQuery(event.target.value)} />}
       <div className="sidebar-section session-list workflow-session-list">
         <div className="sidebar-heading"><span>PROJECT WORK</span><span>{sessions.filter(session => session.scope === "project").length}</span></div>
-        {workspace.project.members.map(member => <div className="workflow-sidebar-person" key={member.name}>
-          <div className="workflow-sidebar-owner"><span className={`avatar ${member.color}`}>{member.initials}</span>{member.name === "You" ? "Yours" : member.name}</div>
-          {filtered.filter(session => session.owner === member.name && session.scope === "project").map(session => <button className={`session-item ${selected === session.id && view === "chat" ? "active" : ""}`} key={session.id} onClick={() => openSession(session.id)}>
-            <span className={`status-dot ${session.status}`} /><span className="session-item-content"><span className="session-item-title">{session.title}</span><span className="session-item-meta">{labels[session.status]}</span></span>
-          </button>)}
-        </div>)}
+        {workspace.project.members.map(member => {
+          const owned = sessions.filter(session => session.owner === member.name && session.scope === "project")
+          const matches = filtered.filter(session => session.owner === member.name && session.scope === "project")
+          const added = owned.filter(session => !["demo-you-api", "demo-you-auth", "demo-sam-frontend", "demo-sam-mobile", "demo-alice-server", "demo-alice-tests"].includes(session.id)).map(session => session.task)
+          const total = `${member.focus}${added.length ? ` Also: ${added.join("; ")}.` : ""}`
+          const expanded = expandedPeople.includes(member.name)
+          const recent = owned.filter(session => {
+            const age = Date.now() - new Date(session.updatedAt).getTime()
+            return hydrated && age >= 0 && age <= 90 * 60 * 1000
+          })
+          return <div className="workflow-sidebar-person" key={member.name}>
+            <div className="workflow-sidebar-owner"><span className={`avatar ${member.color}`}>{member.initials}</span><strong>{displayName(member.name)}</strong><span>{owned.length}</span></div>
+            <p className="workflow-sidebar-total" title={total}>{total}</p>
+            {(expanded ? matches : matches.slice(0, 5)).map(session => <button className={`session-item ${selected === session.id && view === "chat" ? "active" : ""}`} key={session.id} onClick={() => openSession(session.id)} aria-label={`Open sidebar session ${session.title}`}>
+              <span className={`status-dot ${session.status}`} />
+              <span className="session-item-content"><span className="session-item-title">{session.title}</span><span className="workflow-sidebar-session-summary" title={session.summary}>{session.summary}</span><span className="session-item-meta">{labels[session.status]}</span></span>
+            </button>)}
+            {matches.length > 5 && <button className="workflow-sidebar-more" aria-expanded={expanded} onClick={() => setExpandedPeople(previous => expanded ? previous.filter(name => name !== member.name) : [...previous, member.name])}>{expanded ? "Show fewer sessions" : `Show ${matches.length - 5} more sessions`}</button>}
+            <details className="workflow-recent-updates">
+              <summary>Recent updates · 90 min<span>{recent.length}</span></summary>
+              {recent.length === 0 && <p>No recent updates in the last 90 minutes.</p>}
+              {recent.slice(0, 3).map(session => <button key={session.id} onClick={() => openSession(session.id)}><strong>{session.title}</strong><span title={session.summary}>{session.summary}</span></button>)}
+              {recent.length > 3 && <details><summary>{recent.length - 3} more updates</summary>{recent.slice(3).map(session => <button key={session.id} onClick={() => openSession(session.id)}><strong>{session.title}</strong><span title={session.summary}>{session.summary}</span></button>)}</details>}
+            </details>
+          </div>
+        })}
         {filtered.some(session => session.scope === "private" && session.owner === "You") && <div className="workflow-private-list"><div className="sidebar-heading"><span>YOUR PRIVATE SESSIONS</span></div>{filtered.filter(session => session.scope === "private" && session.owner === "You").map(session => <button className={`session-item ${selected === session.id ? "active" : ""}`} key={session.id} onClick={() => openSession(session.id)}><span className={`status-dot ${session.status}`} /><span className="session-item-content"><span className="session-item-title">{session.title}</span><span className="session-item-meta">You · Private</span></span></button>)}</div>}
         {!filtered.length && <p className="workflow-sidebar-empty">No sessions match this search.</p>}
       </div>

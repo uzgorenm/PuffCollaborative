@@ -69,9 +69,6 @@ import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } fro
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
 import { TeamProvider } from "@/pages/puff/team-context"
-import { TeamHome } from "@/pages/puff/team-thread"
-
-const PuffPage = lazy(() => import("@/pages/puff"))
 const TeamThreadPage = lazy(() => import("@/pages/puff/team-thread"))
 
 const NewSession = lazy(() => import("@/pages/new-session"))
@@ -648,11 +645,7 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
-      <Route path="/puff" component={TeamHome} />
       <Route path="/puff/thread/:threadId" component={TeamThreadPage} />
-      <Show when={import.meta.env.DEV}>
-        <Route path="/puff/preview" component={PuffPage} />
-      </Show>
     </>
   )
 }

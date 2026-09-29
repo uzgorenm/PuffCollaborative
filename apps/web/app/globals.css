@@ -7,7 +7,7 @@
   --text: #eeeeed;
   --muted: #92928f;
   --green: #9fc9a5;
-  --sidebar-width: 260px;
+  --sidebar-width: 300px;
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -88,6 +88,27 @@ svg { flex-shrink: 0; }
 .session-item .status-dot { margin-top: 5px; }
 .session-item-title { font-size: 12px; color: #d1d1cc; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 184px; }
 .session-item-meta { display: flex; align-items: center; gap: 7px; color: #777773; font-size: 10px; margin-top: 3px; }
+.project-tree { margin-top: 25px; padding-right: 3px; }
+.project-tree .sidebar-heading { margin-bottom: 9px; text-transform: none; letter-spacing: 0; font-size: 11px; font-weight: 500; }
+.project-tree .project-active { min-height: 38px; font-size: 13px; font-weight: 550; }
+.project-children { padding: 3px 0 18px 23px; }
+.sidebar-subheading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 13px 9px 6px; color: #93938d; font-size: 11px; font-weight: 500; }
+.sidebar-subheading span:last-child { color: #6e6e68; font-size: 10px; }
+.thread-row { align-items: center; gap: 10px; min-height: 36px; padding: 7px 9px; margin-bottom: 1px; }
+.thread-row .status-dot { margin-top: 0; }
+.thread-row .session-item-title { max-width: none; color: #c6c6c0; }
+.sidebar-empty { margin: 7px 9px 12px; color: #7d7d77; font-size: 11px; line-height: 1.5; }
+.teammate-group { margin-top: 23px; padding-top: 17px; border-top: 1px solid #30302d; }
+.teammate-heading { display: flex; align-items: center; gap: 9px; padding: 0 9px; }
+.teammate-heading .avatar { width: 23px; height: 23px; border-radius: 7px; }
+.teammate-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: #e0e0dc; }
+.teammate-window { margin: 8px 9px 5px 41px; color: #a0a099; font-size: 10px; font-weight: 500; }
+.teammate-window span { color: #797973; font-weight: 400; }
+.teammate-summary { margin: 0 9px 11px 41px; color: #a3a39d; font-size: 11px; line-height: 1.5; }
+.teammate-summary p { margin: 0 0 8px; overflow-wrap: anywhere; }
+.teammate-summary p span { display: block; color: #c5c5bf; font-weight: 500; }
+.teammate-summary details summary { margin: 4px 0 8px; color: #c5c5bf; cursor: pointer; }
+.teammate-group .sidebar-subheading { margin-left: 9px; }
 .status-dot { display: inline-block; width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: #767672; }
 .status-dot.running { background: #acd2a6; box-shadow: 0 0 0 3px #9bc7a00c; }
 .status-dot.waiting { background: #dabd80; }
@@ -97,6 +118,7 @@ svg { flex-shrink: 0; }
 .sidebar-footer strong { display: block; font-size: 12px; font-weight: 500; }
 .sidebar-footer small { color: #80807b; font-size: 10px; }
 .sidebar-footer .icon-button { margin-left: auto; }
+.sidebar-scrim { display: none; }
 .avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 25px; height: 25px; border-radius: 50%; background: #4b4947; color: #dedbd8; font-size: 10px; font-weight: 600; border: 1px solid #ffffff12; }
 .avatar.purple { background: #55464f; color: #dcc4d2; }
 .avatar.blue { background: #414e5a; color: #bfd5e8; }
@@ -223,7 +245,7 @@ svg { flex-shrink: 0; }
 }
 
 @media (max-width: 900px) {
-  :root { --sidebar-width: 190px; }
+  :root { --sidebar-width: 275px; }
   .sidebar { padding-left: 9px; padding-right: 9px; }
   .brand { padding-left: 8px; }
   .session-item-title { max-width: 135px; }
@@ -249,10 +271,12 @@ svg { flex-shrink: 0; }
 }
 
 @media (max-width: 680px) {
-  :root { --sidebar-width: 260px; }
+  :root { --sidebar-width: min(310px, calc(100vw - 48px)); }
   .shell { min-height: 0; }
   .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 50; transform: translateX(-100%); transition: transform .2s ease; box-shadow: 12px 0 40px #0005; padding: 20px 13px 14px; }
   .sidebar.open { transform: translateX(0); }
+  .sidebar-scrim { display: block; position: fixed; inset: 0; z-index: 40; width: 100%; height: 100%; background: #0008; }
+  .thread-row { min-height: 44px; }
   .session-item-title { max-width: 184px; }
   .mobile-menu { display: inline-flex; }
   .topbar { height: 56px; padding: 0 14px; gap: 8px; }

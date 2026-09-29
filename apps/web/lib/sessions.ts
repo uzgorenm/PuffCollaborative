@@ -68,7 +68,19 @@ export const demoSessions: Session[] = [
       { role: "assistant", text: "The review notes are ready: the shared workspace should show only explicitly shared sessions. These sample conversations illustrate the experience; production access controls still need separate validation." },
     ],
   },
+  { id: "demo-serdar-sidebar", title: "Design the project sidebar", owner: "Serdar", initials: "S", color: "purple", status: "running", summary: "Arranging personal threads and teammate activity under one project.", updatedAt: "2026-09-29T22:56:00.000Z", messages: [{ role: "user", text: "Make the project sidebar easy to scan." }] },
+  { id: "demo-serdar-review", title: "Review the browser layout", owner: "Serdar", initials: "S", color: "purple", status: "waiting", summary: "Checking spacing and navigation at desktop and phone widths.", updatedAt: "2026-09-29T22:31:00.000Z", messages: [{ role: "user", text: "Check the layout at desktop and phone widths." }] },
+  { id: "demo-alice-keyboard", title: "Audit keyboard navigation", owner: "Alice", initials: "A", color: "blue", status: "running", summary: "Following focus through project changes and open threads.", updatedAt: "2026-09-29T22:53:00.000Z", messages: [{ role: "user", text: "Trace keyboard focus through the workspace." }] },
+  { id: "demo-alice-source", title: "Review source citations", owner: "Alice", initials: "A", color: "blue", status: "waiting", summary: "Checking whether a shared finding points to its exact source.", updatedAt: "2026-09-29T22:17:00.000Z", messages: [{ role: "user", text: "Review the source linked to the shared finding." }] },
+  { id: "demo-bob-density", title: "Compare sidebar density", owner: "Bob", initials: "B", color: "orange", status: "running", summary: "Comparing compact rows with readable thread details.", updatedAt: "2026-09-29T22:49:00.000Z", messages: [{ role: "user", text: "Compare compact and expanded thread lists." }] },
+  { id: "demo-bob-naming", title: "Test project naming", owner: "Bob", initials: "B", color: "orange", status: "waiting", summary: "Checking that the current team project remains clear in navigation.", updatedAt: "2026-09-29T22:10:00.000Z", messages: [{ role: "user", text: "Make the selected team project clear." }] },
 ]
+
+function demoPreviewSessions() {
+  const ages = [12, 24, 17, 38, 8, 33, 11, 47, 15, 54]
+  const now = Date.now()
+  return demoSessions.map((session, index) => ({ ...session, updatedAt: new Date(now - (ages[index] ?? 0) * 60_000).toISOString() }))
+}
 
 export type SessionsResult = {
   sessions: Session[]
@@ -94,7 +106,7 @@ export async function readSessions(): Promise<SessionsResult> {
   const base = process.env.PUFF_API_URL ?? "http://127.0.0.1:4187"
   const url = URL.parse(base)
   if (!url || !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) {
-    return { sessions: demoSessions, source: "demo", detail: "Illustrative demo data. PUFF_API_URL must point to the local scenario simulator." }
+    return { sessions: demoPreviewSessions(), source: "demo", detail: "Illustrative demo data. PUFF_API_URL must point to the local scenario simulator." }
   }
   const prefix = `${url.origin}${url.pathname.replace(/\/$/, "").endsWith("/api/coordination/v1") ? url.pathname.replace(/\/$/, "") : "/api/coordination/v1"}`
   const signal = AbortSignal.timeout(1000)
@@ -149,6 +161,6 @@ export async function readSessions(): Promise<SessionsResult> {
     if (!sessions.length) throw new Error("Simulator has no shared sessions")
     return { sessions, source: "simulator", detail: "SIMULATED coordination fixtures. This is synthetic scenario data, not live model output." }
   } catch {
-    return { sessions: demoSessions, source: "demo", detail: "Illustrative demo conversations. The local scenario simulator is unavailable or could not be read within one second." }
+    return { sessions: demoPreviewSessions(), source: "demo", detail: "Illustrative demo conversations. The local scenario simulator is unavailable or could not be read within one second." }
   }
 }
