@@ -27,6 +27,7 @@ import { Snapshot } from "@opencode-ai/core/snapshot"
 import { ContextSnapshotDecodeError } from "@opencode-ai/core/session/error"
 import { SessionEvent } from "@opencode-ai/core/session/event"
 import { SessionInput } from "@opencode-ai/core/session/input"
+import { SessionAwareness } from "@opencode-ai/core/session/awareness"
 import { SessionMessage } from "@opencode-ai/core/session/message"
 import { Prompt } from "@opencode-ai/core/session/prompt"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
@@ -1912,6 +1913,110 @@ describe("SessionRunnerLLM", () => {
         "user",
         "assistant",
       ])
+    }),
+  )
+
+  it.effect("admits one attributed awareness input to the existing active Session and promotes it after the provider turn", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      const awarenessMessageID = SessionMessage.ID.make("msg_awareness_nav_742")
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Continue expanded navigation" }), resume: false })
+
+      requests.length = 0
+      responses = [
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.stepFinish({ index: 0, reason: "stop" }),
+          LLMEvent.finish({ reason: "stop" }),
+        ],
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.stepFinish({ index: 0, reason: "stop" }),
+          LLMEvent.finish({ reason: "stop" }),
+        ],
+      ]
+      streamGate = yield* Deferred.make<void>()
+      streamStarted = yield* Deferred.make<void>()
+      const running = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      yield* Deferred.await(streamStarted)
+      expect((yield* session.active).has(sessionID)).toBe(true)
+      expect(userTexts(requests[0]!)).toEqual(["Continue expanded navigation"])
+
+      const note = {
+        messageID: awarenessMessageID,
+        target: {
+          sessionID,
+          projectID: Project.ID.global,
+          location: { directory: AbsolutePath.make("/project") },
+        },
+        source: { sessionID: otherSessionID, eventID: "evt_nav_742", revision: 7 },
+        reportID: "flower_report_nav_742",
+        authorID: "agent_a",
+        finding: "Restoring focus to the expanded navigation trigger is required after the panel closes.",
+      }
+      const admitted = yield* SessionAwareness.admit(note)
+      const retried = yield* SessionAwareness.admit(note)
+      expect(admitted.messageID).toBe(awarenessMessageID)
+      expect(retried.admittedSeq).toBe(admitted.admittedSeq)
+      expect(admitted.activeObserved).toBe(true)
+      expect((yield* SessionAwareness.receipt({ sessionID, messageID: awarenessMessageID }))?.promotedSeq).toBeUndefined()
+      expect(requests).toHaveLength(1)
+
+      yield* Deferred.succeed(streamGate, undefined)
+      yield* Fiber.join(running)
+      streamGate = undefined
+      streamStarted = undefined
+
+      const promoted = yield* SessionAwareness.receipt({ sessionID, messageID: awarenessMessageID })
+      expect(promoted?.admittedSeq).toBe(admitted.admittedSeq)
+      expect(promoted?.promotedSeq).toBeNumber()
+      expect(requests).toHaveLength(2)
+      expect(userTexts(requests[1]!)).toHaveLength(2)
+      expect(userTexts(requests[1]!).at(-1)).toContain("evt_nav_742")
+      expect(userTexts(requests[1]!).at(-1)).toContain("flower_report_nav_742")
+      expect(userTexts(requests[1]!).at(-1)).toContain("Restoring focus to the expanded navigation trigger")
+      expect((yield* session.context(sessionID)).filter((message) => message.type === "user")).toHaveLength(2)
+      yield* SessionAwareness.admit(note)
+      yield* Effect.yieldNow
+      expect((yield* session.context(sessionID)).filter((message) => message.type === "user")).toHaveLength(2)
+      expect(requests).toHaveLength(2)
+    }),
+  )
+
+  it.effect("rejects a changed awareness retry and a mismatched Session location", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const note = {
+        messageID: SessionMessage.ID.make("msg_awareness_binding"),
+        target: {
+          sessionID,
+          projectID: Project.ID.global,
+          location: { directory: AbsolutePath.make("/project") },
+        },
+        source: { sessionID: otherSessionID, eventID: "evt_binding", revision: 3 },
+        reportID: "flower_report_binding",
+        authorID: "agent_a",
+        finding: "The focus check needs the trigger element ID.",
+      }
+      const mismatched = yield* SessionAwareness.admit({
+        ...note,
+        target: { ...note.target, location: { directory: AbsolutePath.make("/other-project") } },
+      }).pipe(Effect.flip)
+      expect(mismatched).toMatchObject({ _tag: "SessionAwareness.TargetMismatch" })
+      expect(yield* SessionAwareness.receipt({ sessionID, messageID: note.messageID })).toBeUndefined()
+
+      yield* SessionAwareness.admit(note)
+      const changed = yield* SessionAwareness.admit({ ...note, finding: "A different finding" }).pipe(Effect.flip)
+      expect(changed).toMatchObject({ _tag: "Session.PromptConflictError" })
+      const changedSource = yield* SessionAwareness.admit({
+        ...note,
+        source: { ...note.source, revision: 4 },
+      }).pipe(Effect.flip)
+      expect(changedSource).toMatchObject({ _tag: "Session.PromptConflictError" })
+      expect((yield* SessionAwareness.receipt({ sessionID, messageID: note.messageID }))?.prompt.text).toContain(
+        "The focus check needs the trigger element ID.",
+      )
     }),
   )
 
