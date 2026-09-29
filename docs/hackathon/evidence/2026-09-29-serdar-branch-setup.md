@@ -28,4 +28,8 @@ The first sandboxed focused-test attempt could not bind its ephemeral HTTP ports
 - The updated branch workflow is recorded on `serdar/ui`. The original checkout and other teammates' branches are not changed by these documentation edits. Team integration is deferred to the user's later request.
 - The local runtime sits outside source control. The temporary `agent-browser` installation from the earlier UI task was reused solely for the browser-load check; it is not a product dependency.
 
-Next action: Serdar reviews the page, then uses the scoped prompts in [serdar-agent-prompts.md](../serdar-agent-prompts.md). The two implementation agents use disjoint files; the third agent reviews. Only the UI integration lead writes Git commits/pushes.
+## Subsequent desktop direction
+
+Serdar's later frontend-chat instruction makes the native desktop conversation experience the target. The checks above remain valid for the earlier shared UI baseline; they do not establish native desktop readiness. A subsequent inspected predev attempt in the original checkout failed on `@opentui/solid/preload`. The frontend chat is investigating launch and the session sidebar/context-panel integration. No native launch success was verified in this coordinator follow-up.
+
+Next action: use the revised desktop assignments in [serdar-agent-prompts.md](../serdar-agent-prompts.md). Agent 1 first carries its current work safely into the prepared branch and verifies native launch. Agent 2 owns panel content, and Agent 3 reviews native behavior. Only the UI integration lead writes Git commits/pushes.

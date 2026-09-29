@@ -1,202 +1,179 @@
-# Serdar's UI workspace and parallel-agent prompts
+# Serdar’s desktop workflow and agent prompts
 
-**First task:** review the existing team workspace with the two alternative frontend sessions. Make the difference between the two experiments and the evidence of cross-session learning understandable before expanding the dashboard.
+**Revised after the latest frontend chat on September 29. This replaces the earlier standalone-dashboard assignments.**
 
-## Prepared setup
+The current target is a seamless desktop coding experience: retain the existing chat, composer, tools and diffs; make personal/shared sessions easy to reach; show collaboration beside the active conversation; use polished, restrained motion and keyboard support. The `/puff` browser dashboard is existing prototype material, not the acceptance surface for this increment.
 
-- Branch: `serdar/ui`; base includes UI implementation commit `3f75718234`.
-- Checkout: `/Users/mac/Desktop/Coding/Hackathon/Puff/PuffCollaborative-serdar-ui`.
-- Existing original checkout: `/Users/mac/Desktop/Coding/Hackathon/Puff/PuffCollaborative`. Other chats may still work there. Do not switch its branch, reset it or edit it from these tasks.
-- Local Bun: `/Users/mac/Desktop/Coding/Hackathon/.tools/bun-1.3.14/bin/bun` (1.3.14).
-- Preview: `http://127.0.0.1:4445/puff`, explicitly synthetic. Port 4444 belongs to the earlier UI chat. Do not restart either process during another task's work.
-- Dependencies use the existing frozen lockfile, with worktree-local `node_modules`. No new framework or global runtime was installed.
-- The native worktree tool could not operate because this chat is rooted at the non-Git Hackathon parent directory. The isolated checkout was created with Git's worktree fallback.
+## What the frontend chat is doing
 
-In a new terminal:
+**Review README for task workflow** is active on persistent session navigation and a collapsible context panel beside the conversation. It reported desktop dependencies installed and was investigating native launch. It was still using the original checkout on `main` when inspected; no tracked desktop implementation diff was visible at that checkpoint. The coordinator has not sent instructions or moved that work automatically. Paste Agent 1’s handoff first.
 
-```sh
-export PATH="/Users/mac/Desktop/Coding/Hackathon/.tools/bun-1.3.14/bin:$PATH"
-cd /Users/mac/Desktop/Coding/Hackathon/Puff/PuffCollaborative-serdar-ui
-git branch --show-current
-```
+The latest inspected native predev attempt failed with `preload not found "@opentui/solid/preload"` while invoking the existing OpenCode build from `packages/desktop/scripts/predev.ts`. This is an observed blocker, not a diagnosed cause. The frontend chat owns the investigation; do not start a competing launch/debugging session.
 
-Expected branch: `serdar/ui`. The existing preview is already started for this handoff. If it has ended, first verify that port 4445 is free, then start it from `packages/app`:
+**Read the project README** is idle after a skills review. **Summarize current team work** is idle after explaining ownership and sharing. They can take Agents 2 and 3 below.
 
-```sh
-bun dev -- --host 127.0.0.1 --port 4445 --strictPort
-```
+## Prepared workspace and limits
 
-Verification commands, from `packages/app`:
+- Branch: `serdar/ui`; includes existing dashboard implementation `3f75718234`.
+- Target checkout: `/Users/mac/Desktop/Coding/Hackathon/Puff/PuffCollaborative-serdar-ui`.
+- Original active checkout: `/Users/mac/Desktop/Coding/Hackathon/Puff/PuffCollaborative`. Preserve its files and branch.
+- Local Bun: `/Users/mac/Desktop/Coding/Hackathon/.tools/bun-1.3.14/bin/bun`.
+- The [setup receipt](evidence/2026-09-29-serdar-branch-setup.md) verifies the shared UI baseline. **Native desktop readiness is still open.**
+- Ports 4444/4445 are auxiliary browser previews, not proof of a native desktop run. Do not recreate the worktree or launch duplicate servers.
 
-```sh
-bun test --conditions=solid src/pages/puff src/i18n/parity.test.ts
-bun typecheck
-bun run build
-bun run test:unit
-bun run test:browser
-```
+The desktop renderer imports `AppInterface` from `@opencode-ai/app` in `packages/desktop/src/renderer/index.tsx`. Interface work therefore still belongs largely in `packages/app`; keeping that package does not require shipping a separate website.
 
-The focused HTTP tests require loopback socket access. A sandbox failure to bind port 0 is not an assertion failure; rerun with the required local socket permission without changing the test. Read the [setup receipt](evidence/2026-09-29-serdar-branch-setup.md) for actual results and the known full-suite limitation.
+## First task and parallel ownership
 
-## What the other chats have done
+**Agent 1 first verifies native launch from the intended checkout, then opens one existing coding session with its composer, messages, tools and diffs intact.** Record the command and any blocker. A browser preview does not close this setup gate.
 
-| Chat title | Observed activity at handoff |
-| --- | --- |
-| Review README for task workflow | Finished and reported its UI/evidence work pushed through `8192dbc046`; now idle. Built the responsive dashboard, sharing/review controls, preview, Basic readiness check and focused tests. The prepared branch includes implementation commit `3f75718234`; later main-only handoff documentation is separate. |
-| Read the project README | Idle after a skills-only review. Recommended selective UX review and browser checks; made no implementation changes in that pass. |
-| Summarize current team work | Idle after explaining sharing labels and each teammate's integration responsibility. No implementation was claimed in that pass. |
+| Agent | Owns | Boundary |
+| --- | --- | --- |
+| 1 — Existing frontend lead | Safe handoff, native startup, app/session layout, session sidebar, panel mounting/open/close motion, shared i18n integration, Git | Does not duplicate Agent 2’s panel implementation |
+| 2 — Context panel | Self-contained panel content, local presentation model/tests and scoped styles | No entry-point, sidebar, host-motion, backend or Git edits |
+| 3 — Desktop QA | Native workflow, keyboard/focus/motion review and evidence | No application edits, process restarts or Git mutations |
 
-These are inspected chat states, not commands sent to those chats. A chat does not automatically move into this worktree: include the exact checkout in its next prompt.
+Agent 2 can inspect records and work on the isolated component while launch is resolved. Agent 3 can prepare cases and inspect source now, but native pass/fail evidence requires an actual desktop run. Only Agent 1 integrates shared files and commits. If the frontend lead has already written equivalent panel content, hand off that implementation rather than starting a second one.
 
-## Your first five-minute review
-
-1. Open the preview. Confirm the synthetic-data notice is obvious.
-2. Compare the compact and expanded navigation sessions. Can you explain their different approaches even though both belong to Serdar?
-3. Inspect one shared finding and its sources. Identify its sender and recipient.
-4. Check whether the displayed state proves only a worker acknowledgment or actual use. The current UI explicitly says admission, promotion and use remain unverified.
-5. Open Sharing settings. Try changing the topic, relationship and mute state; reset the preview afterward. These are local simulations, not changes to a real worker.
-
-Give Agent 1 the single most confusing point. Start Agents 2 and 3 in parallel with the file limits below; do not ask three agents to rebuild the whole dashboard.
-
-## Shared instructions for every agent
-
-Paste this with each task:
+## Common instructions — include with each prompt
 
 ```text
-I am Serdar, owner of the Puff UI. Work only in:
+I am Serdar. The product target is the desktop coding app, with
+collaboration inside the existing conversation experience.
+Continue that direction; do not create another dashboard or framework.
+
+Target checkout:
 /Users/mac/Desktop/Coding/Hackathon/Puff/PuffCollaborative-serdar-ui
-Branch: serdar/ui. Verify the path and branch before editing.
+Branch: serdar/ui. Verify both before editing.
+Separate teammate branches supersede historical main-only instructions.
+Do not push main, open a PR or merge teammates’ branches.
+Only Agent 1 may stage, commit or push this shared UI branch.
 
-Our newer instruction is separate teammate branches, combined later.
-It overrides the old main-only instruction in historical plans.
-Do not switch branches in the original checkout, push main, open a PR,
-or merge other teammates' work. Only Agent 1 may stage, commit or push
-this shared UI branch, after collecting the other agents' results.
+Read AGENTS.md, packages/app/AGENTS.md, packages/desktop/AGENTS.md,
+and docs/hackathon/{serdar-agent-prompts,mvp-spec,acceptance-workflows,
+integration-gates}.md. Use the existing SolidJS components, theme,
+i18n and motion mechanisms; support reduced motion. Use Context7
+when library/API documentation is needed.
 
-Read AGENTS.md, packages/app/AGENTS.md, docs/hackathon/mvp-spec.md,
-acceptance-workflows.md, integration-gates.md and this prompt file.
-Continue the existing SolidJS UI; use its components, theme and i18n.
-No new frameworks, dependencies, backend/schema changes or secrets.
-Fetch current library documentation through Context7 when needed.
-
-Preview: http://127.0.0.1:4445/puff. Keep synthetic mode visibly labeled.
-Do not restart another task's server or reuse its browser session.
-Use a separate named browser session for your checks.
-Runtime PATH: /Users/mac/Desktop/Coding/Hackathon/.tools/bun-1.3.14/bin
-
-Report exact files, observed behavior, checks, limitations and remaining
-dependencies. A UI fixture is not live Flower or OpenCode evidence.
+Preserve Session identity, composer drafts, scroll, tool permissions
+and diffs. Follow the app’s benchmark requirement before changing
+session/timeline code. No new backend contract, credentials, framework,
+database or invented live data. Keep synthetic data labeled.
+Do not restart another task’s app/server or reuse its browser session.
+Report exact files, checks, evidence and remaining limitations.
 ```
 
-## Agent 1 — Awareness evidence and UI integration lead
+## Agent 1 — Continue the desktop frontend session
 
-Best continuation: **Review README for task workflow**. Use the shared instructions plus:
+Paste into **Review README for task workflow**, with the common instructions:
 
 ```text
-Continue your existing dashboard. First confirm that the UI commit
-3f75718234 is in this checkout; do not rebuild completed work.
+Continue your desktop work. First carry it safely into the prepared
+serdar/ui checkout. Inspect both Git states. Preserve any uncommitted
+UI work and copy only your owned changes into the new checkout,
+checking the resulting diff. Do not reset, delete or stash other work,
+switch the original checkout’s branch, or merge all of main. If your
+new work is committed, inspect and port only the relevant UI commits.
 
-Own pages/puff/index.tsx, project-state.ts and its tests, preview.ts,
-puff.css, i18n/puff-en.ts, and new components/puff/awareness-* files.
-These implementation paths are relative to packages/app/src/.
-Leave session-card.tsx and its tests to Agent 2. Keep transport,
-controller, backend contracts and generated clients unchanged for
-this slice. You are the sole Git writer.
+Own native startup, app/session entry points, persistent session
+navigation, shared layout/i18n and the panel’s host/open-close motion.
+Reserve packages/app/src/components/puff/context-panel/ for Agent 2.
+If you already wrote equivalent panel content, hand it off for reuse.
 
-Make one finding's evidence chain understandable: source session and
-finding -> Flower result -> target session -> acknowledgment ->
-admission -> promotion -> concrete use. Distinguish missing evidence
-from failure and from successful completion. A returned message ID,
-generic acknowledgment or completed analysis must never imply use.
-Keep the two alternative approaches visible and separate.
+First reproduce and resolve native launch. The last observed predev
+failure mentioned @opentui/solid/preload; investigate the actual cause
+rather than guessing dependencies or bypassing checks. Verify the
+native window, intended checkout and backend before saying setup is
+ready. Report a backend-owned blocker if one remains.
 
-The backend does not yet supply the full receipt contract. Keep any
-new evidence presentation model UI-local and explicitly provisional;
-do not invent routes or change the wire schema. Existing records with
-only acknowledgment must continue to show later stages as unverified.
-If you illustrate later stages, mark them synthetic and point to
-separate fixture evidence; never derive them from acknowledgment.
+Keep coding central. Navigation opens existing Sessions, not duplicates.
+Mount Agent 2’s panel beside the chat. Open/close must preserve draft,
+scroll, tools, diffs and focus without remounting chat or starting a
+competing runner. Own host transitions and reduced-motion behavior.
 
-Add meaningful tests for acknowledgment-only data, missing/stale
-sources, wrong target and failed delivery. Use existing localized copy
-where possible; own any necessary new i18n keys. Preserve the current
-page's layout and working interactions.
+Publish chosen host files and the panel data/callback boundary before
+integration. Bind the exact active worker/Session; missing backend data
+shows unavailable/unknown or explicit demo mode, never simulated live.
+Agent 2 publishes its component props and owns the internal content.
 
-After Agents 2 and 3 report, review only their owned changes, run the
-focused tests, app typecheck/build and browser checks, record the
-remaining full-suite limitation, then commit and push serdar/ui.
-Do not merge to main. If running alone, finish only your slice and
-leave the other agents' work untouched.
+Verify D01–D06 below, relevant tests, app/desktop typechecks and build,
+and the session-layout benchmark required by app instructions.
+Review Agents 2/3’s results, commit reviewed work and push serdar/ui.
+Do not merge main.
 ```
 
-## Agent 2 — Sharing controls and alternative-session usability
+## Agent 2 — Context beside the active conversation
 
-Best continuation: **Read the project README**. Use the shared instructions plus:
+Paste into **Read the project README**, with the common instructions:
 
 ```text
-Own only components/puff/session-card.tsx and a focused
-components/puff/session-card.test.tsx (or a small adjacent pure form
-helper and its tests). Preserve the exported SessionCard props.
-These implementation paths are relative to packages/app/src/.
-Do not edit the page, controller, shared styles, i18n dictionaries,
-wire types, backend or Agent 1's files. Do not commit or push.
+Build the contents of the collaboration context panel.
+Own only packages/app/src/components/puff/context-panel/ and
+ docs/hackathon/serdar-context-panel-handoff.md.
+First inspect Agent 1’s current files/handoff for an equivalent panel;
+reuse it rather than duplicate it. Do not edit app/desktop/session
+entry points, sidebar, host transitions, global CSS, shared i18n,
+controllers, transport, generated clients, backend or Git state.
 
-Start by checking the existing behavior; improve only demonstrated
-gaps in the two-similar-frontend-sessions case. Make the current
-topic, alternative relationship, owner and mute state inspectable.
-Preserve each session's independent approach and identity.
+Create a self-contained SolidJS component with explicit props/callbacks
+and publish a small usage example for Agent 1. Reuse existing UI
+records; keep any additional display model local and provisional,
+not a new backend schema. Use existing localized copy; request new
+shared keys from Agent 1 rather than editing their dictionaries.
 
-Verify keyboard access, form labels, focus and draft preservation
-during snapshot refresh. Check an already-open form after ownership
-or writable permission changes: it must not submit an action the
-current viewer is no longer allowed to request. The backend remains
-the authority; client disablement is a usability safeguard.
+Show the active session’s approach/topic/sharing state, related
+alternatives and useful source-backed findings. Match exact worker
+and Session identity. Switching A/B must not leak stale context into
+the new session. Same-owner alternatives remain separate experiments.
+Missing identity/data gets an honest empty or unavailable state.
 
-Keep mute/unshare available when only analysis is pending, while
-still respecting saving, connection and ownership restrictions.
-Use existing i18n keys/components. Send any required new copy to
-Agent 1 as a precise request instead of editing their dictionary.
-Do not add extra settings or repeat controls that already work.
+Distinguish acknowledgment, admission, promotion and observed use.
+Later stages remain unknown without evidence. A run ID, tool approval
+or generic acknowledgment cannot establish use. Do not invent source
+links, expose unrelated/private context, redirect work or pick a winner.
 
-Write focused regression checks for demonstrated bugs and perform
-a keyboard/mobile walkthrough. Return files changed, before/after
-behavior and exact check results. Leave changes for Agent 1 to review.
+Use scoped styles, accessible disclosure controls and restrained row
+transitions with reduced-motion support. Host motion belongs to Agent 1.
+Test alternative sessions, rapid selection changes, missing receipts,
+stale/offline states and unknown identity. Label fixtures clearly.
+Return component props, tests and limits. Agent 1 mounts and commits it.
 ```
 
-## Agent 3 — Independent UI acceptance reviewer
+## Agent 3 — Independent native desktop QA
 
-Best continuation: **Summarize current team work**, or a new reviewer chosen by Serdar. Use the shared instructions plus:
+Paste into **Summarize current team work**, with the common instructions:
 
 ```text
-Do not modify application code or run Git mutations. Your only write
-area is docs/hackathon/evidence/serdar-ui-qa.md. Review the current
-page first and repeat affected checks after Agents 1 and 2 finish.
+Review the native desktop experience. No app edits or Git mutations.
+Your only write area is docs/hackathon/evidence/serdar-desktop-qa.md.
 
-Use the real preview at port 4445 in your own named browser session.
-Review at desktop and 390px width, then keyboard-only. Check:
-two same-owner alternatives; visible topic/sharing state; source
-inspection; no unearned admission/promotion/use claims; mute during
-pending analysis; stale evidence; offline/failure state; synthetic
-versus real mode; edited proposals; unauthorized or disabled actions.
+Prepare D01–D06 while launch is being fixed. Coordinate an idle app
+window for review; do not restart or take over Agent 1’s active session.
+If native launch is blocked, report it. Browser checks may supplement
+native evidence but cannot replace it.
 
-Use WF01/WF02/WF04/WF05/WF06/WF07 for expectations, but label your
-results UI/FIXTURE. Do not mark the live product cases passed without
-real source, Flower and target-session evidence. Do not create a fake
-backend to imply integration. Do not enter real credentials.
+Check existing compact/expanded sessions through real chat navigation,
+panel open/close, keyboard focus, draft/scroll preservation, correct
+active-session evidence, resizing and reduced motion. Look for jumps,
+flicker, clipped content, trapped focus and fake live states. Do not
+create duplicate Sessions merely to make navigation appear to work.
 
-Record exact commit plus dirty-file caveat, steps, expected/actual
-behavior and reproduction evidence. Report only actionable findings
-with the relevant file/interaction and suggested owner. Acknowledge
-the known Punjabi locale test separately from new regressions.
-Send your report to Serdar; Agent 1 owns fixes and integration.
+Record exact build/source, steps, expected/actual behavior and evidence.
+Distinguish desktop rendering, synthetic context and real Flower/
+OpenCode behavior. Separate the known Punjabi locale failure from new
+regressions. Report actionable findings and owners; repeat affected
+checks after fixes. Do not commit or push.
 ```
 
-## Completion for this UI increment
+## Desktop acceptance checks
 
-- [ ] Serdar can explain the two alternatives and one finding's path from the page alone.
-- [ ] Evidence stages never promise more than their underlying receipts establish.
-- [ ] Sharing remains usable and permission-aware through refresh/pending states.
-- [ ] Agent 3 records a reproducible UI review and resolved/unresolved findings.
-- [ ] Agent 1 verifies and pushes only `serdar/ui`; the team integrates branches later.
+- [ ] **D01 — Native launch:** record command/build, actual window and backend identity from the intended checkout. No browser substitute.
+- [ ] **D02 — Existing sessions:** A/B navigation preserves drafts/history and creates no duplicate Sessions. Both same-owner alternatives remain identifiable.
+- [ ] **D03 — Stable panel:** open/close preserves draft, scroll, tools/diffs and sensible focus; no chat remount.
+- [ ] **D04 — Correct context:** A/B switching updates the exact target’s context; unrelated/private/stale records do not become current findings; receipt claims match evidence.
+- [ ] **D05 — Usable motion:** keyboard, visible focus, window resizing and reduced motion work without persistent flicker, clipping or hidden controls.
+- [ ] **D06 — Honest failures:** missing/offline backend and unsupported operations stay explicit; failures never silently become synthetic successful collaboration.
 
-This completes a UI increment, not backend integration or the hackathon's live Flower workflow. The full acceptance gates remain authoritative.
+After native launch, Serdar’s first review is: **open A, type a draft, open context, switch to B, return to A, and confirm the draft and correct context remain intact.** Then inspect one finding’s source and delivery evidence.
+
+Desktop UI completion is distinct from the live source→Flower→active-session workflow in WF02/WF10. Installer publication and unrelated native features are outside this increment.
