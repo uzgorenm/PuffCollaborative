@@ -1,6 +1,6 @@
 # Coordination backend process test, September 29, 2026
 
-Tested commit: `2e931166e891ccfbbf8313e13be57ff94af4f931`. Bun 1.3.14 on macOS arm64. The test ran the registered HTTP route layer in a coordinator process against disposable SQLite files. A separate fake execution process stayed alive through coordinator `SIGKILL` and restart. HTTP clients used eight distinct roster credentials, including four project members, an outsider, a stale worker instance, and an analysis service. No OpenCode model or tool execution, frontend, Flower job, or paid service was used.
+Tested commit: `f3007ee350aaf39bff0f7d8bac65ff0ae8ce20b2`. Bun 1.3.14 on macOS arm64. The test ran the registered HTTP route layer in a coordinator process against disposable SQLite files. A separate fake execution process stayed alive through coordinator `SIGKILL` and restart. HTTP clients used eight distinct roster credentials, including four project members, an outsider, a stale worker instance, and an analysis service. No OpenCode model or tool execution, frontend, Flower job, or paid service was used.
 
 The harness and run instructions are in [coordination-e2e.md](../../coordination-e2e.md). The test entry point uses `createRoutes` with a fake `RunnerPort` and a Session binding adapter that reads real seeded `session` rows. The roster validator, project admission allowlist, route handlers, queue, runner gateway, EventV2 journal, cards, activity service, SQLite engine, and migrations are the backend implementations under test.
 
@@ -12,10 +12,10 @@ Run from `packages/server` with Bun 1.3.14 on `PATH`:
 | ------------------------------------------------ | ---: | ----------------------------------------------------------------------------------------------------- |
 | `bun typecheck`                                  |    0 | `tsgo --noEmit` completed.                                                                            |
 | `bun test test/coordination-e2e/smoke.test.ts`   |    0 | 1 pass, 0 fail, 23 assertions.                                                                        |
-| `bun test test/coordination-e2e/suite.test.ts`   |    1 | 8 pass, 1 fail, 1,082 assertions. The failing case is the retained runner-output citation regression. |
+| `bun test test/coordination-e2e/suite.test.ts`   |    1 | 8 pass, 1 fail, 1,083 assertions. The failing case is the retained runner-output citation regression. |
 | `bun test test/coordination.integration.test.ts` |    0 | Existing in-process mock test: 1 pass, 0 fail, 51 assertions.                                         |
 
-The suite log contains `COORDINATION_STRESS_SEED 12648430` and `COORDINATION_STRESS_RESULT {"seed":12648430,"threads":20,"accepted":100,"starts":95,"events":414}`. Five accepted instructions were cancelled while queued. The remaining 95 started and drained after a simulated worker disconnect was removed. The fake recorded one execution start for each accepted start, and event replay converged with terminal Run snapshots. The suite took 86.55 seconds in this run.
+The suite log contains `COORDINATION_STRESS_SEED 12648430` and `COORDINATION_STRESS_RESULT {"seed":12648430,"threads":20,"accepted":100,"starts":95,"events":414}`. Five accepted instructions were cancelled while queued. The remaining 95 started and drained after a simulated worker disconnect was removed. The fake recorded one execution start for each accepted start, and event replay converged with terminal Run snapshots. The suite took 49.07 seconds in this run.
 
 ## Scenario results
 
@@ -38,15 +38,15 @@ The contract uses numeric project sequences and retains historical events. It de
 
 ## Smoke event trace
 
-The trace below is from the passing smoke run at the tested commit. Shared thread `thr_4dcc2935-452e-4762-aea5-113c213fe04d` had Alice's first Run `run_ee8806fe-f37f-4d94-a4ff-4f96819801e1` and Bob's queued Run `run_da38114b-4125-49ec-a7f2-ec676d62fd9c`. Dan used independent thread `thr_ec875397-6138-4d96-9821-e4f900e3da6f`.
+The trace below is from the passing smoke run at the tested commit. Shared thread `thr_5c65c139-9240-4e72-bffb-aa745b6cd749` had Alice's first Run `run_f544b533-58d2-43bd-8227-aed35095e938` and Bob's queued Run `run_64f8a524-b4d0-46ba-a185-8234d054cd45`. Dan used independent thread `thr_245b76ce-d629-4752-a01c-7d7827a38f20`.
 
 | Project seq | Observed event                                                                           |
 | ----------: | ---------------------------------------------------------------------------------------- |
-|        6, 7 | Alice and Bob each commented in the shared thread. No Run existed yet.                   |
+|        6, 7 | Bob and Alice each commented in the shared thread. No Run existed yet.                   |
 |    8, 9, 10 | Alice, Bob, and Carol submitted instructions to that thread in durable acceptance order. |
 |          11 | Dan submitted in the independent thread.                                                 |
-|      12, 13 | Alice's and Dan's Runs were reserved in separate threads.                                |
-|      14, 15 | Both Runs started while Bob and Carol remained queued.                                   |
+|      12, 13 | Alice's Run was reserved and started while Bob and Carol remained queued.                |
+|      14, 15 | Dan's Run was reserved and started in the independent thread.                            |
 |      16, 17 | Alice emitted fixture output; Dan emitted an inert fixture tool event.                   |
 |          18 | Alice's Run completed. Dan's thread was still active.                                    |
 |      19, 20 | Bob's accepted Run was reserved and started in the shared thread.                        |
