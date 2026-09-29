@@ -128,6 +128,25 @@ export function make(input: Dependencies): Lifecycle {
       return row ? yield* load(row) : undefined
     })
 
+  const requireReservation = (run: AuthorizedRun) =>
+    Effect.gen(function* () {
+      const current = yield* input.binding.currentRun(run.command)
+      const lease = Date.parse(current.leaseUntil ?? "")
+      if (
+        current.id !== run.command.runId ||
+        current.threadId !== run.command.threadId ||
+        current.runnerMessageId !== run.command.runnerMessageId ||
+        current.attempt !== run.attempt ||
+        current.executionOwner?.workerId !== run.command.executionOwner.workerId ||
+        current.executionOwner?.instanceId !== run.command.executionOwner.instanceId ||
+        current.state !== "reserved" ||
+        !Number.isFinite(lease) ||
+        lease <= now()
+      )
+        return yield* Effect.fail(failure("conflict", "Coordinator no longer reserves this Run for execution"))
+      return undefined
+    })
+
   const accept: Lifecycle["accept"] = (run) =>
     Effect.gen(function* () {
       yield* input.credentials.verify(run.command.executionOwner)
@@ -149,6 +168,18 @@ export function make(input: Dependencies): Lifecycle {
         return yield* Effect.fail(failure("conflict", "Authorized Run and Session differ"))
       if (!run.command.runnerMessageId.startsWith("msg_") || !run.command.text.trim())
         return yield* Effect.fail(failure("invalid", "Run command has an invalid message ID or empty text"))
+      const existing = yield* input.db
+        .select()
+        .from(ExecutionTable)
+        .where(eq(ExecutionTable.run_id, run.command.runId))
+        .get()
+        .pipe(Effect.orDie)
+      if (existing) {
+        if (!sameCommand(existing.command, run.command) || existing.project_id !== trusted.projectId)
+          return yield* Effect.fail(failure("conflict", "Run ID was reused with a different command"))
+        return yield* load(existing)
+      }
+      yield* requireReservation(trusted)
       const row = yield* input.db
         .transaction((tx) =>
           Effect.gen(function* () {
@@ -450,13 +481,15 @@ export function make(input: Dependencies): Lifecycle {
     })
 
   const cancellationRequested: Lifecycle["cancellationRequested"] = (runId) =>
-    Effect.gen(function* () {
-      const current = yield* get(runId)
-      if (!current) return yield* Effect.fail(failure("not_found", "Local Run is missing"))
-      if (current.phase === "cancelling" || current.phase === "recovery_required" || terminal.has(current.phase))
-        return current
-      return yield* transition({ runId, expected: current.phase, next: "cancelling", callbacks: [] })
-    })
+    starts.withLock(runId)(
+      Effect.gen(function* () {
+        const current = yield* get(runId)
+        if (!current) return yield* Effect.fail(failure("not_found", "Local Run is missing"))
+        if (current.phase === "cancelling" || current.phase === "recovery_required" || terminal.has(current.phase))
+          return current
+        return yield* transition({ runId, expected: current.phase, next: "cancelling", callbacks: [] })
+      }),
+    )
 
   const cancellationObserved: Lifecycle["cancellationObserved"] = ({ runId, result }) =>
     Effect.gen(function* () {
@@ -866,6 +899,9 @@ export function make(input: Dependencies): Lifecycle {
           const status = yield* input.recovery
             .reconcile(command.runnerMessageId)
             .pipe(Effect.catch(() => Effect.succeed("unknown" as const)))
+          const reconciled = yield* get(command.runId)
+          if (reconciled?.phase !== "prepared")
+            return yield* Effect.fail(failure("unavailable", "Prepared Run changed during reconciliation"))
           if (status !== "missing") {
             yield* transition({
               runId: command.runId,
@@ -883,6 +919,7 @@ export function make(input: Dependencies): Lifecycle {
           sessionId: setup.value.session.id,
           artifactBaseline: setup.value.artifactBaseline,
         })
+        yield* requireReservation(run)
         const admission = yield* input.sessions
           .prompt({
             id: SessionMessage.ID.make(command.runnerMessageId),
