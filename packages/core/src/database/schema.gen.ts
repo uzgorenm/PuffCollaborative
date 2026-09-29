@@ -299,6 +299,7 @@ export default {
           \`runtime_id\` text,
           \`admitted_message_id\` text,
           \`artifact_baseline\` text,
+          \`artifact_report\` text,
           \`last_session_seq\` integer,
           \`interrupt_abort\` text,
           \`interrupt_state\` text,

@@ -44,6 +44,7 @@ export const ExecutionTable = sqliteTable(
     runtime_id: text(),
     admitted_message_id: text(),
     artifact_baseline: text({ mode: "json" }).$type<RunnerArtifacts.Baseline>(),
+    artifact_report: text({ mode: "json" }).$type<RunnerArtifacts.Report>(),
     last_session_seq: integer(),
     interrupt_abort: text().$type<"acknowledged" | "unknown" | "not_delivered">(),
     interrupt_state: text().$type<"stopped" | "already_idle" | "uncertain">(),

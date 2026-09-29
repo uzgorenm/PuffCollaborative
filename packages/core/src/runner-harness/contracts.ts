@@ -80,6 +80,7 @@ export interface LocalExecution {
   readonly runtime?: RuntimeIdentity
   readonly admittedMessageId?: string
   readonly artifactBaseline?: RunnerArtifacts.Baseline
+  readonly artifactReport?: RunnerArtifacts.Report
 }
 
 export interface CallbackDraft {
@@ -205,6 +206,7 @@ export interface Lifecycle {
     readonly expected: LocalPhase
     readonly next: LocalPhase
     readonly callbacks: ReadonlyArray<CallbackDraft>
+    readonly artifactReport?: RunnerArtifacts.Report
   }) => Effect.Effect<LocalExecution, Failure>
   readonly approvalRequested: (mapping: ApprovalMapping) => Effect.Effect<LocalExecution, Failure>
   readonly approvalResolved: (result: ApprovalResult) => Effect.Effect<LocalExecution, Failure>
@@ -213,6 +215,8 @@ export interface Lifecycle {
     readonly runId: Coordination.RunID
     readonly result: InterruptionResult
   }) => Effect.Effect<LocalExecution, Failure>
+  /** Rebind a persisted active Run to this process's verified runtime without changing its phase. */
+  readonly reattach: (runId: Coordination.RunID) => Effect.Effect<LocalExecution, Failure>
   readonly runtimeFailed: (input: {
     readonly runId: Coordination.RunID
     readonly runtime: RuntimeIdentity

@@ -169,6 +169,28 @@ describe("runner cancellation control path", () => {
     expect(item.state.execution.phase).toBe("cancelled")
   })
 
+  test("concurrent duplicate does not replace a pending confirmed stop with uncertainty", async () => {
+    const item = fixture()
+    const started = Promise.withResolvers<void>()
+    const stop = Promise.withResolvers<RunnerHarnessContracts.InterruptionResult>()
+    item.state.abort = Effect.promise(() => {
+      started.resolve()
+      return stop.promise
+    })
+
+    const first = Effect.runPromise(item.cancel(item.command))
+    await started.promise
+    await Effect.runPromise(item.cancel(item.command))
+    expect(item.state.calls.filter((call) => call === "intent")).toHaveLength(2)
+    expect(item.state.calls.filter((call) => call === "abort")).toHaveLength(1)
+    expect(item.state.execution.phase).toBe("cancelling")
+
+    stop.resolve(item.stopped)
+    await first
+    expect(item.state.execution.phase).toBe("cancelled")
+    expect(item.state.callbacks).toHaveLength(1)
+  })
+
   test("cancellation during approval invalidates the pending native mapping", async () => {
     const item = fixture("waiting_approval")
     await Effect.runPromise(item.cancel(item.command))
