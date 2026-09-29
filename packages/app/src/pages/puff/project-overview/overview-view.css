@@ -188,7 +188,7 @@
   border-top: 1px solid var(--overview-border);
 }
 
-.puff-overview-agent-list p {
+.puff-overview-agent-list p:not(.puff-overview-muted) {
   display: grid;
   grid-template-columns: 7px minmax(0, 1fr);
   column-gap: 7px;

@@ -23,6 +23,8 @@ export const projects = [
 ]
 
 export const sourceRef = { threadId: "wf02-A", eventId: "wf02-A-find", seq: 4 }
+export const completedSourceRef = { threadId: "wf03-unrelated-db", eventId: "wf03-db-complete", seq: 8 }
+export const completedOutcome = "Mapped migration pages and link destinations; link checks and keyboard access remain untested."
 export const targetThreadId = "wf02-B"
 export const phases = ["source", "admitted", "promoted", "used"] as const
 export const activeBInstruction = {
@@ -83,11 +85,13 @@ function card(
   sourceActivitySeq: number,
   owner: string,
   evidenceRefs: { threadId: string; eventId: string; seq: number }[] = [],
+  status: "active" | "done" = "active",
+  recentVerifiedOutcome: string | null = null,
 ) {
   return {
     id: `card-${threadId}`, projectId, threadId, version: 1, sourceActivitySeq,
-    currentTask: task, progress, blockers: [], status: "active",
-    recentVerifiedOutcome: null, contributors: [user(owner)], evidenceRefs,
+    currentTask: task, progress, blockers: [], status,
+    recentVerifiedOutcome, contributors: [user(owner)], evidenceRefs,
     generatedAt: time, submittedBy: "SIMULATED fixture", updatedAt: time,
     summaryJobId: `synthetic-summary-${threadId}`,
   }
@@ -104,7 +108,7 @@ export function buildData(stage: number) {
     thread("wf02-B", wf02, "B · expanded navigation · target", "alice", stage ? 4 + stage : 3),
     thread("wf03-overlap-A", wf03, "NAV-900 investigation A · possible overlap", "cara", 3),
     thread("wf03-overlap-B", wf03, "NAV-900 investigation B · possible overlap", "drew", 5),
-    thread("wf03-unrelated-db", wf03, "Database migration navigation · unrelated", "cara", 6),
+    thread("wf03-unrelated-db", wf03, "Map database migration navigation · complete", "cara", 8),
     thread("wf03-unrelated-ui", wf03, "Project UI navigation · unrelated", "drew", 7),
   ]
   const events = [
@@ -126,6 +130,7 @@ export function buildData(stage: number) {
     ] }),
     event("wf03-db-prompt", wf03, "wf03-unrelated-db", 6, "run.output", "SIMULATED: summarize navigation between the project's database schema migrations.", "cara"),
     event("wf03-ui-prompt", wf03, "wf03-unrelated-ui", 7, "run.output", "SIMULATED: summarize navigation between projects in the user interface.", "drew"),
+    event("wf03-db-complete", wf03, "wf03-unrelated-db", 8, "run.output", "SIMULATED completed result: mapped database migration pages and link destinations. Remaining work: Check migration links and Test migration keyboard access. These checks have not been done.", "cara", { completion: "simulated_reported" }),
   ]
   const wf02MilestoneEvents = [
     event("wf02-B-admitted", wf02, "wf02-B", 5, "work-card.updated", "SIMULATED admission only: source-linked NAV-742 input is durably staged for B; B has not seen or used it.", "alice", { milestone: "admitted", sourceRef }),
@@ -150,7 +155,7 @@ export function buildData(stage: number) {
     "wf03-overlap-B": card("wf03-overlap-B", wf03, "Investigate NAV-900 search-filter reset", "SIMULATED tentative likely overlap; comparison suggested, no stop or merge.", 5, "drew", [
       { threadId: "wf03-overlap-B", eventId: "wf03-overlap-review", seq: 5 },
     ]),
-    "wf03-unrelated-db": card("wf03-unrelated-db", wf03, "Navigate database schema migrations", "SIMULATED unrelated to project UI navigation; no shared finding.", 6, "cara"),
+    "wf03-unrelated-db": card("wf03-unrelated-db", wf03, "Map database migration navigation", "SIMULATED reported complete: mapped migration pages and links; checks remain.", 8, "cara", [completedSourceRef], "done", completedOutcome),
     "wf03-unrelated-ui": card("wf03-unrelated-ui", wf03, "Navigate projects in the user interface", "SIMULATED unrelated to database migrations; no shared finding.", 7, "drew"),
   }
   return { threads, events, cards }

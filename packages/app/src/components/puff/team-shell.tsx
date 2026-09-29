@@ -129,6 +129,15 @@ export function TeamShell(props: ParentProps) {
             <span>{language.t("puff.team.newSession")}</span>
           </button>
         </Show>
+        <Show when={team.state.simulation?.taskStart}>
+          {(start) => <button type="button" class="team-new" onClick={async () => {
+            if (team.state.projectId !== start().projectId) await team.chooseProject(start().projectId)
+            navigate("/puff?new-task=1")
+          }}>
+            <span aria-hidden="true">＋</span>
+            <span>{language.t("puff.simulation.taskStart.newTask")}</span>
+          </button>}
+        </Show>
         <div class="team-rail-body" inert={!team.state.sidebar}>
           <div class="team-section-heading team-projects-heading">{language.t("puff.team.rail.projects")}</div>
           <Show when={team.state.connected}>
