@@ -1,0 +1,99 @@
+{
+  "synthetic": true,
+  "name": "deliberate_alternatives",
+  "projectId": "synthetic-puff",
+  "sessions": [
+    {
+      "workerId": "worker-compact",
+      "sessionId": "compact",
+      "ownerId": "demo-owner",
+      "title": "compact experiment",
+      "featureTopic": "navigation",
+      "relationship": "alternative",
+      "shared": true
+    },
+    {
+      "workerId": "worker-full",
+      "sessionId": "full",
+      "ownerId": "demo-owner",
+      "title": "full experiment",
+      "featureTopic": "navigation",
+      "relationship": "alternative",
+      "shared": true
+    }
+  ],
+  "events": [
+    {
+      "eventId": "compact-1",
+      "projectId": "synthetic-puff",
+      "workerId": "worker-compact",
+      "sessionId": "compact",
+      "revision": 1,
+      "kind": "status",
+      "occurredAt": "2026-09-29T18:00:01Z",
+      "content": {
+        "transition": "started",
+        "actorId": "demo-owner",
+        "instructionId": "nav",
+        "objective": "Explore navigation",
+        "approach": "Compact navigation",
+        "currentStep": "Build compact menu"
+      }
+    },
+    {
+      "eventId": "full-1",
+      "projectId": "synthetic-puff",
+      "workerId": "worker-full",
+      "sessionId": "full",
+      "revision": 1,
+      "kind": "status",
+      "occurredAt": "2026-09-29T18:00:01Z",
+      "content": {
+        "transition": "started",
+        "actorId": "demo-owner",
+        "instructionId": "nav-full",
+        "objective": "Explore navigation",
+        "approach": "Full navigation",
+        "currentStep": "Build full menu"
+      }
+    }
+  ],
+  "expectedCards": {
+    "compact": {
+      "objective": "Explore navigation",
+      "approach": "Compact navigation",
+      "status": "running",
+      "revision": 1
+    },
+    "full": {
+      "approach": "Full navigation",
+      "status": "running",
+      "revision": 1
+    }
+  },
+  "classifications": [
+    "meaningful_progress",
+    "meaningful_progress"
+  ],
+  "expectedRefresh": [
+    true,
+    true
+  ],
+  "expectedRelation": "deliberate_alternatives",
+  "workers": [
+    {
+      "workerId": "worker-compact",
+      "projectId": "synthetic-puff",
+      "ownerId": "demo-owner",
+      "lastSeenAt": "2026-09-29T18:00:00Z",
+      "state": "online"
+    },
+    {
+      "workerId": "worker-full",
+      "projectId": "synthetic-puff",
+      "ownerId": "demo-owner",
+      "lastSeenAt": "2026-09-29T18:00:00Z",
+      "state": "online"
+    }
+  ]
+}
