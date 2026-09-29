@@ -97,6 +97,7 @@ export function make(input: Dependencies): Interface {
     const relative = path.relative(parent, child)
     return !relative || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
   }
+  const lockKey = (directory: string) => `runner-workspace:${directory}`
 
   const cleanPath = (value: string, label: string) => {
     if (!path.isAbsolute(value) || value !== path.resolve(value) || /[\x00-\x1f]/.test(value))
@@ -334,7 +335,7 @@ export function make(input: Dependencies): Interface {
               return yield* Effect.fail(failure("conflict", "Thread is bound to another Session or worker"))
             return workspace
           }),
-          `runner-workspace:${directory}:${workspace.threadId}`,
+          lockKey(directory),
           path.join(directory, ".locks"),
         )
         .pipe(Effect.mapError(convert))
@@ -387,11 +388,7 @@ export function make(input: Dependencies): Interface {
     Effect.gen(function* () {
       const directory = yield* root
       return yield* input.flock
-        .withLock(
-          inspectLocked(threadId, directory),
-          `runner-workspace:${directory}:${threadId}`,
-          path.join(directory, ".locks"),
-        )
+        .withLock(inspectLocked(threadId, directory), lockKey(directory), path.join(directory, ".locks"))
         .pipe(Effect.mapError(convert))
     })
 
@@ -430,7 +427,7 @@ export function make(input: Dependencies): Interface {
               .pipe(Effect.orDie)
             return true
           }),
-          `runner-workspace:${directory}:${request.threadId}`,
+          lockKey(directory),
           path.join(directory, ".locks"),
         )
         .pipe(Effect.mapError(convert))

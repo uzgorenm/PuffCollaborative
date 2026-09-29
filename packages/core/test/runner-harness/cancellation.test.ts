@@ -219,18 +219,13 @@ describe("runner cancellation control path", () => {
 
   test("a scoped tool outlasting abort acknowledgment blocks cancellation confirmation", async () => {
     const item = fixture()
-    const tool = Promise.withResolvers<void>()
-    let active = true
-    const runningTool = tool.promise.finally(() => {
-      active = false
-    })
-    item.state.inspect = Effect.sync(() => ({ ...item.idle, activeTools: active ? 1 : 0 }))
+    const tool = Bun.spawn(["sleep", "2"], { stdout: "ignore", stderr: "ignore" })
+    item.state.inspect = Effect.sync(() => ({ ...item.idle, activeTools: tool.exitCode === null ? 1 : 0 }))
     await Effect.runPromise(item.cancel(item.command))
     expect(item.state.execution.phase).toBe("recovery_required")
     expect(item.state.observations[0]?.abort).toBe("acknowledged")
-    expect(active).toBe(true)
-    tool.resolve()
-    await runningTool
+    expect(tool.exitCode).toBeNull()
+    await tool.exited
   })
 
   test("wrong Session is rejected before cancellation intent or abort", async () => {

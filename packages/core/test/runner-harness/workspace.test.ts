@@ -213,6 +213,47 @@ describe("runner workspaces (disposable Git repositories)", () => {
     )
   })
 
+  test("competing Threads cannot create two worktrees for one Session", async () => {
+    await using tmp = await tmpdir()
+    const source = await repository(tmp.path)
+    await withWorkspace(tmp.path, ({ db, project, flock }) =>
+      Effect.gen(function* () {
+        const projectId = (yield* project.resolve(AbsolutePath.make(source.directory))).id
+        const root = path.join(tmp.path, "workspaces")
+        const a = Coordination.ThreadID.make("thr_first")
+        const b = Coordination.ThreadID.make("thr_second")
+        const first = run(projectId, a, target(root, projectId, a))
+        const second = run(projectId, b, target(root, projectId, b), "second")
+        const competing = {
+          ...second,
+          command: { ...second.command, sessionId: first.command.sessionId },
+          session: Session.Info.make({ ...second.session, id: first.session.id }),
+        }
+        const workspace = RunnerWorkspaces.make({
+          db,
+          project,
+          flock,
+          root,
+          sources: { [projectId]: { repository: source.directory, baseRevision: source.revision } },
+          activity: () => Effect.succeed("idle"),
+        })
+        const results = yield* Effect.all(
+          [first, competing].map((item) =>
+            workspace.ensure(item).pipe(
+              Effect.as(true as const),
+              Effect.catch((error) => Effect.succeed(error)),
+            ),
+          ),
+          { concurrency: 2 },
+        )
+        expect(results.filter((result) => result === true)).toHaveLength(1)
+        expect(results.find((result) => result !== true)).toMatchObject({ code: "conflict" })
+        const entries = yield* Effect.promise(() => fs.readdir(root, { withFileTypes: true }))
+        expect(entries.filter((entry) => entry.isDirectory() && entry.name !== ".locks")).toHaveLength(1)
+      }),
+    )
+  })
+
   test("rejects invalid repository paths, Thread IDs, and a foreign directory at the assigned path", async () => {
     await using tmp = await tmpdir()
     const source = await repository(tmp.path)
