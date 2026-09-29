@@ -111,9 +111,10 @@ is a stretch feature; ongoing awareness is the core demo.
 - [Feature scope, acceptance criteria, and shared contracts](docs/hackathon/mvp-spec.md)
 - [README review against the original idea](docs/hackathon/README-review.md)
 
-Everyone works on **`main`**, the default branch. Commit and push verified work
-directly to `main`; **no PRs or feature branches**. Each person uses a separate
-local clone and integrates incoming commits before pushing. Never force-push.
+**Updated workflow:** work on separate teammate branches and combine them later.
+`main` remains the default integration branch; Serdar's prepared branch is
+`serdar/ui`. Push verified work to your named branch. No automatic merges or PRs.
+Use separate checkouts and never force-push. See [Serdar's setup and agent prompts](docs/hackathon/serdar-agent-prompts.md).
 
 ## Features
 

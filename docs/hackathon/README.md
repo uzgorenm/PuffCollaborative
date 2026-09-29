@@ -39,9 +39,9 @@ Read the [feature acceptance criteria](mvp-spec.md) and [workflow cases](accepta
 
 ## Shared workflow
 
-- **One default branch: main. No PRs or feature branches.** Use a separate local clone for each person.
+- **Updated instruction: separate teammate branches; combine them later.** `main` remains the default integration branch. Serdar uses `serdar/ui` in a separate checkout; see [setup and agent prompts](serdar-agent-prompts.md).
 - Read this board and your task checklist before editing. Respect the file boundaries; Serhat owns shared schemas and root dependency changes, and Serdar owns shared UI entry points.
-- Make small, working commits. Verify your slice, fetch origin/main, merge incoming commits, rerun any affected checks, and push to main. Never force-push.
+- Make small, working commits. Verify your slice and push your named branch. Integrate teammate branches when the team asks; no automatic merge to main or PR. Never force-push.
 - Update this board and the [progress checklist](progress-checklist.md) with a named gate/case and evidence receipt in the same commit as meaningful progress. Preserve other owners' status updates when integrating.
 - GitHub Issues is disabled. This page is the task board; the spec is the feature list and contract reference.
 

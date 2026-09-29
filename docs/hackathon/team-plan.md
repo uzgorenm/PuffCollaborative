@@ -19,7 +19,7 @@
 - Reuse the existing UI/runtime/database. No extra agent framework, replacement frontend, local Ollama setup or new database service.
 - Use selected synthetic sessions for the demo. Never put credentials in source, logs, URLs, browser bundles, fixtures or FAB contents. Flower uses runtime-provided model access.
 - The target session's existing runner retains tool permissions and workspace ownership. No second model loop or arbitrary remote shell endpoint.
-- Main is the only shared development branch. Commit verified owned work, fetch/integrate incoming main and push normally. No PRs, feature branches, force-pushes or resetting another person's changes.
+- Updated branch workflow: each teammate works in a separate checkout on a named branch and pushes verified owned work there. Serdar uses `serdar/ui`. Combine branches later at the team's request; no automatic merge to main, PR, force-push or resetting another person's changes. This supersedes the original main-only plan.
 - Product behavior comes from the spec/workflows. Shared implementation signatures come from Serhat's [coordination contract](../coordination-contract.md), schemas and registered API. The earlier `/puff/v1`/standalone JSON-hub design is superseded as an implementation direction; do not create another backend to satisfy a provisional UI adapter.
 
 ## Ownership and first usable handoff
