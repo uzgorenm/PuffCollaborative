@@ -282,6 +282,9 @@ export default function TeamThreadPage() {
               void team.send()
             }}
           >
+            <Show when={team.state.simulation}>
+              <div class="team-pending-note" role="status">{language.t("puff.simulation.readOnly")}</div>
+            </Show>
             <Show when={pending() && !team.state.action}>
               <div class="team-pending-note" role="status">
                 {language.t("puff.team.unconfirmed")}
@@ -294,7 +297,7 @@ export default function TeamThreadPage() {
               )}
               value={draft().text}
               onInput={(event) => updateDraft(event.currentTarget.value)}
-              disabled={!team.state.connected || !!pending()}
+              disabled={!team.state.connected || !!pending() || !!team.state.simulation}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.isComposing) {
                   event.preventDefault()
@@ -308,7 +311,7 @@ export default function TeamThreadPage() {
                 <span class="team-sr-only">{language.t("puff.team.messageType")}</span>
                 <select
                   value={draft().kind}
-                  disabled={!!pending()}
+                  disabled={!!pending() || !!team.state.simulation}
                   onChange={(event) =>
                     updateDraft(draft().text, event.currentTarget.value as "instruction" | "comment")
                   }

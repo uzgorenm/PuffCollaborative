@@ -90,10 +90,12 @@ export function TeamShell(props: ParentProps) {
             ◧
           </button>
         </div>
-        <button type="button" class="team-new" onClick={createSession} title={language.t("puff.team.newSession")}>
-          <span aria-hidden="true">＋</span>
-          <span>{language.t("puff.team.newSession")}</span>
-        </button>
+        <Show when={!team.state.simulation}>
+          <button type="button" class="team-new" onClick={createSession} title={language.t("puff.team.newSession")}>
+            <span aria-hidden="true">＋</span>
+            <span>{language.t("puff.team.newSession")}</span>
+          </button>
+        </Show>
         <div class="team-rail-body" inert={!team.state.sidebar}>
           <label class="team-search">
             <span aria-hidden="true">⌕</span>
@@ -104,17 +106,19 @@ export function TeamShell(props: ParentProps) {
               onInput={(event) => setFilter("text", event.currentTarget.value)}
             />
           </label>
-          <div class="team-section-heading">{language.t("puff.team.yours")}</div>
-          <For each={global.servers.list()}>
-            {(conn) => {
-              const ctx = global.ensureServerCtx(conn)
-              return (
-                <QueryClientProvider client={ctx.queryClient}>
-                  <PersonalSessions ctx={ctx} conn={conn} filter={filter.text} labels={identityLabels()} />
-                </QueryClientProvider>
-              )
-            }}
-          </For>
+          <Show when={!team.state.simulation}>
+            <div class="team-section-heading">{language.t("puff.team.yours")}</div>
+            <For each={global.servers.list()}>
+              {(conn) => {
+                const ctx = global.ensureServerCtx(conn)
+                return (
+                  <QueryClientProvider client={ctx.queryClient}>
+                    <PersonalSessions ctx={ctx} conn={conn} filter={filter.text} labels={identityLabels()} />
+                  </QueryClientProvider>
+                )
+              }}
+            </For>
+          </Show>
           <div class="team-section-heading team-shared-heading">
             <span>{language.t("puff.team.shared")}</span>
             <span class="team-mini-count">{team.state.threads.length || "—"}</span>
@@ -139,7 +143,10 @@ export function TeamShell(props: ParentProps) {
               <span class="team-sr-only">{language.t("puff.team.project")}</span>
               <select
                 value={team.state.projectId}
-                onChange={(event) => void team.loadProject(event.currentTarget.value)}
+                onChange={(event) => {
+                  void team.chooseProject(event.currentTarget.value)
+                  if (team.state.simulation) navigate("/puff")
+                }}
               >
                 <For each={team.state.projects}>{(project) => <option value={project.id}>{project.name}</option>}</For>
               </select>
@@ -241,6 +248,12 @@ export function TeamShell(props: ParentProps) {
           "team-local-context-open": !!localTarget() && team.state.context,
         }}
       >
+        <Show when={team.state.simulation}>
+          <div class="team-simulation-banner" role="status">
+            <strong>{language.t("puff.simulation.banner")}</strong>
+            <span>{language.t("puff.simulation.bannerDetail")}</span>
+          </div>
+        </Show>
         <Show when={localTarget()}>
           <div class="team-local-toolbar">
             <span>{language.t("puff.team.codingSession")}</span>

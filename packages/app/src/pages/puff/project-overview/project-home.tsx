@@ -14,6 +14,8 @@ import { useTeam } from "../team-context"
 import { teamEventText } from "../team-state"
 import { buildProjectOverview } from "./overview-model"
 import { ProjectOverviewView, type OverviewCopyKey, type PrivateSession, type SourceRef } from "./overview-view"
+import { SimulationGuide } from "./simulation-guide"
+import { scenarioForProject } from "./simulation-contract"
 
 type OtherSession = PrivateSession & { serverKey: ReturnType<typeof ServerConnection.key>; directory: string }
 
@@ -44,8 +46,9 @@ export function ProjectHome() {
   onCleanup(() => clearInterval(interval))
 
   const [local] = createResource(
-    () => global.servers.list().map((server) => ServerConnection.key(server)).join("|"),
+    () => JSON.stringify([!!team.state.simulation, global.servers.list().map((server) => ServerConnection.key(server))]),
     async (): Promise<OtherSession[]> => {
+      if (team.state.simulation) return []
       const servers = global.servers.list()
       const results = await Promise.allSettled(servers.map(async (server) => {
         const ctx = global.ensureServerCtx(server)
@@ -100,8 +103,13 @@ export function ProjectHome() {
     tabs.select(tabs.addSessionTab({ server: entry.serverKey, sessionId: entry.id }))
   }
   const inspect = (ref: SourceRef) => {
-    if (!view()?.sessions.some((session) => session.thread.id === ref.threadId &&
-      session.card?.evidenceRefs.some((item) => item.threadId === ref.threadId && item.eventId === ref.eventId && item.seq === ref.seq))) return
+    const citedByCard = view()?.sessions.some((session) => session.thread.id === ref.threadId &&
+      session.card?.evidenceRefs.some((item) => item.threadId === ref.threadId && item.eventId === ref.eventId && item.seq === ref.seq))
+    const demo = team.state.simulation
+    const source = demo?.wf02?.sourceRef
+    const citedByDemo = demo && scenarioForProject(demo, team.state.projectId)?.id === "wf02" &&
+      source?.threadId === ref.threadId && source.eventId === ref.eventId && source.seq === ref.seq
+    if (!citedByCard && !citedByDemo) return
     void peek.inspect(ref, team.state.projectId, document.activeElement instanceof HTMLElement ? document.activeElement : undefined)
     queueMicrotask(() => closeSourceButton?.focus())
   }
@@ -113,9 +121,26 @@ export function ProjectHome() {
         <h1>{t("connectTitle")}</h1>
         <p>{t("connectHint")}</p>
         <button type="button" onClick={() => void dialog.show(() => <TeamConnection team={team} />)}>{t("connectAction")}</button>
+        <button type="button" onClick={() => void team.connect("http://127.0.0.1:4187", "alice", "demo-alice")}>{language.t("puff.simulation.connect")}</button>
+        <p>{language.t("puff.simulation.connectHint")}</p>
+        <Show when={team.state.error}><p role="alert">{language.t(`puff.${team.state.error || "request"}`)}</p></Show>
       </main>
     }>
       <Show when={team.state.projectId} fallback={<main class="team-conversation-empty team-welcome"><h1>{t("title")}</h1><p>{t("noProject")}</p></main>}>
+        <Show when={team.state.simulation}>
+          {(manifest) => <SimulationGuide
+            manifest={manifest()}
+            projectId={team.state.projectId}
+            busy={!!team.state.simulationAction}
+            error={!!team.state.simulationError}
+            operator={team.state.simulationOperator}
+            onSelect={(id) => void team.chooseProject(id)}
+            onAdvance={() => void team.advanceSimulation()}
+            onReset={() => void team.resetSimulation()}
+            onInspect={inspect}
+            onOpenTarget={(id) => navigate(`/puff/thread/${encodeURIComponent(id)}`)}
+          />}
+        </Show>
         <Show when={view()} fallback={
           <main class="team-conversation-empty team-welcome" role="status">
             <h1>{t("title")}</h1>
@@ -126,12 +151,15 @@ export function ProjectHome() {
           {(value) => <>
             <ProjectOverviewView
               view={value()}
-              privateSessions={other()}
+              privateSessions={team.state.simulation ? [] : other()}
               related={[]}
               t={t}
               onInspect={inspect}
               onOpenShared={(id) => navigate(`/puff/thread/${encodeURIComponent(id)}`)}
               onOpenPrivate={openOther}
+              actorLabel={team.state.simulation ? (id) =>
+                team.state.simulation?.actors.find((actor) => actor.userId === id)?.displayName ?? language.t("puff.simulation.unknownActor")
+              : undefined}
             />
             <Show when={peekView.source.status !== "closed"}>
               <aside class="puff-overview-peek" role="region" aria-label={language.t("puff.team.sourceEvent")} onKeyDown={(event) => {

@@ -2,6 +2,8 @@
   --overview-border: color-mix(in srgb, var(--text-base) 12%, transparent);
   --overview-quiet: var(--text-weak);
   height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: clamp(18px, 3vw, 42px);
   color: var(--text-base);

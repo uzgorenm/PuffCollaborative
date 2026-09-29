@@ -31,6 +31,7 @@ export function ProjectOverviewView(props: {
   onContinue?: (threadId: string) => void
   onReuse?: (threadId: string) => void
   onSeparate?: (threadId: string) => void
+  actorLabel?: (id: string) => string
 }) {
   const execution = (state: Coordination.RunState | "unknown"): OverviewCopyKey => ({
     queued: "executionQueued", reserved: "executionReserved", running: "executionRunning",
@@ -74,7 +75,7 @@ export function ProjectOverviewView(props: {
               <For each={props.view.people}>
                 {(person) => (
                   <article class="puff-overview-person">
-                    <header><span class="puff-overview-avatar" aria-hidden="true">{person.userId.replace(/^usr_/, "").slice(0, 2).toUpperCase()}</span><h3>{person.userId}</h3></header>
+                    <header><span class="puff-overview-avatar" aria-hidden="true">{person.userId.replace(/^usr_/, "").slice(0, 2).toUpperCase()}</span><h3>{props.actorLabel?.(person.userId) ?? person.userId}</h3></header>
                     <div class="puff-overview-focus">
                       <span class="puff-overview-label">{props.t("statedFocus")}</span>
                       <p>{person.statedFocus?.text ?? props.t("noFocus")}</p>
@@ -112,7 +113,7 @@ export function ProjectOverviewView(props: {
                         <span class="puff-overview-pill">{session.freshness === "stale" ? props.t("stale") : session.card ? props.t(work(session.card.status)) : props.t("noSummary")}</span>
                       </div>
                       <div class="puff-overview-meta">
-                        <span>{session.ownerId ? props.t("ownerLabel", { owner: session.ownerId }) : props.t("startedByLabel", { creator: session.thread.createdBy })}</span>
+                        <span>{session.ownerId ? props.t("ownerLabel", { owner: props.actorLabel?.(session.ownerId) ?? session.ownerId }) : props.t("startedByLabel", { creator: props.actorLabel?.(session.thread.createdBy) ?? session.thread.createdBy })}</span>
                         <span>{props.t(execution(session.execution))}</span>
                         <span>{props.t(session.freshness === "current" ? "current" : session.freshness === "stale" ? "stale" : "noSummary")}</span>
                         <time dateTime={session.card?.updatedAt ?? session.thread.createdAt}>{new Date(session.card?.updatedAt ?? session.thread.createdAt).toLocaleString()}</time>

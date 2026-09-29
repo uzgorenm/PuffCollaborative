@@ -292,6 +292,21 @@
   flex-direction: column;
   overflow: hidden;
 }
+.team-simulation-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 9px 18px;
+  border-bottom: 1px solid color-mix(in srgb, #d19b4c 42%, transparent);
+  background: color-mix(in srgb, #d19b4c 19%, var(--background-base));
+  font-size: 12px;
+  line-height: 1.35;
+}
+.team-simulation-banner strong {
+  font-size: 11px;
+  letter-spacing: .09em;
+}
 .team-collapsed .team-logo,
 .team-collapsed .team-new > span:last-child,
 .team-collapsed .team-connection-button > span:last-of-type,

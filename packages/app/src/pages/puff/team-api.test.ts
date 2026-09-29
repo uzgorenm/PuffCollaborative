@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { createTeamApi } from "./team-api"
 import { Coordination } from "@opencode-ai/schema/coordination"
+import { validSimulationManifest } from "./project-overview/simulation-contract"
 
 test("team_client_uses_current_basic_contract_and_never_supplies_an_actor", async () => {
   const calls: { url: string; body: unknown; auth: string | null }[] = []
@@ -129,6 +130,60 @@ test("project_overview_rejects_cross_project_and_malformed_reads", async () => {
   })
   await expect(api.project("project/one")).rejects.toMatchObject({ code: "invalid" })
   await expect(api.workCards("project/one")).rejects.toMatchObject({ code: "invalid" })
+})
+
+const simulated = {
+  simulated: true, mode: "synthetic", label: "SIMULATED", selectedScenarioId: "wf01",
+  scenarios: ["wf01", "wf02", "wf03"].map((id) => ({
+    id, projectId: `sim-${id}`, title: id, classification: "alternative", summary: id, threadIds: [],
+    ...(id === "wf01" ? { privateSessionExcluded: true } : {}),
+    ...(id === "wf03" ? { comparisons: [
+      { id: "overlap", classification: "likely_overlap", threadIds: [], finding: "Tentative overlap" },
+      { id: "unrelated", classification: "none", threadIds: [], finding: null },
+    ] } : {}),
+  })),
+  actors: [],
+  wf02: { stage: 0, phase: "source", sourceRef: { threadId: "wf02-A", eventId: "finding", seq: 4 }, targetThreadId: "wf02-B",
+    milestones: ["source", "admitted", "promoted", "used"].map((phase, index) => ({
+      phase, state: index === 0 ? "simulated_current" : "simulated_future", receiptId: phase,
+      observedAt: index === 0 ? "2026-09-29T19:00:00Z" : null,
+      sourceRef: { threadId: "wf02-A", eventId: "finding", seq: 4 }, targetThreadId: "wf02-B",
+    })) },
+}
+
+test("simulation_probe_requires_an_explicit_marker_and_keeps_a_missing_route_live", async () => {
+  const config = { baseUrl: "http://127.0.0.1:4187", username: "alice", password: "demo-alice" }
+  const demo = createTeamApi({ ...config, transport: async () => Response.json(simulated) })
+  expect(validSimulationManifest((await demo.simulation())!)).toBe(true)
+  const live = createTeamApi({ ...config, transport: async () => new Response(null, { status: 404 }) })
+  expect(await live.simulation()).toBeUndefined()
+  const malformed = createTeamApi({ ...config, transport: async () => Response.json({ ...simulated, simulated: false }) })
+  await expect(malformed.simulation()).rejects.toMatchObject({ code: "invalid" })
+  const premature = createTeamApi({ ...config, transport: async () => Response.json({
+    ...simulated,
+    wf02: { ...simulated.wf02, milestones: simulated.wf02.milestones.map((item, index) =>
+      index === 2 ? { ...item, observedAt: "2026-09-29T19:00:00Z" } : item) },
+  }) })
+  await expect(premature.simulation()).rejects.toMatchObject({ code: "invalid" })
+})
+
+test("simulation_controls_send_only_demo_post_routes_and_decode_each_manifest", async () => {
+  const calls: { path: string; method: string; body: unknown }[] = []
+  const api = createTeamApi({
+    baseUrl: "http://127.0.0.1:4187", username: "alice", password: "demo-alice",
+    transport: async (url, init) => {
+      calls.push({ path: new URL(url).pathname, method: init.method ?? "", body: JSON.parse(String(init.body)) })
+      return Response.json(simulated)
+    },
+  })
+  await api.selectSimulation("wf02")
+  await api.advanceSimulation()
+  await api.resetSimulation()
+  expect(calls).toEqual([
+    { path: "/api/coordination/v1/simulation/select", method: "POST", body: { scenarioId: "wf02" } },
+    { path: "/api/coordination/v1/simulation/wf02/advance", method: "POST", body: {} },
+    { path: "/api/coordination/v1/simulation/reset", method: "POST", body: {} },
+  ])
 })
 
 test("source_resolves_only_the_exact_authenticated_project_event", async () => {

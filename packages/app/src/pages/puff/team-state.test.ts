@@ -81,6 +81,7 @@ function service(
     if (response !== undefined) return response
     if (path === "/projects")
       return Response.json([{ id: "prj_test", name: "Project", createdBy: "alice", createdAt: "2026-09-29T19:00:00Z" }])
+    if (path === "/simulation") return new Response(null, { status: 404 })
     if (path === "/projects/prj_test/threads") return Response.json([thread()])
     if (path.startsWith("/threads/") && path.includes("/events?"))
       return Response.json({ events: [], cursor: 0, hasMore: false })
@@ -88,6 +89,27 @@ function service(
     throw new Error(`Unexpected test request: ${path}`)
   }
 }
+
+const demoManifest = (stage = 0) => ({
+  simulated: true, mode: "synthetic", label: "SIMULATED", selectedScenarioId: "wf01",
+  scenarios: ["wf01", "wf02", "wf03"].map((id) => ({
+    id, projectId: `sim-${id}`, title: `Scenario ${id}`, classification: "alternative",
+    summary: `Summary ${id}`, threadIds: [],
+    ...(id === "wf01" ? { privateSessionExcluded: true } : {}),
+    ...(id === "wf03" ? { comparisons: [
+      { id: "overlap", classification: "likely_overlap", threadIds: [], finding: "Tentative overlap" },
+      { id: "unrelated", classification: "none", threadIds: [], finding: null },
+    ] } : {}),
+  })),
+  actors: [],
+  wf02: { stage, phase: ["source", "admitted", "promoted", "used"][stage],
+    sourceRef: { threadId: "wf02-A", eventId: "finding", seq: 4 }, targetThreadId: "wf02-B",
+    milestones: ["source", "admitted", "promoted", "used"].map((phase, index) => ({
+      phase, state: index < stage ? "simulated_observed" : index === stage ? "simulated_current" : "simulated_future",
+      receiptId: phase, observedAt: index <= stage ? "2026-09-29T19:00:00Z" : null,
+      sourceRef: { threadId: "wf02-A", eventId: "finding", seq: 4 }, targetThreadId: "wf02-B",
+    })) },
+})
 
 // Drain only promise continuations; no wall-clock sleeps or live service requests.
 async function settle() {
@@ -234,6 +256,53 @@ test("overview_inspects_an_exact_non_conversation_source_without_changing_the_ta
   expect(await team.resolveOverviewSource(card.evidenceRefs[0]!, new AbortController().signal)).toEqual(cited)
   expect(team.state.threadId).toBe("a")
   expect(team.state.drafts.a?.text).toBe("Keep this draft")
+  team.dispose()
+})
+
+test("simulated_connection_is_explicit_and_disables_real_instruction_controls", async () => {
+  const team = await connected(service((path) => path === "/simulation" ? Response.json(demoManifest()) : undefined))
+  expect(team.state.simulation?.label).toBe("SIMULATED")
+  team.selectThread("a")
+  await settle()
+  expect(team.writable()).toBe(false)
+  team.dispose()
+})
+
+test("simulation_stage_and_reset_controls_refresh_only_the_declared_demo", async () => {
+  let stage = 0
+  const calls: string[] = []
+  const team = await connected(service((path) => {
+    if (path === "/simulation") return Response.json(demoManifest(stage))
+    if (path === "/simulation/wf02/advance") { calls.push(path); return Response.json(demoManifest(++stage)) }
+    if (path === "/simulation/reset") { calls.push(path); stage = 0; return Response.json(demoManifest()) }
+    return
+  }))
+  await team.advanceSimulation()
+  expect(team.state.simulation?.wf02?.phase).toBe("admitted")
+  await team.resetSimulation()
+  expect(team.state.simulation?.wf02?.stage).toBe(0)
+  expect(calls).toEqual(["/simulation/wf02/advance", "/simulation/reset"])
+  team.dispose()
+})
+
+test("a_nonoperator_can_switch_between_authorized_simulated_projects_without_demo_mutation", async () => {
+  const calls: string[] = []
+  const manifest = { ...demoManifest(), scenarios: demoManifest().scenarios.slice(0, 2) }
+  const team = createTeamController(service((path) => {
+    if (path === "/projects") return Response.json(manifest.scenarios.map((scenario) => ({
+      id: scenario.projectId, name: scenario.title, createdBy: "alice", createdAt: "2026-09-29T19:00:00Z",
+    })))
+    if (path === "/simulation") return Response.json(manifest)
+    if (path === "/projects/sim-wf01/threads" || path === "/projects/sim-wf02/threads") return Response.json([])
+    if (path.startsWith("/simulation/")) { calls.push(path); return Response.json(manifest) }
+    return
+  }))
+  expect(await team.connect("http://127.0.0.1:4187", "bob", "demo-bob")).toBe(true)
+  expect(team.state.simulationOperator).toBe(false)
+  await team.chooseProject("sim-wf02")
+  expect(team.state.projectId).toBe("sim-wf02")
+  expect(await team.advanceSimulation()).toBe(false)
+  expect(calls).toEqual([])
   team.dispose()
 })
 
