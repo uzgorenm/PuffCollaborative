@@ -4,6 +4,11 @@ This is the team's shared task board and feature-status page. Detailed implement
 
 ## Our tasks
 
+**Ownership check pending:** The latest root README assigns Serhat to the shared
+server and leaves the OpenCode role unnamed. The earlier assignments below and in
+the detailed plan have Serhat on OpenCode and Ferit on the server. Confirm this
+possible swap before starting either workstream; Serdar and Talha are unchanged.
+
 | Task | Owner | Deliverable | Status | Verified commit / blocker |
 | --- | --- | --- | --- | --- |
 | T1 — OpenCode adapter | Serhat | Export selected session activity; deliver approved context to the correct existing session once. | Planned | No merged implementation verified yet. |

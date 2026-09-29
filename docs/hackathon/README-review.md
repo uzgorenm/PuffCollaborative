@@ -1,6 +1,6 @@
 # README review against the team's original goals
 
-Reviewed September 29, 2026 against [Serhat's README at aff8de5](https://github.com/uzgorenm/PuffCollaborative/blob/aff8de5ca03c75385458762e71f4476838f6d99d/README.md). At review time, the local checkout still had the older upstream README and the fork differed from upstream in README.md only. The new main branch starts from aff8de5, preserving that README before adding this planning work. Described product features remain proposed.
+Reviewed September 29, 2026 against [Serhat's README at aff8de5](https://github.com/uzgorenm/PuffCollaborative/blob/aff8de5ca03c75385458762e71f4476838f6d99d/README.md). At review time, the local checkout still had the older upstream README and the fork differed from upstream in README.md only. The new main branch starts from aff8de5, preserving that README before adding this planning work. The coverage column below records that original review, not the current README. Described product features remain proposed.
 
 ## What is already covered
 
@@ -23,17 +23,17 @@ Shared project threads; visibility into activity and blockers; relevant context 
 | Account for stale knowledge and failures | Not specified | Version summaries; show last-seen time; mark disconnected workers; invalidate proposals when referenced versions change. |
 | Fit four people and 5–6 hours | Broad feature list | One fixed demo project, four fixed members, two workers, three actual agents, one view, one complete coordination loop. |
 
-## Suggested README additions
+## README follow-through
 
-Add a short problem statement explaining that teams repeat work because useful findings remain trapped in isolated coding conversations.
+The [root README](../../README.md#problem-and-product-direction) now includes the original problem: repeated explanations and duplicated work both within one person's sessions and across teammates.
 
-Add two feature bullets: (1) duplicate-work/dependency detection with source-linked reuse suggestions; (2) approved project memory reused by new and ongoing sessions.
+Its feature list explicitly includes duplicate-work/dependency detection, source-linked reuse suggestions, and approved project memory reused by new and ongoing sessions. The wider company-wiki, selective retention/reuse, and next-task recommendation ideas are preserved as product directions. The proposed hackathon slice is distinguished from that longer-term vision.
 
-Add a sharing-boundary paragraph: sharing is explicit and project-scoped; exported content reaches the collaboration service and potentially hosted models; local storage alone does not imply local inference.
+Its architecture explains why workers remain separate and which exported content reaches the collaboration service and hosted models; local execution alone does not imply local inference.
 
-Clarify the demo handoff: the same worker continues the same session after its owner approves a teammate's attributed instruction. No session or credential migration occurs.
+Its demo specifies a handoff on the same worker and session after the target owner approves an attributed instruction, followed by reuse of an accepted decision in a fresh session. No session or credential migration is implied.
 
-Link to [the scoped MVP](mvp-spec.md) and [the four-person task board](team-plan.md), and distinguish required demo features from stretch features.
+The README links to [the scoped MVP](mvp-spec.md), [the four-person task board](README.md), and [implementation checklists](team-plan.md). These remain planning artifacts, not evidence that product features are implemented.
 
 ## Scope to defer
 

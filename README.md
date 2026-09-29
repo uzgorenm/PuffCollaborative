@@ -11,6 +11,26 @@ other’s work without manually transferring context.
 
 > Status: Proposed MVP. The capabilities below describe the intended design.
 
+## Problem and product direction
+
+AI coding sessions help people build quickly, but useful context often stays
+inside one conversation. The same person repeats explanations across sessions;
+teammates independently investigate or build the same thing because their agents
+do not know what others are doing or have already learned.
+
+Puff should connect that work: summarize each shared session's current objective,
+progress, and blockers; notice overlaps and reusable findings; and bring relevant
+context into both new and ongoing sessions. The value is less repeated work and
+less manual explanation, with sources that let people check each suggestion.
+
+Serdar's broader idea includes an evolving project or company wiki assembled from
+session knowledge, selective retention and reuse of useful results, and eventually
+suggestions about what someone should work on next. These are product directions,
+not all requirements for the 5–6 hour hackathon. The proposed MVP starts with small,
+human-approved decision records; full wiki generation, general result caching,
+and task recommendations remain future work. Automatic context lookup at session
+start is a stretch feature; explicit lookup must work first.
+
 ## Team workspace
 
 **Start here: [Team task board and feature status](docs/hackathon/README.md).**
@@ -31,6 +51,10 @@ local clone and integrates incoming commits before pushing. Never force-push.
   and blockers. Summaries refresh when the work meaningfully changes.
 - **Shared context:** Agents retrieve relevant decisions and activity from
   other threads without loading every conversation into every prompt.
+- **Avoid repeated work:** Flower identifies overlapping work, dependencies,
+  and opportunities to reuse a finding, with links to the supporting sessions.
+- **Lasting project memory:** People approve useful findings as project decisions.
+  New and ongoing sessions can retrieve them; outdated decisions can be superseded.
 - **Distributed execution:** Run coding sessions across different machines
   within one shared project workspace.
 
@@ -52,6 +76,28 @@ Owns project membership, permissions, shared thread identity, message
 ordering, and worker routing. Connects Flower coordination agents to
 OpenCode workers through an authenticated bridge.
 
+### Why these agents are separate
+
+Each coding agent owns a different session history and executes against its own
+workspace, tools, and credentials. The Flower coordinator compares explicitly
+shared evidence across those boundaries and proposes useful context to exchange.
+The workers retain execution control; the coordinator does not need unrestricted
+access to everyone's files or machines. The proposed baseline is two OpenCode
+agents and one Flower AgentApp, not three copies of the same chat agent.
+
+### What is shared
+
+Sharing is explicit and project-scoped. The MVP uses selected synthetic demo
+sessions, not automatic collection of everyone's conversations. Only permitted
+session content and activity are exported; unrelated sessions, credentials,
+arbitrary files, and full tool payloads are excluded from the export contract.
+
+Exported content is visible to the collaboration service and authorized project
+viewers. Content submitted to Flower/SuperGrid and its hosted model leaves the
+worker machine. Local execution does not make those requests private or local;
+the demo must show what crosses each boundary. Summaries are observations, while
+accepted project knowledge requires a human decision.
+
 ## Human Control
 
 Multiple teammates can contribute, but each thread has one ordered execution
@@ -63,20 +109,30 @@ credentials or grant unrestricted access to another person’s machine.
 
 ## MVP Demo
 
-Two developers work on separate tasks across two machines. Both can see
-each other’s live threads and project summaries.
+Two developers work in separate sessions across two machines. One has already
+found an answer or built something that the other is about to repeat. A real
+Flower run detects the overlap or dependency, cites both sessions, and proposes
+the useful context to share.
 
-A Flower coordination agent identifies a dependency between their tasks
-and proposes a handoff. One developer opens the other’s thread and
-continues the work using its existing context.
+The target worker's owner reviews, edits, approves, or rejects the proposal.
+Approval delivers one attributed instruction to that session on its existing
+host, and the session visibly uses the finding. Its credentials, workspace, and
+host do not move. A new session then retrieves an accepted decision, showing
+that the team's knowledge survives the original conversation.
+
+The interface should make worker ownership, shared evidence, the Flower run,
+human approval, and actual delivery visible. The magic moment is seeing one
+session avoid repeating work because another session's finding reached it.
 
 ## Initial Scope
 
-Prioritize shared visibility, collaborative input, context retrieval,
-and explicit human handoffs.
+Prioritize current session summaries, overlap/reuse detection, approved context
+delivery, and a minimal durable project memory. Shared visibility and collaborative
+input support this complete flow. Protect one reliable demo with four people in
+5–6 hours; the [MVP spec](docs/hackathon/mvp-spec.md) defines the acceptance criteria.
 
-Defer automatic task assignment, automatic merging, and migration of
-running sessions between machines.
+Defer full company-wiki generation, automatic task assignment, general result
+caching, automatic merging, and migration of running sessions between machines.
 
 ## Task Delegation
 
