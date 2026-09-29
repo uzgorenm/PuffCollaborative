@@ -2,6 +2,8 @@
 
 Tested checkout: `e83a0bb71203c14c3ad996ea155187ad5453763d`. Bun 1.3.14 on macOS arm64. The test ran the registered HTTP route layer in a coordinator process against disposable SQLite files. A separate fake execution process stayed alive through coordinator `SIGKILL` and restart. HTTP clients used eight distinct roster credentials, including four project members, an outsider, a stale worker instance, and an analysis service. No OpenCode model or tool execution, frontend, Flower job, or paid service was used. The subsequent receipt edit changed documentation only.
 
+The runner-output citation failure recorded below was repaired at `b3eeb0c`; the [recheck receipt](2026-09-29-coordination-activity-revision.md) records nine passing process cases. The results below remain the record of the earlier run.
+
 The harness and run instructions are in [coordination-e2e.md](../../coordination-e2e.md). The test entry point uses `createRoutes` with a fake `RunnerPort` and a Session binding adapter that reads real seeded `session` rows. The roster validator, project admission allowlist, route handlers, queue, runner gateway, EventV2 journal, cards, activity service, SQLite engine, and migrations are the backend implementations under test.
 
 ## Commands and results

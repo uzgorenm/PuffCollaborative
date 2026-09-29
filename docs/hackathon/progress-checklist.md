@@ -31,6 +31,8 @@ The [backend mock integration receipt](evidence/2026-09-29-coordination-backend-
 
 The [process test receipt](evidence/2026-09-29-coordination-process-e2e.md) tests commit `e83a0bb71203c14c3ad996ea155187ad5453763d` through real HTTP and SQLite with a separate fake runner process. The smoke test, typecheck, existing mock integration test, fresh initialization and preceding-schema migration passed. The broader suite had eight passing cases and one failing regression: `run.output` commits without advancing `Thread.activitySeq`, preventing a source-cited work card for that output. Seed `12648430` completed 100 accepted instructions across 20 threads, with five queued cancellations and 95 starts.
 
+The [activity revision recheck](evidence/2026-09-29-coordination-activity-revision.md) at `b3eeb0c` passed all nine process cases and 1,084 assertions, including the previously failing work-card citation. The separate in-process mock HTTP test passed 51 assertions. These results use fake execution; real OpenCode execution and the Puff awareness exchange remain unverified.
+
 This is backend integration evidence against external simulators. It does not change the G0 through G7 or WF01 through WF10 statuses. The real OpenCode runner, shared frontend, and Jev/Flower exchange still need live receipts.
 
 ## Rules for checking a box
