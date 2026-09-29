@@ -58,6 +58,7 @@ const sourceRequests: string[] = []
 const transport: ProjectTransport = async (url) => {
   const request = new URL(url)
   const path = request.pathname.replace("/api/coordination/v1", "")
+  if (path === "/status") return Response.json({ ready: true, simulated: false })
   if (path === "/projects") return Response.json([project])
   if (path === "/simulation") return new Response(null, { status: 404 })
   if (path === `/projects/${project.id}/threads`) return Response.json([thread("a"), thread("b")])

@@ -18,8 +18,10 @@ This package installs independently with its own npm lockfile under `apps/`, out
 
 - `/api/sessions` reads the existing local scenario simulator at `http://127.0.0.1:4187`, or a loopback URL supplied through `PUFF_API_URL`.
 - Simulator data is explicitly marked **simulated**. If unavailable, four illustrative sessions are explicitly marked **demo**. The adapter performs read-only requests with a one-second timeout; the browser refreshes every ten seconds.
-- Session cards and sidebar rows open the selected conversation. Search matches session title, owner, or summary. Filters show all, personal, or working sessions. The summary row can collapse.
+- The main sidebar groups up to five personal threads under the Stanford Hackathon project. Each teammate section shows work updated in the past 90 minutes, with additional updates behind an expandable row, followed by up to five threads. Search matches session title, owner, or summary.
+- Session cards and sidebar rows open the selected conversation. Filters show all, personal, or working sessions in the bottom summary row, which can collapse.
 - New prompts save as local drafts in this browser, persist across reloads, and can be deleted. Enter saves, Shift+Enter adds a line, and Cmd/Ctrl+K returns to a new session.
 - Agent execution, real teammate presence, invites, authentication, sharing consent, work redirection, and cross-session awareness delivery are not connected. The interface makes these limits visible; saving a draft does not start an agent.
+- The sidebar derives teammates from the available session owners. Someone with no returned sessions does not appear yet. Demo timestamps are refreshed so the 90 minute view can be inspected; they are sample data, not observed teammate activity.
 
 The existing hackathon workflow acceptance gates remain open. This preview establishes browser layout and navigation, not a completed live collaboration system.

@@ -56,13 +56,21 @@ export default function Workspace() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [toast, setToast] = useState("")
   const [hydrated, setHydrated] = useState(false)
+  const [now, setNow] = useState(0)
   const input = useRef<HTMLTextAreaElement>(null)
   const content = useRef<HTMLElement>(null)
   const allSessions = [...localSessions, ...sessions]
   const active = allSessions.find(session => session.id === selected)
   const activeIsLocal = Boolean(active && localSessions.some(session => session.id === active.id))
   const people = Array.from(new Map(sessions.map(session => [session.owner, session])).values())
-  const filtered = allSessions.filter(session => (!query || `${session.title} ${session.owner} ${session.summary}`.toLowerCase().includes(query.toLowerCase())) && (filter !== "My sessions" || session.owner === "You") && (filter !== "Working" || session.status === "running"))
+  const matchingSessions = allSessions.filter(session => !query || `${session.title} ${session.owner} ${session.summary}`.toLowerCase().includes(query.toLowerCase()))
+  const filtered = matchingSessions.filter(session => (filter !== "My sessions" || session.owner === "You" || session.owner === "Serdar") && (filter !== "Working" || session.status === "running"))
+  const ownThreads = matchingSessions.filter(session => session.owner === "You" || session.owner === "Serdar").sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 5)
+  const teammateGroups = [...new Set(sessions.map(session => session.owner).filter(owner => owner !== "You" && owner !== "Serdar"))].sort().map(owner => {
+    const threads = matchingSessions.filter(session => session.owner === owner).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    const recent = sessions.filter(session => session.owner === owner && Date.parse(session.updatedAt) >= now - 90 * 60_000 && Date.parse(session.updatedAt) <= now).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    return { owner, threads: threads.slice(0, 5), recent, person: sessions.find(session => session.owner === owner)! }
+  }).filter(group => group.threads.length > 0)
 
   useEffect(() => {
     try {
@@ -71,10 +79,11 @@ export default function Workspace() {
       if (Array.isArray(parsed)) setLocalSessions(parsed.filter((entry): entry is Session => Boolean(entry && typeof entry === "object" && typeof entry.id === "string" && entry.id.startsWith("local-") && typeof entry.title === "string" && entry.owner === "You" && typeof entry.summary === "string" && typeof entry.updatedAt === "string" && typeof entry.initials === "string" && ["green", "blue", "purple", "orange"].includes(entry.color) && ["running", "waiting", "complete"].includes(entry.status) && Array.isArray(entry.messages) && entry.messages.every((message: { role?: string; text?: string }) => message && ["user", "assistant"].includes(message.role || "") && typeof message.text === "string"))))
     } catch { setToast("Browser storage is unavailable. Drafts will last for this visit.") }
     setHydrated(true)
+    setNow(Date.now())
     const controller = new AbortController()
     const refresh = () => fetch("/api/sessions", { signal: controller.signal }).then(response => response.json()).then(data => { if (Array.isArray(data.sessions)) { setSessions(data.sessions); setSource(data.source) } }).catch(() => {})
     refresh()
-    const interval = setInterval(refresh, 10000)
+    const interval = setInterval(() => { setNow(Date.now()); refresh() }, 10000)
     return () => { controller.abort(); clearInterval(interval) }
   }, [])
 
@@ -107,21 +116,35 @@ export default function Workspace() {
   return <div className="shell">
     <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
       <div className="brand"><Puff small /><span>Puff</span><span className="brand-tag">collaborative</span></div>
-      <button className="workspace-switch" onClick={newChat}><span className="workspace-icon">H</span><span>Hackathon<small>Team workspace</small></span><Icon name="chevron" size={16} /></button>
       <button className="nav-button" onClick={newChat}><Icon name="plus" /><span>New session</span><kbd>⌘ K</kbd></button>
       <button className="nav-button" onClick={() => setSearching(previous => !previous)}><Icon name="search" /><span>Search sessions</span></button>
       {searching && <input className="session-search" autoFocus placeholder="Search title, person, or task…" aria-label="Search sessions" value={query} onChange={event => setQuery(event.target.value)} />}
-      <div className="sidebar-section"><div className="sidebar-heading"><span>PROJECTS</span><button className="icon-button" aria-label="Open project home" onClick={newChat}><Icon name="plus" size={14} /></button></div>
-        <button className="nav-button project-active" onClick={newChat}><Icon name="folder" /><span>Hackathon</span><Icon name="chevron" size={14} /></button>
-      </div>
-      <div className="sidebar-section session-list"><div className="sidebar-heading"><span>SESSIONS</span><span>{allSessions.length}</span></div>
-        {filtered.map(session => <button className={`session-item ${selected === session.id ? "active" : ""}`} key={session.id} onClick={() => openSession(session.id)}><span className={`status-dot ${session.status}`} /><span className="session-item-content"><span className="session-item-title">{session.title}</span><span className="session-item-meta">{session.owner} <span>·</span> {labels[session.status]}</span></span></button>)}
-        {!filtered.length && <p className="empty-state">No matching sessions.</p>}
+      <div className="sidebar-section session-list project-tree"><div className="sidebar-heading"><span>Projects</span></div>
+        <button className="nav-button project-active" onClick={newChat}><Icon name="folder" /><span>Stanford Hackathon</span></button>
+        <div className="project-children">
+          <div className="sidebar-subheading"><span>Your threads</span><span>{ownThreads.length}</span></div>
+          {ownThreads.map(session => <button className={`session-item thread-row ${selected === session.id ? "active" : ""}`} key={session.id} onClick={() => openSession(session.id)} title={session.title} aria-label={`${session.title}, ${labels[session.status]}`}><span className={`status-dot ${session.status}`} /><span className="session-item-title">{session.title}</span></button>)}
+          {!ownThreads.length && (!query || teammateGroups.length > 0) && <p className="sidebar-empty">{query ? "No matching threads." : "Your threads will appear here."}</p>}
+          {teammateGroups.map(group => <section className="teammate-group" key={group.owner} aria-label={`${group.owner}'s threads`}>
+            <div className="teammate-heading"><span className={`avatar ${group.person.color}`}>{group.person.initials}</span><strong>{group.owner}</strong></div>
+            <div className="teammate-window">Past 90 minutes <span>· {source === "simulator" ? "simulated" : "demo"}</span></div>
+            <div className="teammate-summary">
+              {group.recent.length ? <>
+                {group.recent.slice(0, 2).map(session => <p key={session.id}><span>{session.title}</span>{session.summary}</p>)}
+                {group.recent.length > 2 && <details><summary>{group.recent.length - 2} more updates</summary>{group.recent.slice(2).map(session => <p key={session.id}><span>{session.title}</span>{session.summary}</p>)}</details>}
+              </> : <p>No updates recorded in this window.</p>}
+            </div>
+            <div className="sidebar-subheading"><span>Threads</span><span>{group.threads.length}</span></div>
+            {group.threads.map(session => <button className={`session-item thread-row ${selected === session.id ? "active" : ""}`} key={session.id} onClick={() => openSession(session.id)} title={session.title} aria-label={`${group.owner}: ${session.title}, ${labels[session.status]}`}><span className={`status-dot ${session.status}`} /><span className="session-item-title">{session.title}</span></button>)}
+          </section>)}
+          {query && !ownThreads.length && !teammateGroups.length && <p className="sidebar-empty">No matching sessions.</p>}
+        </div>
       </div>
       <div className="sidebar-footer"><div className="avatar green">S</div><div><strong>Serdar</strong><small>Personal workspace</small></div><button className="icon-button" aria-label="Workspace information" onClick={() => setToast("Your drafts are stored in this browser. Team sessions come from the configured simulator.")}><Icon name="settings" /></button></div>
     </aside>
+    {sidebarOpen && <button className="sidebar-scrim" type="button" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)} />}
     <main className="main">
-      <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" aria-label="Toggle sidebar" onClick={() => setSidebarOpen(previous => !previous)}><Icon name="panel" /></button><Icon name="folder" size={16} /><span>Hackathon</span><span className="breadcrumb-divider">/</span><span className="breadcrumb-current">{active ? "Session" : "Workspace"}</span></div><div className="topbar-actions"><div className="presence">{people.slice(0, 3).map(person => <div key={person.owner} className={`avatar ${person.color}`} title={`${person.owner} · ${labels[person.status]}`}>{person.initials}</div>)}<span className="presence-label">{people.length} people <span className="presence-source">· {source === "simulator" ? "simulated" : "demo"}</span></span></div><button className="invite-button" onClick={() => setInviteOpen(true)}><Icon name="people" size={15} /> Invite</button></div></header>
+      <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" aria-label="Toggle sidebar" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(previous => !previous)}><Icon name="panel" /></button><Icon name="folder" size={16} /><span>Hackathon</span><span className="breadcrumb-divider">/</span><span className="breadcrumb-current">{active ? "Session" : "Workspace"}</span></div><div className="topbar-actions"><div className="presence">{people.slice(0, 3).map(person => <div key={person.owner} className={`avatar ${person.color}`} title={`${person.owner} · ${labels[person.status]}`}>{person.initials}</div>)}<span className="presence-label">{people.length} people <span className="presence-source">· {source === "simulator" ? "simulated" : "demo"}</span></span></div><button className="invite-button" onClick={() => setInviteOpen(true)}><Icon name="people" size={15} /> Invite</button></div></header>
       <section ref={content} className={`content ${active ? "has-chat" : ""}`}>
         {!active ? <div className="welcome"><Puff /><div className="eyebrow">A LITTLE CONTEXT. A LOT LESS CATCHING UP.</div><h1>What are we working on?</h1><p>Your space to build. Your team's work, in view.</p><div className="suggestions">{suggestions.map(suggestion => <button key={suggestion.title} className="suggestion" onClick={() => { setDraft(suggestion.text); input.current?.focus() }}><span className="suggestion-icon"><Icon name={suggestion.icon} size={19} /></span><span>{suggestion.title}</span><Icon name="diagonal" size={14} /></button>)}</div></div> : <div className="chat-view"><div className="chat-heading"><div className="eyebrow">{activeIsLocal ? "LOCAL DRAFT" : source === "simulator" ? "SIMULATED SESSION" : "DEMO SESSION"}</div><h1>{active.title}</h1><div className="message-meta"><div className={`avatar ${active.color}`}>{active.initials}</div><span>{active.owner}</span><span className={`status-dot ${active.status}`} /><span>{labels[active.status]}</span><span>· {updatedLabel(active.updatedAt)}</span></div></div>{active.messages.map((message, index) => <article className={`message ${message.role}`} key={`${active.id}-${index}`}><div className="message-label">{message.role === "user" ? active.owner : "Puff"}</div><div className="message-body">{message.text}</div></article>)}{activeIsLocal && <div className="draft-notice"><Icon name="clock" size={15} /> Saved locally. Connect an execution backend to run this task.</div>}</div>}
         <div className="composer-wrap"><div className="composer"><div className="composer-context"><Icon name="folder" size={15} /><span>Hackathon</span><span className="context-divider">/</span><span>{activeIsLocal ? "Your draft" : "New session"}</span></div><textarea ref={input} value={draft} onChange={event => setDraft(event.target.value)} placeholder="Ask Puff, or describe a task…" rows={2} aria-label="Session prompt" onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} /><div className="composer-toolbar"><div className="composer-options"><span className="composer-local"><span className="status-dot waiting" /> Local draft</span>{activeIsLocal && <button aria-label="Delete local draft" onClick={() => { setLocalSessions(previous => previous.filter(session => session.id !== active?.id)); setSelected(null) }}><Icon name="close" size={14} /> Delete draft</button>}</div><button className="send-button" aria-label="Save session draft" disabled={!draft.trim()} onClick={send}><Icon name="arrow" size={20} /></button></div></div><div className="keyboard-hint">Enter to save a draft <span>·</span> Shift + Enter for a new line</div></div>
