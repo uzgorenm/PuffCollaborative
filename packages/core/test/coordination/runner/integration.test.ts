@@ -64,6 +64,38 @@ const services = Effect.gen(function* () {
 })
 
 describe("coordination runner with real Queue, SQLite and EventV2; mocked Access and execution port", () => {
+  it.effect("reconstructs a reserved start from SQLite after the adapter is replaced", () =>
+    Effect.gen(function* () {
+      const { queue, approvals } = yield* services
+      const accepted = yield* queue.submit({
+        principal: member,
+        threadId: thread.id,
+        requestId: "req_restart",
+        text: "Resume delivery",
+      })
+      let adapter: CoordinationContracts.Runner
+      const mock = MockRunner.createMockRunner({
+        report: (callback) => Effect.runPromise(adapter.report({ ...callback, principal: runner })).then(() => {}),
+        plan: () => [{ kind: "complete" }],
+      })
+      mock.setConnected(false)
+      adapter = RunnerAdapter.make({ access, queue, port: mock.port, approvals, now: () => Date.parse(date) })
+      const first = yield* adapter
+        .claim(runner, thread.id, owner)
+        .pipe(Effect.match({ onFailure: (error) => error, onSuccess: () => undefined }))
+      expect(first?.code).toBe("unavailable")
+      expect((yield* queue.getRun(accepted.run.id))?.state).toBe("reserved")
+
+      mock.setConnected(true)
+      adapter = RunnerAdapter.make({ access, queue, port: mock.port, approvals, now: () => Date.parse(date) })
+      expect(yield* adapter.claim(runner, thread.id, owner)).toBeUndefined()
+      yield* Effect.promise(() => mock.wait(accepted.run.id))
+      expect(mock.starts).toHaveLength(1)
+      expect(mock.starts[0]?.runId).toBe(accepted.run.id)
+      expect((yield* queue.getRun(accepted.run.id))?.state).toBe("completed")
+    }),
+  )
+
   it.effect("commits streamed output and tool activity once with their Run", () =>
     Effect.gen(function* () {
       const { queue, approvals, events } = yield* services

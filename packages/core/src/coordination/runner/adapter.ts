@@ -53,6 +53,8 @@ export function make(input: Dependencies): CoordinationContracts.Runner {
       const thread = yield* input.access.getThread(principal, threadId, "runner")
       if (thread.workerId !== executionOwner.workerId)
         return yield* Effect.fail(conflict("Thread belongs to another worker"))
+      const recovered = yield* recoverPending(executionOwner)
+      if (recovered.some((run) => run.threadId === threadId)) return undefined
       const reserved = yield* input.queue.reserveNext({
         principal,
         threadId,
