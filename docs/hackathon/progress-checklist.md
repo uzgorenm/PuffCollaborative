@@ -33,6 +33,8 @@ The [process test receipt](evidence/2026-09-29-coordination-process-e2e.md) test
 
 The [activity revision recheck](evidence/2026-09-29-coordination-activity-revision.md) at `b3eeb0c` passed all nine process cases and 1,084 assertions, including the previously failing work-card citation. The separate in-process mock HTTP test passed 51 assertions. These results use fake execution; real OpenCode execution and the Puff awareness exchange remain unverified.
 
+The [content revision recheck](evidence/2026-09-29-coordination-content-revision.md) at `8bf5459` passed the focused SQLite freshness and comment tests (2 tests, 26 assertions) and all nine process cases (1,084 assertions). Content events now advance `Thread.activitySeq`; queue, lifecycle and card events keep their project cursor without changing that revision. The process worker remains fake. Agent 6 is checking the separate 60-minute activity feed's missing `run.output` kind.
+
 This is backend integration evidence against external simulators. It does not change the G0 through G7 or WF01 through WF10 statuses. The real OpenCode runner, shared frontend, and Jev/Flower exchange still need live receipts.
 
 ## Rules for checking a box
