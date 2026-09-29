@@ -25,6 +25,9 @@ from journal import journal_events
 from private_state import open_private_file, secure_directory, secure_state_tree
 
 LOCK = threading.Lock()
+# Flower rewrites ~/.flwr/credentials.yaml on token refresh; on Windows concurrent
+# runs collide on that file, so connection setup and submission are serialized.
+CONNECT = threading.Lock()
 
 
 def record(path, event):
@@ -46,12 +49,14 @@ def record(path, event):
 
 def run_agent(project, payload, journal, stage):
     app = build_local_agent(Path(project))
-    connection = read_superlink_connection("supergrid")
-    client = init_http_client_from_connection(connection)
+    with CONNECT:
+        connection = read_superlink_connection("supergrid")
+        client = init_http_client_from_connection(connection)
     run_id = None
     try:
         # Authenticate before any paid submission. No credential values enter the journal.
-        client.ListFederations(ListFederationsRequest())
+        with CONNECT:
+            client.ListFederations(ListFederationsRequest())
         record(
             journal,
             {
@@ -62,15 +67,16 @@ def run_agent(project, payload, journal, stage):
                 "warnings": list(app.warnings),
             },
         )
-        run_id, series_id = start_chat_run(
-            client,
-            json.dumps(payload),
-            connection.federation,
-            None,
-            app.app_spec,
-            app.fab_hash,
-            app.fab_content,
-        )
+        with CONNECT:
+            run_id, series_id = start_chat_run(
+                client,
+                json.dumps(payload),
+                connection.federation,
+                None,
+                app.app_spec,
+                app.fab_hash,
+                app.fab_content,
+            )
         record(
             journal,
             {

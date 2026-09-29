@@ -8,10 +8,11 @@ the agent is working on another agent's area, a correction instruction for it.
 
 import json
 import os
+import time
 
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 
 app = AgentApp()
 
@@ -60,22 +61,43 @@ def main(agent: AgentSession, context: Context) -> None:
         raise ValueError("Invalid guardian envelope")
     if len(payload.get("others", [])) > 8:
         raise ValueError("Too many other agents")
-    with OpenAI(
-        base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
-        api_key=os.environ["FLWR_RUNTIME_API_KEY"],
-        max_retries=0,
-        timeout=150,
-    ) as client:
-        response = client.responses.create(
-            model=context.run_config["model"],
-            instructions=INSTRUCTIONS,
-            input=json.dumps(payload),
-            max_output_tokens=6000,
-            reasoning={"effort": "low"},
-        )
-    if response.status != "completed":
-        raise RuntimeError("Model task did not complete")
+    # Endeavor first; if it times out or errors (it can be slow under SuperGrid load),
+    # fall back so the coding agents still get a guardian answer.
+    started_at = time.time()
+    models = [context.run_config["model"], context.run_config.get("fallback-model")]
+    response, errors = None, []
+    for model, timeout in zip([m for m in models if m], (60, 90)):
+        call_started = time.monotonic()
+        try:
+            with OpenAI(
+                base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
+                api_key=os.environ["FLWR_RUNTIME_API_KEY"],
+                max_retries=0,
+                timeout=timeout,
+            ) as client:
+                response = client.responses.create(
+                    model=model,
+                    instructions=INSTRUCTIONS,
+                    input=json.dumps(payload),
+                    max_output_tokens=6000,
+                    reasoning={"effort": "low"},
+                )
+            if response.status == "completed":
+                break
+            errors.append(f"{model}: {response.status}")
+        except OpenAIError as error:
+            errors.append(f"{model}: {type(error).__name__}")
+        response = None
+    if response is None:
+        raise RuntimeError("Model task did not complete: " + "; ".join(errors))
     result = parse_json(response.output_text)
+    # Timing and model identity travel with the result so the worker can record them.
+    result["meta"] = {
+        "model": model,
+        "startedAt": started_at,
+        "modelSeconds": round(time.monotonic() - call_started, 2),
+        "fallbackReasons": errors,
+    }
     text = json.dumps({"schemaVersion": 1, "runId": str(context.run_id), "result": result})
     # Application output travels through run events, never through stdout/log parsing.
     agent.events.emit({"type": "response.output_text.delta", "delta": text})
