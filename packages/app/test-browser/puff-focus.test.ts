@@ -144,26 +144,67 @@ async function mountThread() {
   await team.refresh()
   await settle()
   expect(String(team.state.snapshot?.thread.id)).toBe("a")
-  return { host, history, team, cleanup: () => { dispose(); team.dispose(); host.remove() } }
+  return {
+    host,
+    history,
+    team,
+    cleanup: () => {
+      dispose()
+      team.dispose()
+      host.remove()
+    },
+  }
 }
+
+test("test-service disclosure stays outside the ordinary conversation", async () => {
+  const scope = await mountThread()
+  try {
+    scope.team.set("simulation", {
+      simulated: true,
+      mode: "synthetic",
+      label: "SIMULATED",
+      selectedScenarioId: "wf04",
+      scenarios: [
+        {
+          id: "wf04",
+          projectId: scope.team.state.snapshot!.thread.projectId,
+          title: "Project list recovery",
+          classification: "source_backed_fix",
+          summary: "Recovery",
+          threadIds: [],
+        },
+      ],
+      actors: [],
+    })
+    await settle()
+    expect(scope.host.querySelector(".team-composer")).toBeNull()
+    expect(scope.host.textContent).not.toContain("puff.simulation.readOnly")
+  } finally {
+    scope.cleanup()
+  }
+})
 
 test("reduced-motion media rules disable shell and panel movement", async () => {
   const rules = async (path: string) => {
     const sheet = new CSSStyleSheet()
     sheet.replaceSync(await Bun.file(new URL(path, import.meta.url)).text())
-    const media = Array.from(sheet.cssRules).find((rule): rule is CSSMediaRule =>
-      rule instanceof CSSMediaRule && rule.conditionText === "(prefers-reduced-motion: reduce)")
+    const media = Array.from(sheet.cssRules).find(
+      (rule): rule is CSSMediaRule =>
+        rule instanceof CSSMediaRule && rule.conditionText === "(prefers-reduced-motion: reduce)",
+    )
     return Array.from(media?.cssRules ?? []).filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
   }
   const shell = (await rules("../src/components/puff/team.css")).find((rule) =>
-    rule.selectorText.includes(".team-shell *"))
+    rule.selectorText.includes(".team-shell *"),
+  )
   expect(shell?.style.getPropertyValue("animation")).toBe("none")
   expect(shell?.style.getPropertyValue("transition")).toBe("none")
   expect(shell?.style.getPropertyValue("scroll-behavior")).toBe("auto")
   expect(shell?.style.getPropertyPriority("animation")).toBe("important")
 
   const panel = (await rules("../src/components/puff/context-panel/context-panel.css")).find((rule) =>
-    rule.selectorText.includes(".puff-context *"))
+    rule.selectorText.includes(".puff-context *"),
+  )
   expect(panel?.style.getPropertyValue("animation-duration")).toBe("0ms")
   expect(panel?.style.getPropertyValue("transition-duration")).toBe("0ms")
   expect(panel?.style.getPropertyValue("scroll-behavior")).toBe("auto")
@@ -272,7 +313,8 @@ test("polling preserves Inspect and inline peek focus, then Escape returns to th
 
     expect(sourceRequests).toEqual(["/api/coordination/v1/projects/prj_focus/events?after=0&limit=1"])
     const close = panel.querySelector<HTMLButtonElement>(".puff-context-peek-close")
-    if (!close) throw new Error(`Inspect expanded=${inspect.getAttribute("aria-expanded")}, but inline source peek was absent`)
+    if (!close)
+      throw new Error(`Inspect expanded=${inspect.getAttribute("aria-expanded")}, but inline source peek was absent`)
     expect(document.activeElement === close).toBe(true)
     expect(panel.querySelector(".puff-context-source-detail")?.textContent).toContain("event-a")
 
