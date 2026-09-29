@@ -8,7 +8,7 @@ The current target is a seamless desktop coding experience: retain the existing 
 
 **Review README for task workflow** is active on persistent session navigation and a collapsible context panel beside the conversation. It reported desktop dependencies installed and was investigating native launch. It was still using the original checkout on `main` when inspected; no tracked desktop implementation diff was visible at that checkpoint. The coordinator has not sent instructions or moved that work automatically. Paste Agent 1’s handoff first.
 
-The latest inspected native predev attempt failed with `preload not found "@opentui/solid/preload"` while invoking the existing OpenCode build from `packages/desktop/scripts/predev.ts`. This is an observed blocker, not a diagnosed cause. The frontend chat owns the investigation; do not start a competing launch/debugging session.
+An inspected native predev attempt failed with `preload not found "@opentui/solid/preload"` while invoking the existing OpenCode build from `packages/desktop/scripts/predev.ts`. This is an observed failure, not a diagnosed current cause. Its latest update says a helper is investigating startup/server wiring while the lead builds the shared-session interface. Keep that investigation with the existing team; do not launch a duplicate startup agent.
 
 **Read the project README** is idle after a skills review. **Summarize current team work** is idle after explaining ownership and sharing. They can take Agents 2 and 3 below.
 
@@ -33,7 +33,7 @@ The desktop renderer imports `AppInterface` from `@opencode-ai/app` in `packages
 | 2 — Context panel | Self-contained panel content, local presentation model/tests and scoped styles | No entry-point, sidebar, host-motion, backend or Git edits |
 | 3 — Desktop QA | Native workflow, keyboard/focus/motion review and evidence | No application edits, process restarts or Git mutations |
 
-Agent 2 can inspect records and work on the isolated component while launch is resolved. Agent 3 can prepare cases and inspect source now, but native pass/fail evidence requires an actual desktop run. Only Agent 1 integrates shared files and commits. If the frontend lead has already written equivalent panel content, hand off that implementation rather than starting a second one.
+Agent 2 can inspect records immediately, but starts editing only after Agent 1 confirms the panel file handoff; the active lead may already be implementing it. After that boundary is explicit, component work and launch investigation can proceed in parallel. Agent 3 can prepare cases and inspect source now, but native pass/fail evidence requires an actual desktop run. Only Agent 1 integrates shared files and commits. Hand off any existing panel implementation rather than starting a second one.
 
 ## Common instructions — include with each prompt
 
@@ -111,7 +111,8 @@ Build the contents of the collaboration context panel.
 Own only packages/app/src/components/puff/context-panel/ and
  docs/hackathon/serdar-context-panel-handoff.md.
 First inspect Agent 1’s current files/handoff for an equivalent panel;
-reuse it rather than duplicate it. Do not edit app/desktop/session
+reuse it rather than duplicate it. Stay read-only until Agent 1 confirms
+the panel file handoff. Do not edit app/desktop/session
 entry points, sidebar, host transitions, global CSS, shared i18n,
 controllers, transport, generated clients, backend or Git state.
 
