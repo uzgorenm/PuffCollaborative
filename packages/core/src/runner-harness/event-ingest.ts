@@ -22,14 +22,7 @@ export interface Dependencies {
 
 export function make(input: Dependencies): EventIngestion {
   return {
-    observe: ({
-      execution,
-      session,
-      onObservation,
-      onReady,
-    }: Parameters<EventIngestion["observe"]>[0] & {
-      readonly onReady?: Effect.Effect<void>
-    }) =>
+    observe: ({ execution, session, onObservation, onReady }) =>
       Effect.scoped(
         Effect.gen(function* () {
           const run = execution.run
