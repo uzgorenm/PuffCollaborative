@@ -23,3 +23,9 @@ Pinned Bun 1.3.14. In the frozen integration source, then again at committed `e3
 The real-host browser regression uses the actual Thread page, controller, client and panel with synthetic HTTP responses. It verifies exact source display, Inspect and Close retaining focus through unchanged polling, Escape returning to the same Inspect control, and preservation of composer draft and reading position. Happy DOM does not establish OS Tab traversal or rendered Reduce Motion behavior. See [R3's report](../reviews/r3-next.md) for harness limits and red/green evidence.
 
 The earlier `serdar/ui` native window remains a different source checkpoint. Native QA must launch/identify a separate instance from this source before claiming N1/N2/N3 acceptance. Real sharing authority, Flower export/delivery, active Session promotion and B using an update remain separate open gates. The new Project overview is a later slice.
+
+## Ownership-label correction
+
+Follow-up `2865b1bb9b60e41e192df39a3514a14d04ab2e0b` removes the two host mappings from `Thread.createdBy` to Session `ownerId`. A Thread creator is not an authoritative Session/worker owner. The optional identity field now explicitly requires a trusted binding; no producer is invented.
+
+The real-host regression first failed with the creator appearing as `puff.owner alice`. After the fix, all **47 browser tests passed, 147 assertions**, app typecheck passed, and the normal pre-push hook passed all 21 typecheck tasks. A separate source reviewer found no blocker in the five changed files. Remote main was verified at this exact SHA. The already-running native QA instance remains frozen at `d1ec774099` and has not tested this follow-up.

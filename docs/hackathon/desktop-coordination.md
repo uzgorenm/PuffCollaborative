@@ -4,13 +4,13 @@ Serdar authorized the coordinator chat, **Set up Flower development**, to direct
 
 ## Resource ownership
 
-**Next round:** [current development assignments](next-development.md) give new implementation work the main-integration checkout. The native QA checkout stays frozen, preventing hot reload from interrupting QA. This supersedes the earlier UI-checkout write ownership for new tasks; historical receipts keep their original source identities.
+**Current round:** [current development assignments](next-development.md) place the next UI in the isolated project-overview checkout and the combined backend in a separate candidate checkout. Main-integration stays frozen for native QA. Historical receipts keep their original source identities.
 
 | Resource | Owner | Other agents can do |
 | --- | --- | --- |
 | Main integration Git, clean publication checkout and pushes | Coordinator | Supply exact ready commits and evidence; do not concurrently push main or edit the publication checkout |
 | Next UI composition | Build Puff project overview and coordination, in its isolated overview checkout | Prior lead's source-inspection checkpoint is frozen at e332cbf539; preserve its fixes |
-| Context-panel files | Read the project README | Suggest changes through R2/R3 reports; do not edit the same files |
+| Published context-panel files | Frozen for QA | No renewed implementation ownership; propose changes to the overview owner |
 | Shared desktop mouse, keyboard and focus | Native QA after the frontend lead's release | Inspect source and existing captures; no native interaction |
 | Native acceptance | Summarize current team work | Continue independent source/tests; do not touch its target window |
 | Consumer integration test | Complete R1 collaborative review | Use own fixture identities/request IDs; do not mutate another test's sessions |
@@ -20,11 +20,12 @@ This is a coordination protocol, not an operating-system lock. The coordinator i
 
 ## Active access record
 
-- **Interactive desktop owner:** `Summarize current team work`, for the next source-inspection acceptance pass only. It may launch one separate native instance from frozen `PuffCollaborative-main-integration` source `e332cbf539`; verify unused renderer/CDP ports before using planned 5176/9224 and profile `/tmp/puff-next-ui-qa`. Do not restart or modify the older instances.
-- **Next owner:** unassigned. Every other chat, including the overview checker, remains source/tests-only until QA records and releases its exact new instance.
+- **Interactive desktop owner:** `Summarize current team work`. The source-inspection instance is running from frozen `PuffCollaborative-main-integration` source `e332cbf539` / docs `d1ec774099`, Electron PID `73232`, renderer PID `73221`, ports 5176/9224, profile `/tmp/puff-next-ui-qa`, target `6FC3B81265B3233AD1FB3B675A58BECB`. QA's receipt owns detailed observations. Do not hot-reload this instance with main's later ownership-label fix.
+- **Next handoff:** Serdar wants a hands-on overview preview. QA finishes its current bounded pass and restores its own renderer-local fixture interception, then may launch one separate overview instance only after the owner supplies a stable verified source commit. Planned profile `/tmp/puff-project-overview-preview` and ports 5177/9225 require availability checks. These planned values do not establish a running preview. QA records the actual target and explicitly releases native input to Serdar; after release all agents stop autonomous native interaction.
+- **Other chats:** including the overview checker, remain source/tests-only. No competing clicks, profile mutation or desktop/server restart.
 - **Current UI checkout:** `PuffCollaborative-serdar-ui`; integration uses a separate `PuffCollaborative-main-integration` checkout. The original checkout remains untouched.
 - **Known development backend:** `127.0.0.1:4466`, explicitly synthetic/mock fixture. Treat the source/runtime identity from the latest lead handoff as authoritative; never publish credentials here.
-- **New QA target:** frozen integration source `e332cbf539`; planned isolated profile/ports above are not a claim that it is already running. QA must record actual PID, profile, ports and source before interaction.
+- **Native evidence boundary:** current source-inspection checks use synthetic/mock data. A separate overview preview does not establish persisted kickoff/preferences, trusted sharing, Flower delivery or actual target use.
 - **Prior QA target, preserve untouched:** profile `/tmp/puff-serdar-ui-desktop`, renderer 5175, debugging 9223, latest source `65767b5f31` on `serdar/ui`. This older window does not verify the new integration source.
 - **Original interim instance:** renderer 5173/debugging 9222 remains separate and preserved; do not confuse it with the final QA target. Separate windows are not permission for concurrent OS input.
 - **Independent review work:** source, scoped unit tests and existing evidence can proceed now. No reviewer waits for desktop access to finish its source artifact.
