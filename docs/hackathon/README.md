@@ -11,7 +11,7 @@ This is the team's shared task board and feature-status page. Detailed implement
 | T1 — Shared state and API | Serhat | Shared session topics, current activity, source-linked awareness delivery, approval checks, and durable decisions. | Planned | No merged implementation verified yet. |
 | T2 — OpenCode adapter | Talha | Export selected activity; deliver relevant awareness at a safe turn boundary and approved instructions to the correct session. | Planned | No merged implementation verified yet. |
 | T3 — Team interface | Serdar | Show simultaneous experiments, progress, source-linked updates, decisions, and delivery/failure states. | Planned | No merged implementation verified yet. |
-| T4 — Flower coordinator | Ferit | Real SuperGrid summaries that distinguish parallel alternatives from duplicates and find shared constraints. | Planned | Standalone template smoke test passed; product integration remains to be built. |
+| T4 — Flower coordinator | Ferit | Real SuperGrid summaries that distinguish parallel alternatives from duplicates and find shared constraints. | Planned | Standalone template smoke test passed; product integration, multiple-Flower-agent collaboration, and our own Hub publication remain unverified. See the [official brief review](../../README.md#official-hackathon-requirements-and-readiness). |
 
 Open [the task checklists](team-plan.md) and find the numbered task with your name. Each has file ownership, inputs/outputs, acceptance checks, and a scope cut if time gets short.
 

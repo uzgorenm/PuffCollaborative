@@ -11,6 +11,71 @@ other’s work without manually transferring context.
 
 > Status: Proposed MVP. The capabilities below describe the intended design.
 
+## Official hackathon requirements and readiness
+
+Checked September 29, 2026 against the organizers' [Stanford hackathon brief](https://discuss.flower.ai/t/collaborative-agent-hackathon-stanford-ca-2026/1275).
+Use that page and `#hackathon_stanford_2026` in [Flower Slack](https://flower.ai/join-slack)
+for updates and support.
+
+- **Challenge:** Demonstrate multiple Flower Agents collaborating through
+  SuperGrid, with a result that benefits from their cooperation. The brief gives
+  agent chains and context/handoffs between AgentApps as examples.
+- **Judging:** Depth of Flower/SuperGrid use, impact and originality, and demo
+  clarity and delivery. **Endeavor is a bonus**, not a prerequisite.
+- **Schedule:** September 29, 2026, 9:30 am–7:30 pm at 389 Jane Stanford Way.
+  Demo preparation starts at 4:30 pm; presentations start at 5:15 pm and last
+  **3–5 minutes** per team. Submit before the demos; the post does not specify
+  a separate exact submission cutoff.
+- **Runtime:** SuperGrid tasks have a five-minute timeout from entering Running.
+  Keep coordination bounded so coding can continue if analysis fails.
+
+### Submission checklist
+
+- [ ] Register the team name, members, and email addresses using the
+  [team form](https://flowerlabs.typeform.com/to/rQuplUGG).
+- [ ] Publish our own working AgentApp on Flower Hub and record its public link.
+  Follow the [publication guide](https://flower.ai/docs/agent/how-to-guides/use-flower-hub.html#publish-your-agentapp).
+- [ ] Submit a short project description and the GitHub repository link.
+- [ ] Rehearse the working result and explain the problem and Flower's role
+  within the presentation time.
+
+Unchecked means not verified in this repository, including actions teammates
+may already have completed elsewhere. A local build or use of an upstream Hub
+template does not establish publication of our own app.
+
+### Where Puff fits, and the remaining gap
+
+Our live coding-session awareness idea fits the collaboration theme: one agent's
+finding helps another agent adapt before a person manually transfers context.
+However, the current engineering baseline is **two OpenCode agents and one Flower
+AgentApp**. It uses Flower, but that alone does not demonstrate the brief's
+multiple-Flower-agent collaboration. Treat the baseline as an integration
+checkpoint, not a claim that the hackathon challenge is already satisfied.
+
+The original `@flwrlabs/collaborative-agent` setup completed a real SuperGrid
+greeting run, `12037878883441469089`; its `finished:completed` status was rechecked
+on September 29. That test requested no tools. It proves runtime access, not
+agent-to-agent cooperation or Puff integration. At this review, the shared
+repository has no verified Puff-specific Flower integration or recorded
+team-owned Hub publication.
+
+**Recommended next step:** Ferit should prove a small real exchange between
+Flower agents as an early integration checkpoint. For example, a session
+analysis agent passes an evidence-backed finding to a coordination agent, which
+relates it to another session and produces the awareness note. This is a proposed
+extension, not implemented behavior. The
+[organizers' collaborative-agent example](https://github.com/jafermarq/flower-collaborative-agent-hackathon)
+demonstrates agents communicating across SuperNodes connected to SuperGrid.
+Native Grid transport is one implementation option; the brief also permits
+agent chains. Ask a mentor to confirm the fit if retaining only one Flower agent.
+
+Protect one complete demo: permitted session evidence -> actual Flower-agent
+exchange -> source-linked update -> delivery into a running coding session ->
+visible adaptation. Show the participating agents and their exchanged result,
+along with run status and delivery evidence. Then publish the working AgentApp.
+Retain the four existing ownership areas; their interfaces still support this
+flow. The [team board](docs/hackathon/README.md) tracks implementation evidence.
+
 ## Problem and product direction
 
 AI coding sessions help people build quickly, but useful context often stays

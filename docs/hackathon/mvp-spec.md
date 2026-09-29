@@ -2,6 +2,8 @@
 
 Status: proposed team implementation scope for review. No product implementation is implied by this document.
 
+**Hackathon alignment, checked September 29:** The [official requirements and readiness review](../../README.md#official-hackathon-requirements-and-readiness) identifies a remaining gap: the brief asks for collaboration among multiple Flower Agents on SuperGrid and a published Flower Hub app. The single-Flower baseline below is an engineering checkpoint, not verified satisfaction of that challenge. Prove the additional Flower-agent interaction or obtain mentor confirmation of an alternative before claiming hackathon readiness; native Grid routing is one possible implementation, not the only accepted pattern described by the brief.
+
 ## Outcome
 
 One developer can run two OpenCode sessions that deliberately explore alternative solutions to the same feature. Puff exposes selected activity, distinguishes alternatives from redundant work, and gives each agent relevant updates from the other while both remain active. The agent that receives an update can adjust its plan without losing its own session. The same flow also supports sessions owned by different developers. A fresh session can later retrieve a human-accepted decision without being given every earlier conversation.
