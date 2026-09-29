@@ -28,13 +28,20 @@ This is the team's shared task board. **Start with the [progress checklist](prog
 | T1 — Shared state and API | Serhat | Shared topics/evidence, validated awareness routing, state and events. | Process HTTP suite passes with fake runner; awareness integration open | The [recovery isolation receipt](evidence/2026-09-29-coordination-recovery-isolation.md) at `204d9d6` records nine passing process cases, including concurrent work, replay, restart and a 20-thread drain. The [activity-feed receipt](evidence/2026-09-29-coordination-activity-feed.md) covers authenticated `run.output` delivery. An [independent runner recheck](evidence/2026-09-29-coordination-real-runner-recheck.md) also passed; the Puff awareness contract and G0 remain open. |
 | T2 — OpenCode adapter | Talha | Export selected activity; admit awareness into an already active Session and reconcile retries. | Runner execution verified with a local model; awareness admission open | The [runner integration receipt](evidence/runner-2026-09-29-r13-integration.md) at `a694a8f` records two passing process cases and 93 assertions with pinned OpenCode, persistent workspaces and Sessions, approval, cancellation and restart. R1 and Agent 1 repeated both cases at published `46dc9e8` with 93 assertions; [Agent 1's receipt](evidence/2026-09-29-coordination-real-runner-recheck.md) records the server typecheck. G1 and WF02 still need selected activity and admission into an already active Session. |
 | T3 — Team interface | Serdar | Show distinct experiments, inspectable evidence and admission/promotion/use. | Native desktop connected to the backend with a mock runner; main browser sidebar verified with demo data; final independent QA and live awareness open | `beab6436ea` integrates UI `f4c8ad9ee4` with the repaired main backend. Original coding sessions remain beside an identity-bound context panel. [Native receipt](evidence/2026-09-29-serdar-native.md); [integrated verification](evidence/2026-09-29-main-desktop-checkpoint.md); [desktop/backend preview](evidence/2026-09-29-desktop-backend-preview.md); [main web sidebar](evidence/2026-09-29-main-web-sidebar.md). G0/G5 and live WF02 remain open. |
-| T4 — Flower coordinator | Ferit | Real cooperating Flower agents distinguish alternatives and produce a usable finding. | Product exchange unverified | Upstream template smoke test is recorded; G2/WF10 and team-owned publication still need evidence. See the [official brief review](../../README.md#official-hackathon-requirements-and-readiness). |
+| T4 — Flower coordinator | Ferit | Real cooperating Flower agents distinguish alternatives and produce a usable finding. | Guardian mode and chain run live on SuperGrid (synthetic input); live server/OpenCode run open | Agent 1: two AgentApps, validated host handoff, bounded adapter and local checks under `hackathon/flower/`. [Receipt](evidence/2026-09-29-flower-chain.md): SuperGrid authentication rejected the synthetic attempt; no Puff run IDs returned. G2/WF10 remain open; C3/C8 need Serhat's authoritative mapping. No publication attempted. |
 
 Open [the task checklists](team-plan.md) and find the numbered task with your name. Each has file ownership, inputs/outputs, acceptance checks, and a scope cut if time gets short.
 
 Status distinguishes merged work, explicitly observed local work and unverified integration. The [baseline receipt](evidence/2026-09-29-coordinator-baseline.md) names the inspected commit and limits. For **Blocked**, name the dependency/owner; for **Done**, link a pushed commit and passing workflow receipt. Update the progress checklist at the same time. Do not infer another person's progress from absent commits.
 
 ## Our features
+
+Ferit's activity/Jev slice: **unit/fixture verified, integration pending**. Separate
+implementation in `hackathon/flower/activity/` includes deterministic cards,
+bounded refresh scheduling, injected/real Jev clients, and selected evidence.
+See its README for C2/C3/C8 contract questions. This does not close G2/WF10 or
+claim Agent 1's Flower chain is integrated. Exact receipt follows in
+`evidence/2026-09-29-activity-intelligence.md`.
 
 | ID | Feature | Main contributors | Priority | Status |
 | --- | --- | --- | --- | --- |
