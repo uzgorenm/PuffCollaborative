@@ -82,6 +82,8 @@ The six Agent roles inside the backend contract are Serhat's implementation subd
 
 **Consumes:** current shared contract/fixture, real snapshots/events, delivery/use receipts and explicit action permissions. **Produces:** one reachable view in the existing app, source inspection, accurate state and human controls. **Gates:** G0, G3, G4, G5.
 
+**Verified UI checkpoint:** [3f75718234 receipt](evidence/2026-09-29-serdar-ui.md) covers the responsive page, synthetic same-owner alternatives, source inspection, review/sharing controls, late updates and reconnect safeguards. Focused tests, typecheck/build and desktop/mobile walkthrough pass; full units retain one unrelated locale failure. The boxes below remain open where they require the common contract or real service/agent evidence. The next UI task is to consume Serhat's authoritative shared state and Talha's admission/promotion/use receipts after G0.
+
 - [ ] Keep the local preview visibly synthetic while reconciling its provisional `/puff/v1` Bearer adapter with the actual service/auth contract. A renamed URL without matching schema/auth/service behavior is insufficient.
 - [ ] Add and verify the page route/navigation. Render two alternative sessions with owner, approach, planned/ongoing/completed status, freshness and exact sources. Test the same-owner case, not just two different people.
 - [ ] Show pending, admitted, promoted, failed/ambiguous and observed use separately. Never derive use from an approval, returned message ID, spinner completion or the canned preview response.

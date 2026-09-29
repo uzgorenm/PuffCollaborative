@@ -101,6 +101,14 @@ export type ProjectCopyError = {
 export const isProjectCopyError = (value: unknown): value is ProjectCopyError =>
   typeof value === "object" && value !== null && "name" in value && value["name"] === "ProjectCopyError"
 
+export type ForbiddenError = { readonly _tag: "ForbiddenError"; readonly message: string }
+export const isForbiddenError = (value: unknown): value is ForbiddenError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ForbiddenError"
+
+export type CoordinationNotFoundError = { readonly _tag: "CoordinationNotFoundError"; readonly message: string }
+export const isCoordinationNotFoundError = (value: unknown): value is CoordinationNotFoundError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "CoordinationNotFoundError"
+
 export type HealthGetOutput = { readonly healthy: true }
 
 export type LocationGetInput = {
@@ -2805,3 +2813,859 @@ export type ProjectCopiesRefreshInput = {
 }
 
 export type ProjectCopiesRefreshOutput = void
+
+export type ServerCoordinationStatusOutput = { readonly ready: boolean }
+
+export type ServerCoordinationDataProjectListOutput = ReadonlyArray<{
+  readonly id: string
+  readonly name: string
+  readonly createdBy: string
+  readonly createdAt: string
+}>
+
+export type ServerCoordinationDataProjectCreateInput = {
+  readonly projectId: { readonly projectId: string; readonly name: string; readonly requestId: string }["projectId"]
+  readonly name: { readonly projectId: string; readonly name: string; readonly requestId: string }["name"]
+  readonly requestId: { readonly projectId: string; readonly name: string; readonly requestId: string }["requestId"]
+}
+
+export type ServerCoordinationDataProjectCreateOutput = {
+  readonly id: string
+  readonly name: string
+  readonly createdBy: string
+  readonly createdAt: string
+}
+
+export type ServerCoordinationDataProjectGetInput = { readonly projectId: { readonly projectId: string }["projectId"] }
+
+export type ServerCoordinationDataProjectGetOutput = {
+  readonly project: {
+    readonly id: string
+    readonly name: string
+    readonly createdBy: string
+    readonly createdAt: string
+  }
+  readonly members: ReadonlyArray<{
+    readonly projectId: string
+    readonly userId: string
+    readonly role: "owner" | "member"
+    readonly joinedAt: string
+  }>
+}
+
+export type ServerCoordinationDataMemberGrantInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly targetUserId: { readonly targetUserId: string; readonly requestId: string }["targetUserId"]
+  readonly requestId: { readonly targetUserId: string; readonly requestId: string }["requestId"]
+}
+
+export type ServerCoordinationDataMemberGrantOutput = {
+  readonly projectId: string
+  readonly userId: string
+  readonly role: "owner" | "member"
+  readonly joinedAt: string
+}
+
+export type ServerCoordinationDataContributionListInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly userId?: { readonly userId?: string | undefined }["userId"]
+}
+
+export type ServerCoordinationDataContributionListOutput = ReadonlyArray<{
+  readonly projectId: string
+  readonly threadId: string
+  readonly userId: string
+  readonly sourceKind: "instruction" | "comment"
+  readonly sourceId: string
+  readonly occurredAt: string
+}>
+
+export type ServerCoordinationDataProjectThreadListInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+}
+
+export type ServerCoordinationDataProjectThreadListOutput = ReadonlyArray<{
+  readonly id: string
+  readonly projectId: string
+  readonly sessionId: string
+  readonly workerId: string
+  readonly title: string
+  readonly createdBy: string
+  readonly createdAt: string
+  readonly activitySeq: number
+}>
+
+export type ServerCoordinationDataThreadCreateInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly sessionId: { readonly sessionId: string; readonly title: string; readonly requestId: string }["sessionId"]
+  readonly title: { readonly sessionId: string; readonly title: string; readonly requestId: string }["title"]
+  readonly requestId: { readonly sessionId: string; readonly title: string; readonly requestId: string }["requestId"]
+}
+
+export type ServerCoordinationDataThreadCreateOutput = {
+  readonly id: string
+  readonly projectId: string
+  readonly sessionId: string
+  readonly workerId: string
+  readonly title: string
+  readonly createdBy: string
+  readonly createdAt: string
+  readonly activitySeq: number
+}
+
+export type ServerCoordinationDataThreadGetInput = { readonly threadId: { readonly threadId: string }["threadId"] }
+
+export type ServerCoordinationDataThreadGetOutput = {
+  readonly thread: {
+    readonly id: string
+    readonly projectId: string
+    readonly sessionId: string
+    readonly workerId: string
+    readonly title: string
+    readonly createdBy: string
+    readonly createdAt: string
+    readonly activitySeq: number
+  }
+  readonly instructions: ReadonlyArray<{
+    readonly id: string
+    readonly requestId: string
+    readonly threadId: string
+    readonly actorId: string
+    readonly text: string
+    readonly queueSeq: number
+    readonly submittedAt: string
+    readonly runId: string
+  }>
+  readonly runs: ReadonlyArray<{
+    readonly id: string
+    readonly threadId: string
+    readonly instructionId: string
+    readonly state:
+      | "queued"
+      | "reserved"
+      | "running"
+      | "waiting_approval"
+      | "cancelling"
+      | "recovery_required"
+      | "completed"
+      | "failed"
+      | "cancelled"
+    readonly attempt: number
+    readonly runnerMessageId: string
+    readonly executionOwner?: { readonly workerId: string; readonly instanceId: string } | undefined
+    readonly leaseUntil?: string | undefined
+    readonly createdAt: string
+    readonly startedAt?: string | undefined
+    readonly endedAt?: string | undefined
+  }>
+  readonly approvals: ReadonlyArray<{
+    readonly id: string
+    readonly threadId: string
+    readonly runId: string
+    readonly toolCallId: string
+    readonly version: number
+    readonly state: "pending" | "claimed" | "approved" | "rejected"
+    readonly requestedAt: string
+    readonly claimedBy?: string | undefined
+    readonly claimExpiresAt?: string | undefined
+    readonly decisionId?: string | undefined
+    readonly decision?: "approve" | "reject" | undefined
+    readonly deliveryState: "none" | "pending" | "delivered" | "failed"
+    readonly decidedBy?: string | undefined
+    readonly decidedAt?: string | undefined
+  }>
+  readonly workCard?:
+    | {
+        readonly id: string
+        readonly projectId: string
+        readonly threadId: string
+        readonly version: number
+        readonly sourceActivitySeq: number
+        readonly currentTask: string
+        readonly progress: string
+        readonly blockers: ReadonlyArray<string>
+        readonly status: "queued" | "active" | "blocked" | "idle" | "done"
+        readonly recentVerifiedOutcome: string | null
+        readonly contributors: ReadonlyArray<string>
+        readonly evidenceRefs: ReadonlyArray<{
+          readonly threadId: string
+          readonly eventId: string
+          readonly seq: number
+        }>
+        readonly generatedAt: string
+        readonly submittedBy: string
+        readonly updatedAt: string
+        readonly summaryJobId: string
+      }
+    | undefined
+  readonly cursor: number
+}
+
+export type ServerCoordinationDataCommentListInput = { readonly threadId: { readonly threadId: string }["threadId"] }
+
+export type ServerCoordinationDataCommentListOutput = ReadonlyArray<{
+  readonly id: string
+  readonly threadId: string
+  readonly authorId: string
+  readonly body: string
+  readonly createdAt: string
+}>
+
+export type ServerCoordinationDataCommentCreateInput = {
+  readonly threadId: { readonly threadId: string }["threadId"]
+  readonly requestId: { readonly requestId: string; readonly body: string }["requestId"]
+  readonly body: { readonly requestId: string; readonly body: string }["body"]
+}
+
+export type ServerCoordinationDataCommentCreateOutput = {
+  readonly id: string
+  readonly threadId: string
+  readonly authorId: string
+  readonly body: string
+  readonly createdAt: string
+}
+
+export type ServerCoordinationDataInstructionSubmitInput = {
+  readonly threadId: { readonly threadId: string }["threadId"]
+  readonly requestId: { readonly requestId: string; readonly text: string }["requestId"]
+  readonly text: { readonly requestId: string; readonly text: string }["text"]
+}
+
+export type ServerCoordinationDataInstructionSubmitOutput = {
+  readonly instruction: {
+    readonly id: string
+    readonly requestId: string
+    readonly threadId: string
+    readonly actorId: string
+    readonly text: string
+    readonly queueSeq: number
+    readonly submittedAt: string
+    readonly runId: string
+  }
+  readonly run: {
+    readonly id: string
+    readonly threadId: string
+    readonly instructionId: string
+    readonly state:
+      | "queued"
+      | "reserved"
+      | "running"
+      | "waiting_approval"
+      | "cancelling"
+      | "recovery_required"
+      | "completed"
+      | "failed"
+      | "cancelled"
+    readonly attempt: number
+    readonly runnerMessageId: string
+    readonly executionOwner?: { readonly workerId: string; readonly instanceId: string } | undefined
+    readonly leaseUntil?: string | undefined
+    readonly createdAt: string
+    readonly startedAt?: string | undefined
+    readonly endedAt?: string | undefined
+  }
+}
+
+export type ServerCoordinationDataInstructionCancelInput = {
+  readonly threadId: { readonly threadId: string; readonly instructionId: string }["threadId"]
+  readonly instructionId: { readonly threadId: string; readonly instructionId: string }["instructionId"]
+}
+
+export type ServerCoordinationDataInstructionCancelOutput = {
+  readonly id: string
+  readonly threadId: string
+  readonly instructionId: string
+  readonly state:
+    | "queued"
+    | "reserved"
+    | "running"
+    | "waiting_approval"
+    | "cancelling"
+    | "recovery_required"
+    | "completed"
+    | "failed"
+    | "cancelled"
+  readonly attempt: number
+  readonly runnerMessageId: string
+  readonly executionOwner?: { readonly workerId: string; readonly instanceId: string } | undefined
+  readonly leaseUntil?: string | undefined
+  readonly createdAt: string
+  readonly startedAt?: string | undefined
+  readonly endedAt?: string | undefined
+}
+
+export type ServerCoordinationDataRunnerReserveInput = { readonly threadId: { readonly threadId: string }["threadId"] }
+
+export type ServerCoordinationDataRunnerReserveOutput = {
+  readonly run?:
+    | {
+        readonly id: string
+        readonly threadId: string
+        readonly instructionId: string
+        readonly state:
+          | "queued"
+          | "reserved"
+          | "running"
+          | "waiting_approval"
+          | "cancelling"
+          | "recovery_required"
+          | "completed"
+          | "failed"
+          | "cancelled"
+        readonly attempt: number
+        readonly runnerMessageId: string
+        readonly executionOwner?: { readonly workerId: string; readonly instanceId: string } | undefined
+        readonly leaseUntil?: string | undefined
+        readonly createdAt: string
+        readonly startedAt?: string | undefined
+        readonly endedAt?: string | undefined
+      }
+    | undefined
+}
+
+export type ServerCoordinationDataRunnerReportInput = {
+  readonly runId: { readonly runId: string }["runId"]
+  readonly callbackId: {
+    readonly callbackId: string
+    readonly callback:
+      | {
+          readonly kind: "state"
+          readonly expectedState:
+            | "queued"
+            | "reserved"
+            | "running"
+            | "waiting_approval"
+            | "cancelling"
+            | "recovery_required"
+            | "completed"
+            | "failed"
+            | "cancelled"
+          readonly nextState:
+            | "queued"
+            | "reserved"
+            | "running"
+            | "waiting_approval"
+            | "cancelling"
+            | "recovery_required"
+            | "completed"
+            | "failed"
+            | "cancelled"
+          readonly approvalId?: string | undefined
+          readonly toolCallId?: string | undefined
+        }
+      | {
+          readonly kind: "activity"
+          readonly state: "running" | "waiting_approval"
+          readonly activity:
+            | {
+                readonly kind: "run.tool"
+                readonly toolName: string
+                readonly status: "started" | "completed" | "failed"
+                readonly summary?: string | undefined
+              }
+            | { readonly kind: "run.output"; readonly text: string }
+            | { readonly kind: "run.workspace"; readonly workspaceId: string; readonly ref: string }
+            | { readonly kind: "run.diff"; readonly ref: string; readonly summary?: string | undefined }
+        }
+  }["callbackId"]
+  readonly callback: {
+    readonly callbackId: string
+    readonly callback:
+      | {
+          readonly kind: "state"
+          readonly expectedState:
+            | "queued"
+            | "reserved"
+            | "running"
+            | "waiting_approval"
+            | "cancelling"
+            | "recovery_required"
+            | "completed"
+            | "failed"
+            | "cancelled"
+          readonly nextState:
+            | "queued"
+            | "reserved"
+            | "running"
+            | "waiting_approval"
+            | "cancelling"
+            | "recovery_required"
+            | "completed"
+            | "failed"
+            | "cancelled"
+          readonly approvalId?: string | undefined
+          readonly toolCallId?: string | undefined
+        }
+      | {
+          readonly kind: "activity"
+          readonly state: "running" | "waiting_approval"
+          readonly activity:
+            | {
+                readonly kind: "run.tool"
+                readonly toolName: string
+                readonly status: "started" | "completed" | "failed"
+                readonly summary?: string | undefined
+              }
+            | { readonly kind: "run.output"; readonly text: string }
+            | { readonly kind: "run.workspace"; readonly workspaceId: string; readonly ref: string }
+            | { readonly kind: "run.diff"; readonly ref: string; readonly summary?: string | undefined }
+        }
+  }["callback"]
+}
+
+export type ServerCoordinationDataRunnerReportOutput = {
+  readonly id: string
+  readonly threadId: string
+  readonly instructionId: string
+  readonly state:
+    | "queued"
+    | "reserved"
+    | "running"
+    | "waiting_approval"
+    | "cancelling"
+    | "recovery_required"
+    | "completed"
+    | "failed"
+    | "cancelled"
+  readonly attempt: number
+  readonly runnerMessageId: string
+  readonly executionOwner?: { readonly workerId: string; readonly instanceId: string } | undefined
+  readonly leaseUntil?: string | undefined
+  readonly createdAt: string
+  readonly startedAt?: string | undefined
+  readonly endedAt?: string | undefined
+}
+
+export type ServerCoordinationDataApprovalClaimInput = {
+  readonly threadId: { readonly threadId: string; readonly approvalId: string }["threadId"]
+  readonly approvalId: { readonly threadId: string; readonly approvalId: string }["approvalId"]
+  readonly expectedVersion: { readonly expectedVersion: number }["expectedVersion"]
+}
+
+export type ServerCoordinationDataApprovalClaimOutput = {
+  readonly id: string
+  readonly threadId: string
+  readonly runId: string
+  readonly toolCallId: string
+  readonly version: number
+  readonly state: "pending" | "claimed" | "approved" | "rejected"
+  readonly requestedAt: string
+  readonly claimedBy?: string | undefined
+  readonly claimExpiresAt?: string | undefined
+  readonly decisionId?: string | undefined
+  readonly decision?: "approve" | "reject" | undefined
+  readonly deliveryState: "none" | "pending" | "delivered" | "failed"
+  readonly decidedBy?: string | undefined
+  readonly decidedAt?: string | undefined
+}
+
+export type ServerCoordinationDataApprovalDecideInput = {
+  readonly threadId: { readonly threadId: string; readonly approvalId: string }["threadId"]
+  readonly approvalId: { readonly threadId: string; readonly approvalId: string }["approvalId"]
+  readonly expectedVersion: {
+    readonly expectedVersion: number
+    readonly decisionId: string
+    readonly decision: "approve" | "reject"
+  }["expectedVersion"]
+  readonly decisionId: {
+    readonly expectedVersion: number
+    readonly decisionId: string
+    readonly decision: "approve" | "reject"
+  }["decisionId"]
+  readonly decision: {
+    readonly expectedVersion: number
+    readonly decisionId: string
+    readonly decision: "approve" | "reject"
+  }["decision"]
+}
+
+export type ServerCoordinationDataApprovalDecideOutput = {
+  readonly id: string
+  readonly threadId: string
+  readonly runId: string
+  readonly toolCallId: string
+  readonly version: number
+  readonly state: "pending" | "claimed" | "approved" | "rejected"
+  readonly requestedAt: string
+  readonly claimedBy?: string | undefined
+  readonly claimExpiresAt?: string | undefined
+  readonly decisionId?: string | undefined
+  readonly decision?: "approve" | "reject" | undefined
+  readonly deliveryState: "none" | "pending" | "delivered" | "failed"
+  readonly decidedBy?: string | undefined
+  readonly decidedAt?: string | undefined
+}
+
+export type ServerCoordinationDataProjectReplayInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly after?: { readonly after?: number | undefined; readonly limit?: number | undefined }["after"]
+  readonly limit?: { readonly after?: number | undefined; readonly limit?: number | undefined }["limit"]
+}
+
+export type ServerCoordinationDataProjectReplayOutput = {
+  readonly events: ReadonlyArray<{
+    readonly id: string
+    readonly projectId: string
+    readonly threadId?: string | undefined
+    readonly seq: number
+    readonly kind:
+      | "project.created"
+      | "membership.changed"
+      | "thread.created"
+      | "comment.created"
+      | "instruction.submitted"
+      | "instruction.cancelled"
+      | "run.reserved"
+      | "run.started"
+      | "run.tool"
+      | "run.output"
+      | "run.workspace"
+      | "run.diff"
+      | "run.approval.requested"
+      | "run.approval.resolved"
+      | "run.cancel.requested"
+      | "run.completed"
+      | "run.failed"
+      | "run.cancelled"
+      | "run.recovery.required"
+      | "work-card.updated"
+    readonly occurredAt: string
+    readonly actorId?: string | undefined
+    readonly runId?: string | undefined
+    readonly instructionId?: string | undefined
+    readonly payload: { readonly [x: string]: unknown }
+  }>
+  readonly cursor: number
+  readonly hasMore: boolean
+}
+
+export type ServerCoordinationDataProjectStreamInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly after?: { readonly after?: number | undefined; readonly limit?: number | undefined }["after"]
+  readonly limit?: { readonly after?: number | undefined; readonly limit?: number | undefined }["limit"]
+}
+
+export type ServerCoordinationDataProjectStreamOutput = {
+  readonly id: string
+  readonly projectId: string
+  readonly threadId?: string | undefined
+  readonly seq: number
+  readonly kind:
+    | "project.created"
+    | "membership.changed"
+    | "thread.created"
+    | "comment.created"
+    | "instruction.submitted"
+    | "instruction.cancelled"
+    | "run.reserved"
+    | "run.started"
+    | "run.tool"
+    | "run.output"
+    | "run.workspace"
+    | "run.diff"
+    | "run.approval.requested"
+    | "run.approval.resolved"
+    | "run.cancel.requested"
+    | "run.completed"
+    | "run.failed"
+    | "run.cancelled"
+    | "run.recovery.required"
+    | "work-card.updated"
+  readonly occurredAt: string
+  readonly actorId?: string | undefined
+  readonly runId?: string | undefined
+  readonly instructionId?: string | undefined
+  readonly payload: { readonly [x: string]: unknown }
+}
+
+export type ServerCoordinationDataThreadReplayInput = {
+  readonly threadId: { readonly threadId: string }["threadId"]
+  readonly after?: { readonly after?: number | undefined; readonly limit?: number | undefined }["after"]
+  readonly limit?: { readonly after?: number | undefined; readonly limit?: number | undefined }["limit"]
+}
+
+export type ServerCoordinationDataThreadReplayOutput = {
+  readonly events: ReadonlyArray<{
+    readonly id: string
+    readonly projectId: string
+    readonly threadId?: string | undefined
+    readonly seq: number
+    readonly kind:
+      | "project.created"
+      | "membership.changed"
+      | "thread.created"
+      | "comment.created"
+      | "instruction.submitted"
+      | "instruction.cancelled"
+      | "run.reserved"
+      | "run.started"
+      | "run.tool"
+      | "run.output"
+      | "run.workspace"
+      | "run.diff"
+      | "run.approval.requested"
+      | "run.approval.resolved"
+      | "run.cancel.requested"
+      | "run.completed"
+      | "run.failed"
+      | "run.cancelled"
+      | "run.recovery.required"
+      | "work-card.updated"
+    readonly occurredAt: string
+    readonly actorId?: string | undefined
+    readonly runId?: string | undefined
+    readonly instructionId?: string | undefined
+    readonly payload: { readonly [x: string]: unknown }
+  }>
+  readonly cursor: number
+  readonly hasMore: boolean
+}
+
+export type ServerCoordinationDataThreadStreamInput = {
+  readonly threadId: { readonly threadId: string }["threadId"]
+  readonly after?: { readonly after?: number | undefined; readonly limit?: number | undefined }["after"]
+  readonly limit?: { readonly after?: number | undefined; readonly limit?: number | undefined }["limit"]
+}
+
+export type ServerCoordinationDataThreadStreamOutput = {
+  readonly id: string
+  readonly projectId: string
+  readonly threadId?: string | undefined
+  readonly seq: number
+  readonly kind:
+    | "project.created"
+    | "membership.changed"
+    | "thread.created"
+    | "comment.created"
+    | "instruction.submitted"
+    | "instruction.cancelled"
+    | "run.reserved"
+    | "run.started"
+    | "run.tool"
+    | "run.output"
+    | "run.workspace"
+    | "run.diff"
+    | "run.approval.requested"
+    | "run.approval.resolved"
+    | "run.cancel.requested"
+    | "run.completed"
+    | "run.failed"
+    | "run.cancelled"
+    | "run.recovery.required"
+    | "work-card.updated"
+  readonly occurredAt: string
+  readonly actorId?: string | undefined
+  readonly runId?: string | undefined
+  readonly instructionId?: string | undefined
+  readonly payload: { readonly [x: string]: unknown }
+}
+
+export type ServerCoordinationDataWorkCardGetInput = { readonly threadId: { readonly threadId: string }["threadId"] }
+
+export type ServerCoordinationDataWorkCardGetOutput = {
+  readonly card?:
+    | {
+        readonly id: string
+        readonly projectId: string
+        readonly threadId: string
+        readonly version: number
+        readonly sourceActivitySeq: number
+        readonly currentTask: string
+        readonly progress: string
+        readonly blockers: ReadonlyArray<string>
+        readonly status: "queued" | "active" | "blocked" | "idle" | "done"
+        readonly recentVerifiedOutcome: string | null
+        readonly contributors: ReadonlyArray<string>
+        readonly evidenceRefs: ReadonlyArray<{
+          readonly threadId: string
+          readonly eventId: string
+          readonly seq: number
+        }>
+        readonly generatedAt: string
+        readonly submittedBy: string
+        readonly updatedAt: string
+        readonly summaryJobId: string
+      }
+    | undefined
+}
+
+export type ServerCoordinationDataWorkCardUpdateInput = {
+  readonly threadId: { readonly threadId: string }["threadId"]
+  readonly expectedVersion: {
+    readonly expectedVersion: number
+    readonly sourceActivitySeq: number
+    readonly card: {
+      readonly currentTask: string
+      readonly progress: string
+      readonly blockers: ReadonlyArray<string>
+      readonly status: "queued" | "active" | "blocked" | "idle" | "done"
+      readonly summaryJobId: string
+      readonly recentVerifiedOutcome: string | null
+      readonly contributors: ReadonlyArray<string>
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly generatedAt: string
+    }
+  }["expectedVersion"]
+  readonly sourceActivitySeq: {
+    readonly expectedVersion: number
+    readonly sourceActivitySeq: number
+    readonly card: {
+      readonly currentTask: string
+      readonly progress: string
+      readonly blockers: ReadonlyArray<string>
+      readonly status: "queued" | "active" | "blocked" | "idle" | "done"
+      readonly summaryJobId: string
+      readonly recentVerifiedOutcome: string | null
+      readonly contributors: ReadonlyArray<string>
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly generatedAt: string
+    }
+  }["sourceActivitySeq"]
+  readonly card: {
+    readonly expectedVersion: number
+    readonly sourceActivitySeq: number
+    readonly card: {
+      readonly currentTask: string
+      readonly progress: string
+      readonly blockers: ReadonlyArray<string>
+      readonly status: "queued" | "active" | "blocked" | "idle" | "done"
+      readonly summaryJobId: string
+      readonly recentVerifiedOutcome: string | null
+      readonly contributors: ReadonlyArray<string>
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly generatedAt: string
+    }
+  }["card"]
+}
+
+export type ServerCoordinationDataWorkCardUpdateOutput = {
+  readonly id: string
+  readonly projectId: string
+  readonly threadId: string
+  readonly version: number
+  readonly sourceActivitySeq: number
+  readonly currentTask: string
+  readonly progress: string
+  readonly blockers: ReadonlyArray<string>
+  readonly status: "queued" | "active" | "blocked" | "idle" | "done"
+  readonly recentVerifiedOutcome: string | null
+  readonly contributors: ReadonlyArray<string>
+  readonly evidenceRefs: ReadonlyArray<{ readonly threadId: string; readonly eventId: string; readonly seq: number }>
+  readonly generatedAt: string
+  readonly submittedBy: string
+  readonly updatedAt: string
+  readonly summaryJobId: string
+}
+
+export type ServerCoordinationDataWorkCardListInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+}
+
+export type ServerCoordinationDataWorkCardListOutput = ReadonlyArray<{
+  readonly id: string
+  readonly projectId: string
+  readonly threadId: string
+  readonly version: number
+  readonly sourceActivitySeq: number
+  readonly currentTask: string
+  readonly progress: string
+  readonly blockers: ReadonlyArray<string>
+  readonly status: "queued" | "active" | "blocked" | "idle" | "done"
+  readonly recentVerifiedOutcome: string | null
+  readonly contributors: ReadonlyArray<string>
+  readonly evidenceRefs: ReadonlyArray<{ readonly threadId: string; readonly eventId: string; readonly seq: number }>
+  readonly generatedAt: string
+  readonly submittedBy: string
+  readonly updatedAt: string
+  readonly summaryJobId: string
+}>
+
+export type ServerCoordinationDataActivityListInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+}
+
+export type ServerCoordinationDataActivityListOutput = {
+  readonly projectId: string
+  readonly asOf: string
+  readonly workingNow: ReadonlyArray<{
+    readonly id: string
+    readonly sourceThread: { readonly threadId: string; readonly sessionId: string; readonly href: string }
+    readonly runId: string | null
+    readonly status:
+      | "queued"
+      | "reserved"
+      | "running"
+      | "waiting_approval"
+      | "cancelling"
+      | "recovery_required"
+      | "completed"
+      | "failed"
+      | "cancelled"
+      | "idle"
+    readonly startedAt: string | null
+    readonly approvalId: string | null
+    readonly objective: string | null
+    readonly step: string | null
+    readonly blockers: ReadonlyArray<string>
+    readonly recentVerifiedOutcome: string | null
+    readonly contributors: ReadonlyArray<string>
+    readonly freshness: {
+      readonly sourceActivitySeq: number
+      readonly threadActivitySeq: number
+      readonly stale: boolean
+      readonly generatedAt: string
+      readonly updatedAt: string
+      readonly summaryJobId: string
+    } | null
+  }>
+  readonly upNext: ReadonlyArray<{
+    readonly id: string
+    readonly sourceThread: { readonly threadId: string; readonly sessionId: string; readonly href: string }
+    readonly status: "queued"
+    readonly queueSeq: number
+    readonly submittedAt: string
+    readonly actorId: string
+    readonly text: string
+  }>
+  readonly recent: ReadonlyArray<{
+    readonly id: string
+    readonly sourceThread: { readonly threadId: string; readonly sessionId: string; readonly href: string } | null
+    readonly kind:
+      | "project.created"
+      | "membership.changed"
+      | "thread.created"
+      | "comment.created"
+      | "instruction.submitted"
+      | "instruction.cancelled"
+      | "run.reserved"
+      | "run.started"
+      | "run.tool"
+      | "run.output"
+      | "run.workspace"
+      | "run.diff"
+      | "run.approval.requested"
+      | "run.approval.resolved"
+      | "run.cancel.requested"
+      | "run.completed"
+      | "run.failed"
+      | "run.cancelled"
+      | "run.recovery.required"
+      | "work-card.updated"
+    readonly occurredAt: string
+    readonly actorId: string | null
+    readonly outcome: string | null
+    readonly eventSeq: number
+  }>
+}

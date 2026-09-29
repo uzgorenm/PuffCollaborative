@@ -273,11 +273,30 @@ export interface Runner {
 
 export interface WorkCards {
   readonly get: (threadId: Coordination.ThreadID) => Effect.Effect<Coordination.WorkCard | undefined, Failure>
+  readonly read: (
+    principal: Coordination.AuthContext,
+    threadId: Coordination.ThreadID,
+  ) => Effect.Effect<Coordination.WorkCard | undefined, Failure>
+  readonly list: (
+    principal: Coordination.AuthContext,
+    projectId: Coordination.ProjectID,
+  ) => Effect.Effect<ReadonlyArray<Coordination.WorkCard>, Failure>
   readonly update: (input: {
     readonly principal: Coordination.AuthContext
     readonly threadId: Coordination.ThreadID
     readonly expectedVersion: number
     readonly sourceActivitySeq: number
-    readonly card: Pick<Coordination.WorkCard, "currentTask" | "progress" | "blockers" | "status" | "summaryJobId">
+    readonly card: Pick<
+      Coordination.WorkCard,
+      | "currentTask"
+      | "progress"
+      | "blockers"
+      | "status"
+      | "summaryJobId"
+      | "recentVerifiedOutcome"
+      | "contributors"
+      | "evidenceRefs"
+      | "generatedAt"
+    >
   }) => Effect.Effect<Coordination.WorkCard, Failure>
 }

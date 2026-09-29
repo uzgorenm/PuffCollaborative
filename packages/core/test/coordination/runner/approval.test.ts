@@ -5,6 +5,7 @@ import type { CoordinationContracts } from "@opencode-ai/core/coordination/contr
 import { CoordinationApproval } from "@opencode-ai/core/coordination/approval/store"
 import { CoordinationEvents } from "@opencode-ai/core/coordination/events/events"
 import { Database } from "@opencode-ai/core/database/database"
+import { DatabaseMigration } from "@opencode-ai/core/database/migration"
 import { EventV2 } from "@opencode-ai/core/event"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -44,7 +45,7 @@ describe("coordination approval with real SQLite and event journal; access and q
     Effect.gen(function* () {
       const { db } = yield* Database.Service
       const events = yield* CoordinationEvents.Service
-      yield* db.transaction((tx) => migration.up(tx)).pipe(Effect.orDie)
+      yield* DatabaseMigration.applyOnly(db, [migration]).pipe(Effect.orDie)
       const access = {
         getThread: () => Effect.succeed(thread),
       } as unknown as CoordinationContracts.Access

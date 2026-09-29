@@ -8,6 +8,7 @@ import { CoordinationApproval } from "@opencode-ai/core/coordination/approval/st
 import { RunnerAdapter } from "@opencode-ai/core/coordination/runner/adapter"
 import { MockRunner } from "@opencode-ai/core/coordination/runner/mock"
 import { Database } from "@opencode-ai/core/database/database"
+import { DatabaseMigration } from "@opencode-ai/core/database/migration"
 import { EventV2 } from "@opencode-ai/core/event"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -50,20 +51,45 @@ const access: CoordinationContracts.Access = {
 const services = Effect.gen(function* () {
   const db = (yield* Database.Service).db
   const events = yield* CoordinationEvents.Service
-  yield* db
-    .transaction((tx) =>
-      Effect.gen(function* () {
-        yield* queueMigration.up(tx)
-        yield* approvalMigration.up(tx)
-      }),
-    )
-    .pipe(Effect.orDie)
+  yield* DatabaseMigration.applyOnly(db, [approvalMigration, queueMigration]).pipe(Effect.orDie)
   const queue = CoordinationQueue.make({ db, access, events, now: () => Date.parse(date) })
   const approvals = CoordinationApproval.make({ db, events, access, queue, now: () => Date.parse(date) })
   return { queue, approvals, events }
 })
 
 describe("coordination runner with real Queue, SQLite and EventV2; mocked Access and execution port", () => {
+  it.effect("reconstructs a reserved start from SQLite after the adapter is replaced", () =>
+    Effect.gen(function* () {
+      const { queue, approvals } = yield* services
+      const accepted = yield* queue.submit({
+        principal: member,
+        threadId: thread.id,
+        requestId: "req_restart",
+        text: "Resume delivery",
+      })
+      let adapter: CoordinationContracts.Runner
+      const mock = MockRunner.createMockRunner({
+        report: (callback) => Effect.runPromise(adapter.report({ ...callback, principal: runner })).then(() => {}),
+        plan: () => [{ kind: "complete" }],
+      })
+      mock.setConnected(false)
+      adapter = RunnerAdapter.make({ access, queue, port: mock.port, approvals, now: () => Date.parse(date) })
+      const first = yield* adapter
+        .claim(runner, thread.id, owner)
+        .pipe(Effect.match({ onFailure: (error) => error, onSuccess: () => undefined }))
+      expect(first?.code).toBe("unavailable")
+      expect((yield* queue.getRun(accepted.run.id))?.state).toBe("reserved")
+
+      mock.setConnected(true)
+      adapter = RunnerAdapter.make({ access, queue, port: mock.port, approvals, now: () => Date.parse(date) })
+      expect(yield* adapter.claim(runner, thread.id, owner)).toBeUndefined()
+      yield* Effect.promise(() => mock.wait(accepted.run.id))
+      expect(mock.starts).toHaveLength(1)
+      expect(mock.starts[0]?.runId).toBe(accepted.run.id)
+      expect((yield* queue.getRun(accepted.run.id))?.state).toBe("completed")
+    }),
+  )
+
   it.effect("commits streamed output and tool activity once with their Run", () =>
     Effect.gen(function* () {
       const { queue, approvals, events } = yield* services

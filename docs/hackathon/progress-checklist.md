@@ -23,6 +23,16 @@ Baseline reviewed on September 29 at source commit `e42a799cf6aefe1cc6d6907310b3
 
 CI workflows have been removed. A push does not run a readiness check automatically. Earlier repository cleanup builds/typechecks are historical evidence for that earlier change, not for live coordination.
 
+## UI checkpoint — September 29, 12:32 PDT
+
+Serdar's [UI receipt](evidence/2026-09-29-serdar-ui.md) records source/unit/fixture evidence at `3f7571823468fba62e86810e16ddc0b5f13a9b44`: reachable responsive `/puff`, explicit synthetic/development labels, source inspection, review/edit/reject, sharing controls and pending/reconnect safeguards. Eighteen focused tests, 41 browser-condition tests, typecheck and build pass. Full units: 736 pass, one unchanged locale-detection failure. Desktop/mobile browser walkthroughs and screenshots are recorded.
+
+This adds implementation evidence to T3; it closes no live gate or WF01–WF07 case. G0 still needs the shared snapshot/actions/identity mapping, and G3/G5 need actual admission, promotion and agent-use receipts. The default connection checks the registered Basic-auth status route; the provisional API is development-only. A second teammate has not yet reproduced this receipt.
+
+## Coordination backend checkpoint — September 29, 12:44 PDT
+
+The [backend mock integration receipt](evidence/2026-09-29-coordination-backend-mock.md) is tied to pushed commit [`4124e1a`](https://github.com/uzgorenm/PuffCollaborative/commit/4124e1a). It records the registered `/api/coordination/v1` handlers, individual Basic identities, real SQLite/EventV2 persistence, a two-client HTTP flow, restart reads, migrations, generated client and the explicit mock runner. The core coordination suite passed 39 tests; the server integration passed seven consecutive 51-assertion runs after an ordering assumption was fixed. This is an integrated multiplayer backend result with a mock execution port. It does not close G0 or a WF01–WF07 case because the Puff awareness contract, real OpenCode execution and Flower pipeline have not been exercised together.
+
 ## Rules for checking a box
 
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.

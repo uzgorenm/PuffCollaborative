@@ -1,4 +1,6 @@
+import { puff } from "./puff-en"
 export const dict = {
+  ...puff, // Explicit English fallback for the hackathon feature.
   "command.category.suggested": "추천",
   "command.category.view": "보기",
   "command.category.project": "프로젝트",

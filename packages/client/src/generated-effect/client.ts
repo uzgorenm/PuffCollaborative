@@ -681,6 +681,281 @@ const adaptGroup17 = (raw: RawClient["server.projectCopy"]) => ({
   refresh: Endpoint17_2(raw),
 })
 
+const Endpoint18_0 = (raw: RawClient["server.coordination"]) => () =>
+  raw["coordination.status"]({}).pipe(Effect.mapError(mapClientError))
+
+const adaptGroup18 = (raw: RawClient["server.coordination"]) => ({ status: Endpoint18_0(raw) })
+
+const Endpoint19_0 = (raw: RawClient["server.coordination.data"]) => () =>
+  raw["coordination.projectList"]({}).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_1Request = Parameters<RawClient["server.coordination.data"]["coordination.projectCreate"]>[0]
+type Endpoint19_1Input = {
+  readonly projectId: Endpoint19_1Request["payload"]["projectId"]
+  readonly name: Endpoint19_1Request["payload"]["name"]
+  readonly requestId: Endpoint19_1Request["payload"]["requestId"]
+}
+const Endpoint19_1 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_1Input) =>
+  raw["coordination.projectCreate"]({
+    payload: { projectId: input["projectId"], name: input["name"], requestId: input["requestId"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_2Request = Parameters<RawClient["server.coordination.data"]["coordination.projectGet"]>[0]
+type Endpoint19_2Input = { readonly projectId: Endpoint19_2Request["params"]["projectId"] }
+const Endpoint19_2 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_2Input) =>
+  raw["coordination.projectGet"]({ params: { projectId: input["projectId"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_3Request = Parameters<RawClient["server.coordination.data"]["coordination.memberGrant"]>[0]
+type Endpoint19_3Input = {
+  readonly projectId: Endpoint19_3Request["params"]["projectId"]
+  readonly targetUserId: Endpoint19_3Request["payload"]["targetUserId"]
+  readonly requestId: Endpoint19_3Request["payload"]["requestId"]
+}
+const Endpoint19_3 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_3Input) =>
+  raw["coordination.memberGrant"]({
+    params: { projectId: input["projectId"] },
+    payload: { targetUserId: input["targetUserId"], requestId: input["requestId"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_4Request = Parameters<RawClient["server.coordination.data"]["coordination.contributionList"]>[0]
+type Endpoint19_4Input = {
+  readonly projectId: Endpoint19_4Request["params"]["projectId"]
+  readonly userId?: Endpoint19_4Request["query"]["userId"]
+}
+const Endpoint19_4 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_4Input) =>
+  raw["coordination.contributionList"]({
+    params: { projectId: input["projectId"] },
+    query: { userId: input["userId"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_5Request = Parameters<RawClient["server.coordination.data"]["coordination.projectThreadList"]>[0]
+type Endpoint19_5Input = { readonly projectId: Endpoint19_5Request["params"]["projectId"] }
+const Endpoint19_5 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_5Input) =>
+  raw["coordination.projectThreadList"]({ params: { projectId: input["projectId"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint19_6Request = Parameters<RawClient["server.coordination.data"]["coordination.threadCreate"]>[0]
+type Endpoint19_6Input = {
+  readonly projectId: Endpoint19_6Request["params"]["projectId"]
+  readonly sessionId: Endpoint19_6Request["payload"]["sessionId"]
+  readonly title: Endpoint19_6Request["payload"]["title"]
+  readonly requestId: Endpoint19_6Request["payload"]["requestId"]
+}
+const Endpoint19_6 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_6Input) =>
+  raw["coordination.threadCreate"]({
+    params: { projectId: input["projectId"] },
+    payload: { sessionId: input["sessionId"], title: input["title"], requestId: input["requestId"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_7Request = Parameters<RawClient["server.coordination.data"]["coordination.threadGet"]>[0]
+type Endpoint19_7Input = { readonly threadId: Endpoint19_7Request["params"]["threadId"] }
+const Endpoint19_7 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_7Input) =>
+  raw["coordination.threadGet"]({ params: { threadId: input["threadId"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_8Request = Parameters<RawClient["server.coordination.data"]["coordination.commentList"]>[0]
+type Endpoint19_8Input = { readonly threadId: Endpoint19_8Request["params"]["threadId"] }
+const Endpoint19_8 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_8Input) =>
+  raw["coordination.commentList"]({ params: { threadId: input["threadId"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_9Request = Parameters<RawClient["server.coordination.data"]["coordination.commentCreate"]>[0]
+type Endpoint19_9Input = {
+  readonly threadId: Endpoint19_9Request["params"]["threadId"]
+  readonly requestId: Endpoint19_9Request["payload"]["requestId"]
+  readonly body: Endpoint19_9Request["payload"]["body"]
+}
+const Endpoint19_9 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_9Input) =>
+  raw["coordination.commentCreate"]({
+    params: { threadId: input["threadId"] },
+    payload: { requestId: input["requestId"], body: input["body"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_10Request = Parameters<RawClient["server.coordination.data"]["coordination.instructionSubmit"]>[0]
+type Endpoint19_10Input = {
+  readonly threadId: Endpoint19_10Request["params"]["threadId"]
+  readonly requestId: Endpoint19_10Request["payload"]["requestId"]
+  readonly text: Endpoint19_10Request["payload"]["text"]
+}
+const Endpoint19_10 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_10Input) =>
+  raw["coordination.instructionSubmit"]({
+    params: { threadId: input["threadId"] },
+    payload: { requestId: input["requestId"], text: input["text"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_11Request = Parameters<RawClient["server.coordination.data"]["coordination.instructionCancel"]>[0]
+type Endpoint19_11Input = {
+  readonly threadId: Endpoint19_11Request["params"]["threadId"]
+  readonly instructionId: Endpoint19_11Request["params"]["instructionId"]
+}
+const Endpoint19_11 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_11Input) =>
+  raw["coordination.instructionCancel"]({
+    params: { threadId: input["threadId"], instructionId: input["instructionId"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_12Request = Parameters<RawClient["server.coordination.data"]["coordination.runnerReserve"]>[0]
+type Endpoint19_12Input = { readonly threadId: Endpoint19_12Request["params"]["threadId"] }
+const Endpoint19_12 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_12Input) =>
+  raw["coordination.runnerReserve"]({ params: { threadId: input["threadId"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_13Request = Parameters<RawClient["server.coordination.data"]["coordination.runnerReport"]>[0]
+type Endpoint19_13Input = {
+  readonly runId: Endpoint19_13Request["params"]["runId"]
+  readonly callbackId: Endpoint19_13Request["payload"]["callbackId"]
+  readonly callback: Endpoint19_13Request["payload"]["callback"]
+}
+const Endpoint19_13 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_13Input) =>
+  raw["coordination.runnerReport"]({
+    params: { runId: input["runId"] },
+    payload: { callbackId: input["callbackId"], callback: input["callback"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_14Request = Parameters<RawClient["server.coordination.data"]["coordination.approvalClaim"]>[0]
+type Endpoint19_14Input = {
+  readonly threadId: Endpoint19_14Request["params"]["threadId"]
+  readonly approvalId: Endpoint19_14Request["params"]["approvalId"]
+  readonly expectedVersion: Endpoint19_14Request["payload"]["expectedVersion"]
+}
+const Endpoint19_14 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_14Input) =>
+  raw["coordination.approvalClaim"]({
+    params: { threadId: input["threadId"], approvalId: input["approvalId"] },
+    payload: { expectedVersion: input["expectedVersion"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_15Request = Parameters<RawClient["server.coordination.data"]["coordination.approvalDecide"]>[0]
+type Endpoint19_15Input = {
+  readonly threadId: Endpoint19_15Request["params"]["threadId"]
+  readonly approvalId: Endpoint19_15Request["params"]["approvalId"]
+  readonly expectedVersion: Endpoint19_15Request["payload"]["expectedVersion"]
+  readonly decisionId: Endpoint19_15Request["payload"]["decisionId"]
+  readonly decision: Endpoint19_15Request["payload"]["decision"]
+}
+const Endpoint19_15 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_15Input) =>
+  raw["coordination.approvalDecide"]({
+    params: { threadId: input["threadId"], approvalId: input["approvalId"] },
+    payload: {
+      expectedVersion: input["expectedVersion"],
+      decisionId: input["decisionId"],
+      decision: input["decision"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_16Request = Parameters<RawClient["server.coordination.data"]["coordination.projectReplay"]>[0]
+type Endpoint19_16Input = {
+  readonly projectId: Endpoint19_16Request["params"]["projectId"]
+  readonly after?: Endpoint19_16Request["query"]["after"]
+  readonly limit?: Endpoint19_16Request["query"]["limit"]
+}
+const Endpoint19_16 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_16Input) =>
+  raw["coordination.projectReplay"]({
+    params: { projectId: input["projectId"] },
+    query: { after: input["after"], limit: input["limit"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_17Request = Parameters<RawClient["server.coordination.data"]["coordination.projectStream"]>[0]
+type Endpoint19_17Input = {
+  readonly projectId: Endpoint19_17Request["params"]["projectId"]
+  readonly after?: Endpoint19_17Request["query"]["after"]
+  readonly limit?: Endpoint19_17Request["query"]["limit"]
+}
+const Endpoint19_17 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_17Input) =>
+  Stream.unwrap(
+    raw["coordination.projectStream"]({
+      params: { projectId: input["projectId"] },
+      query: { after: input["after"], limit: input["limit"] },
+    }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((stream) => stream.pipe(Stream.mapError(mapClientError))),
+    ),
+  )
+
+type Endpoint19_18Request = Parameters<RawClient["server.coordination.data"]["coordination.threadReplay"]>[0]
+type Endpoint19_18Input = {
+  readonly threadId: Endpoint19_18Request["params"]["threadId"]
+  readonly after?: Endpoint19_18Request["query"]["after"]
+  readonly limit?: Endpoint19_18Request["query"]["limit"]
+}
+const Endpoint19_18 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_18Input) =>
+  raw["coordination.threadReplay"]({
+    params: { threadId: input["threadId"] },
+    query: { after: input["after"], limit: input["limit"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_19Request = Parameters<RawClient["server.coordination.data"]["coordination.threadStream"]>[0]
+type Endpoint19_19Input = {
+  readonly threadId: Endpoint19_19Request["params"]["threadId"]
+  readonly after?: Endpoint19_19Request["query"]["after"]
+  readonly limit?: Endpoint19_19Request["query"]["limit"]
+}
+const Endpoint19_19 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_19Input) =>
+  Stream.unwrap(
+    raw["coordination.threadStream"]({
+      params: { threadId: input["threadId"] },
+      query: { after: input["after"], limit: input["limit"] },
+    }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((stream) => stream.pipe(Stream.mapError(mapClientError))),
+    ),
+  )
+
+type Endpoint19_20Request = Parameters<RawClient["server.coordination.data"]["coordination.workCardGet"]>[0]
+type Endpoint19_20Input = { readonly threadId: Endpoint19_20Request["params"]["threadId"] }
+const Endpoint19_20 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_20Input) =>
+  raw["coordination.workCardGet"]({ params: { threadId: input["threadId"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_21Request = Parameters<RawClient["server.coordination.data"]["coordination.workCardUpdate"]>[0]
+type Endpoint19_21Input = {
+  readonly threadId: Endpoint19_21Request["params"]["threadId"]
+  readonly expectedVersion: Endpoint19_21Request["payload"]["expectedVersion"]
+  readonly sourceActivitySeq: Endpoint19_21Request["payload"]["sourceActivitySeq"]
+  readonly card: Endpoint19_21Request["payload"]["card"]
+}
+const Endpoint19_21 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_21Input) =>
+  raw["coordination.workCardUpdate"]({
+    params: { threadId: input["threadId"] },
+    payload: {
+      expectedVersion: input["expectedVersion"],
+      sourceActivitySeq: input["sourceActivitySeq"],
+      card: input["card"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_22Request = Parameters<RawClient["server.coordination.data"]["coordination.workCardList"]>[0]
+type Endpoint19_22Input = { readonly projectId: Endpoint19_22Request["params"]["projectId"] }
+const Endpoint19_22 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_22Input) =>
+  raw["coordination.workCardList"]({ params: { projectId: input["projectId"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint19_23Request = Parameters<RawClient["server.coordination.data"]["coordination.activityList"]>[0]
+type Endpoint19_23Input = { readonly projectId: Endpoint19_23Request["params"]["projectId"] }
+const Endpoint19_23 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_23Input) =>
+  raw["coordination.activityList"]({ params: { projectId: input["projectId"] } }).pipe(Effect.mapError(mapClientError))
+
+const adaptGroup19 = (raw: RawClient["server.coordination.data"]) => ({
+  projectList: Endpoint19_0(raw),
+  projectCreate: Endpoint19_1(raw),
+  projectGet: Endpoint19_2(raw),
+  memberGrant: Endpoint19_3(raw),
+  contributionList: Endpoint19_4(raw),
+  projectThreadList: Endpoint19_5(raw),
+  threadCreate: Endpoint19_6(raw),
+  threadGet: Endpoint19_7(raw),
+  commentList: Endpoint19_8(raw),
+  commentCreate: Endpoint19_9(raw),
+  instructionSubmit: Endpoint19_10(raw),
+  instructionCancel: Endpoint19_11(raw),
+  runnerReserve: Endpoint19_12(raw),
+  runnerReport: Endpoint19_13(raw),
+  approvalClaim: Endpoint19_14(raw),
+  approvalDecide: Endpoint19_15(raw),
+  projectReplay: Endpoint19_16(raw),
+  projectStream: Endpoint19_17(raw),
+  threadReplay: Endpoint19_18(raw),
+  threadStream: Endpoint19_19(raw),
+  workCardGet: Endpoint19_20(raw),
+  workCardUpdate: Endpoint19_21(raw),
+  workCardList: Endpoint19_22(raw),
+  activityList: Endpoint19_23(raw),
+})
+
 const adaptClient = (raw: RawClient) => ({
   health: adaptGroup0(raw["server.health"]),
   location: adaptGroup1(raw["server.location"]),
@@ -700,6 +975,8 @@ const adaptClient = (raw: RawClient) => ({
   questions: adaptGroup15(raw["server.question"]),
   references: adaptGroup16(raw["server.reference"]),
   projectCopies: adaptGroup17(raw["server.projectCopy"]),
+  "server.coordination": adaptGroup18(raw["server.coordination"]),
+  "server.coordination.data": adaptGroup19(raw["server.coordination.data"]),
 })
 
 export const make = (options?: { readonly baseUrl?: URL | string }) =>

@@ -112,6 +112,54 @@ import type {
   ProjectCopiesRemoveOutput,
   ProjectCopiesRefreshInput,
   ProjectCopiesRefreshOutput,
+  ServerCoordinationStatusOutput,
+  ServerCoordinationDataProjectListOutput,
+  ServerCoordinationDataProjectCreateInput,
+  ServerCoordinationDataProjectCreateOutput,
+  ServerCoordinationDataProjectGetInput,
+  ServerCoordinationDataProjectGetOutput,
+  ServerCoordinationDataMemberGrantInput,
+  ServerCoordinationDataMemberGrantOutput,
+  ServerCoordinationDataContributionListInput,
+  ServerCoordinationDataContributionListOutput,
+  ServerCoordinationDataProjectThreadListInput,
+  ServerCoordinationDataProjectThreadListOutput,
+  ServerCoordinationDataThreadCreateInput,
+  ServerCoordinationDataThreadCreateOutput,
+  ServerCoordinationDataThreadGetInput,
+  ServerCoordinationDataThreadGetOutput,
+  ServerCoordinationDataCommentListInput,
+  ServerCoordinationDataCommentListOutput,
+  ServerCoordinationDataCommentCreateInput,
+  ServerCoordinationDataCommentCreateOutput,
+  ServerCoordinationDataInstructionSubmitInput,
+  ServerCoordinationDataInstructionSubmitOutput,
+  ServerCoordinationDataInstructionCancelInput,
+  ServerCoordinationDataInstructionCancelOutput,
+  ServerCoordinationDataRunnerReserveInput,
+  ServerCoordinationDataRunnerReserveOutput,
+  ServerCoordinationDataRunnerReportInput,
+  ServerCoordinationDataRunnerReportOutput,
+  ServerCoordinationDataApprovalClaimInput,
+  ServerCoordinationDataApprovalClaimOutput,
+  ServerCoordinationDataApprovalDecideInput,
+  ServerCoordinationDataApprovalDecideOutput,
+  ServerCoordinationDataProjectReplayInput,
+  ServerCoordinationDataProjectReplayOutput,
+  ServerCoordinationDataProjectStreamInput,
+  ServerCoordinationDataProjectStreamOutput,
+  ServerCoordinationDataThreadReplayInput,
+  ServerCoordinationDataThreadReplayOutput,
+  ServerCoordinationDataThreadStreamInput,
+  ServerCoordinationDataThreadStreamOutput,
+  ServerCoordinationDataWorkCardGetInput,
+  ServerCoordinationDataWorkCardGetOutput,
+  ServerCoordinationDataWorkCardUpdateInput,
+  ServerCoordinationDataWorkCardUpdateOutput,
+  ServerCoordinationDataWorkCardListInput,
+  ServerCoordinationDataWorkCardListOutput,
+  ServerCoordinationDataActivityListInput,
+  ServerCoordinationDataActivityListOutput,
 } from "./types"
 import { ClientError } from "./client-error"
 
@@ -983,6 +1031,313 @@ export function make(options: ClientOptions) {
             successStatus: 204,
             declaredStatuses: [400, 401],
             empty: true,
+          },
+          requestOptions,
+        ),
+    },
+    "server.coordination": {
+      status: (requestOptions?: RequestOptions) =>
+        request<ServerCoordinationStatusOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/status`,
+            successStatus: 200,
+            declaredStatuses: [503, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    "server.coordination.data": {
+      projectList: (requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataProjectListOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      projectCreate: (input: ServerCoordinationDataProjectCreateInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataProjectCreateOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/projects`,
+            body: { projectId: input["projectId"], name: input["name"], requestId: input["requestId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      projectGet: (input: ServerCoordinationDataProjectGetInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataProjectGetOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      memberGrant: (input: ServerCoordinationDataMemberGrantInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataMemberGrantOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/members`,
+            body: { targetUserId: input["targetUserId"], requestId: input["requestId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      contributionList: (input: ServerCoordinationDataContributionListInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataContributionListOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/contributions`,
+            query: { userId: input["userId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      projectThreadList: (input: ServerCoordinationDataProjectThreadListInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataProjectThreadListOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/threads`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      threadCreate: (input: ServerCoordinationDataThreadCreateInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataThreadCreateOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/threads`,
+            body: { sessionId: input["sessionId"], title: input["title"], requestId: input["requestId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      threadGet: (input: ServerCoordinationDataThreadGetInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataThreadGetOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      commentList: (input: ServerCoordinationDataCommentListInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataCommentListOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/comments`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      commentCreate: (input: ServerCoordinationDataCommentCreateInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataCommentCreateOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/comments`,
+            body: { requestId: input["requestId"], body: input["body"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      instructionSubmit: (input: ServerCoordinationDataInstructionSubmitInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataInstructionSubmitOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/instructions`,
+            body: { requestId: input["requestId"], text: input["text"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      instructionCancel: (input: ServerCoordinationDataInstructionCancelInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataInstructionCancelOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/instructions/${encodeURIComponent(input.instructionId)}/cancel`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      runnerReserve: (input: ServerCoordinationDataRunnerReserveInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataRunnerReserveOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/runner/threads/${encodeURIComponent(input.threadId)}/reserve`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      runnerReport: (input: ServerCoordinationDataRunnerReportInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataRunnerReportOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/runner/runs/${encodeURIComponent(input.runId)}/events`,
+            body: { callbackId: input["callbackId"], callback: input["callback"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      approvalClaim: (input: ServerCoordinationDataApprovalClaimInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataApprovalClaimOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/approvals/${encodeURIComponent(input.approvalId)}/claim`,
+            body: { expectedVersion: input["expectedVersion"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      approvalDecide: (input: ServerCoordinationDataApprovalDecideInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataApprovalDecideOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/approvals/${encodeURIComponent(input.approvalId)}/decision`,
+            body: {
+              expectedVersion: input["expectedVersion"],
+              decisionId: input["decisionId"],
+              decision: input["decision"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      projectReplay: (input: ServerCoordinationDataProjectReplayInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataProjectReplayOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/events`,
+            query: { after: input["after"], limit: input["limit"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      projectStream: (
+        input: ServerCoordinationDataProjectStreamInput,
+        requestOptions?: RequestOptions,
+      ): AsyncIterable<ServerCoordinationDataProjectStreamOutput> =>
+        sse<ServerCoordinationDataProjectStreamOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/events/stream`,
+            query: { after: input["after"], limit: input["limit"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      threadReplay: (input: ServerCoordinationDataThreadReplayInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataThreadReplayOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/events`,
+            query: { after: input["after"], limit: input["limit"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      threadStream: (
+        input: ServerCoordinationDataThreadStreamInput,
+        requestOptions?: RequestOptions,
+      ): AsyncIterable<ServerCoordinationDataThreadStreamOutput> =>
+        sse<ServerCoordinationDataThreadStreamOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/events/stream`,
+            query: { after: input["after"], limit: input["limit"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      workCardGet: (input: ServerCoordinationDataWorkCardGetInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataWorkCardGetOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/work-card`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      workCardUpdate: (input: ServerCoordinationDataWorkCardUpdateInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataWorkCardUpdateOutput>(
+          {
+            method: "PUT",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/work-card`,
+            body: {
+              expectedVersion: input["expectedVersion"],
+              sourceActivitySeq: input["sourceActivitySeq"],
+              card: input["card"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      workCardList: (input: ServerCoordinationDataWorkCardListInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataWorkCardListOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/work-cards`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      activityList: (input: ServerCoordinationDataActivityListInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataActivityListOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/activity`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
           },
           requestOptions,
         ),

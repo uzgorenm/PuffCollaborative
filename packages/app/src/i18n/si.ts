@@ -1,4 +1,6 @@
+import { puff } from "./puff-en"
 export const dict: Record<string, string> = {
+  ...puff, // Explicit English fallback for the hackathon feature.
   "desktop.menu.app": "OpenCode",
   "desktop.menu.file": "ගොනුව",
   "desktop.menu.edit": "සංස්කරණය කරන්න",

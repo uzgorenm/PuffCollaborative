@@ -49,6 +49,64 @@ const snapshot = Schema.Struct({
   cursor: Schema.Int,
 })
 
+const sourceThread = Schema.Struct({
+  threadId: Coordination.ThreadID,
+  sessionId: Coordination.Thread.fields.sessionId,
+  href: Schema.String,
+})
+
+const activityView = Schema.Struct({
+  projectId: Coordination.ProjectID,
+  asOf: Schema.String,
+  workingNow: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      sourceThread,
+      runId: Schema.NullOr(Coordination.RunID),
+      status: Schema.Union([Coordination.RunState, Schema.Literal("idle")]),
+      startedAt: Schema.NullOr(Schema.String),
+      approvalId: Schema.NullOr(Schema.String),
+      objective: Schema.NullOr(Schema.String),
+      step: Schema.NullOr(Schema.String),
+      blockers: Schema.Array(Schema.String),
+      recentVerifiedOutcome: Schema.NullOr(Schema.String),
+      contributors: Schema.Array(Coordination.UserID),
+      freshness: Schema.NullOr(
+        Schema.Struct({
+          sourceActivitySeq: Schema.Int,
+          threadActivitySeq: Schema.Int,
+          stale: Schema.Boolean,
+          generatedAt: Schema.String,
+          updatedAt: Schema.String,
+          summaryJobId: Schema.String,
+        }),
+      ),
+    }),
+  ),
+  upNext: Schema.Array(
+    Schema.Struct({
+      id: Coordination.InstructionID,
+      sourceThread,
+      status: Schema.Literal("queued"),
+      queueSeq: Schema.Int,
+      submittedAt: Schema.String,
+      actorId: Coordination.UserID,
+      text: Schema.String,
+    }),
+  ),
+  recent: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      sourceThread: Schema.NullOr(sourceThread),
+      kind: Coordination.EventKind,
+      occurredAt: Schema.String,
+      actorId: Schema.NullOr(Coordination.UserID),
+      outcome: Schema.NullOr(Schema.String),
+      eventSeq: Schema.Int,
+    }),
+  ),
+})
+
 export const CoordinationGroup = HttpApiGroup.make("server.coordination").add(
   HttpApiEndpoint.get("coordination.status", "/api/coordination/v1/status", {
     success: Schema.Struct({ ready: Schema.Boolean }),
@@ -64,27 +122,27 @@ export const CoordinationGroup = HttpApiGroup.make("server.coordination").add(
 
 export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data")
   .add(
-    HttpApiEndpoint.get("coordination.projects.list", "/api/coordination/v1/projects", {
+    HttpApiEndpoint.get("coordination.projectList", "/api/coordination/v1/projects", {
       success: Schema.Array(Coordination.SharedProject),
       error: errors,
     }),
   )
   .add(
-    HttpApiEndpoint.post("coordination.projects.create", "/api/coordination/v1/projects", {
+    HttpApiEndpoint.post("coordination.projectCreate", "/api/coordination/v1/projects", {
       payload: Schema.Struct({ projectId: Coordination.ProjectID, name: Schema.String, requestId: Schema.String }),
       success: Coordination.SharedProject,
       error: errors,
     }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.projects.get", "/api/coordination/v1/projects/:projectId", {
+    HttpApiEndpoint.get("coordination.projectGet", "/api/coordination/v1/projects/:projectId", {
       params: { projectId: Coordination.ProjectID },
       success: Schema.Struct({ project: Coordination.SharedProject, members: Schema.Array(Coordination.Membership) }),
       error: errors,
     }),
   )
   .add(
-    HttpApiEndpoint.post("coordination.projects.members", "/api/coordination/v1/projects/:projectId/members", {
+    HttpApiEndpoint.post("coordination.memberGrant", "/api/coordination/v1/projects/:projectId/members", {
       params: { projectId: Coordination.ProjectID },
       payload: Schema.Struct({ targetUserId: Coordination.UserID, requestId: Schema.String }),
       success: Coordination.Membership,
@@ -92,26 +150,22 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
-    HttpApiEndpoint.get(
-      "coordination.projects.contributions",
-      "/api/coordination/v1/projects/:projectId/contributions",
-      {
-        params: { projectId: Coordination.ProjectID },
-        query: Schema.Struct({ userId: Coordination.UserID.pipe(Schema.optional) }),
-        success: Schema.Array(Coordination.Contribution),
-        error: errors,
-      },
-    ),
+    HttpApiEndpoint.get("coordination.contributionList", "/api/coordination/v1/projects/:projectId/contributions", {
+      params: { projectId: Coordination.ProjectID },
+      query: Schema.Struct({ userId: Coordination.UserID.pipe(Schema.optional) }),
+      success: Schema.Array(Coordination.Contribution),
+      error: errors,
+    }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.projects.threads", "/api/coordination/v1/projects/:projectId/threads", {
+    HttpApiEndpoint.get("coordination.projectThreadList", "/api/coordination/v1/projects/:projectId/threads", {
       params: { projectId: Coordination.ProjectID },
       success: Schema.Array(Coordination.Thread),
       error: errors,
     }),
   )
   .add(
-    HttpApiEndpoint.post("coordination.threads.create", "/api/coordination/v1/projects/:projectId/threads", {
+    HttpApiEndpoint.post("coordination.threadCreate", "/api/coordination/v1/projects/:projectId/threads", {
       params: { projectId: Coordination.ProjectID },
       payload: Schema.Struct({
         sessionId: Coordination.Thread.fields.sessionId,
@@ -123,21 +177,21 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.threads.get", "/api/coordination/v1/threads/:threadId", {
+    HttpApiEndpoint.get("coordination.threadGet", "/api/coordination/v1/threads/:threadId", {
       params: { threadId: Coordination.ThreadID },
       success: snapshot,
       error: errors,
     }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.comments.list", "/api/coordination/v1/threads/:threadId/comments", {
+    HttpApiEndpoint.get("coordination.commentList", "/api/coordination/v1/threads/:threadId/comments", {
       params: { threadId: Coordination.ThreadID },
       success: Schema.Array(Coordination.Comment),
       error: errors,
     }),
   )
   .add(
-    HttpApiEndpoint.post("coordination.comments.create", "/api/coordination/v1/threads/:threadId/comments", {
+    HttpApiEndpoint.post("coordination.commentCreate", "/api/coordination/v1/threads/:threadId/comments", {
       params: { threadId: Coordination.ThreadID },
       payload: Schema.Struct({ requestId: Schema.String, body: Schema.String }),
       success: Coordination.Comment,
@@ -145,7 +199,7 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
-    HttpApiEndpoint.post("coordination.instructions.submit", "/api/coordination/v1/threads/:threadId/instructions", {
+    HttpApiEndpoint.post("coordination.instructionSubmit", "/api/coordination/v1/threads/:threadId/instructions", {
       params: { threadId: Coordination.ThreadID },
       payload: Schema.Struct({ requestId: Schema.String, text: Schema.String }),
       success: Schema.Struct({ instruction: Coordination.InstructionRequest, run: Coordination.Run }),
@@ -154,7 +208,7 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
   )
   .add(
     HttpApiEndpoint.post(
-      "coordination.instructions.cancel",
+      "coordination.instructionCancel",
       "/api/coordination/v1/threads/:threadId/instructions/:instructionId/cancel",
       {
         params: { threadId: Coordination.ThreadID, instructionId: Coordination.InstructionID },
@@ -164,14 +218,14 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     ),
   )
   .add(
-    HttpApiEndpoint.post("coordination.runner.reserve", "/api/coordination/v1/runner/threads/:threadId/reserve", {
+    HttpApiEndpoint.post("coordination.runnerReserve", "/api/coordination/v1/runner/threads/:threadId/reserve", {
       params: { threadId: Coordination.ThreadID },
       success: Schema.Struct({ run: Schema.optional(Coordination.Run) }),
       error: errors,
     }),
   )
   .add(
-    HttpApiEndpoint.post("coordination.runner.report", "/api/coordination/v1/runner/runs/:runId/events", {
+    HttpApiEndpoint.post("coordination.runnerReport", "/api/coordination/v1/runner/runs/:runId/events", {
       params: { runId: Coordination.RunID },
       payload: Schema.Struct({ callbackId: Schema.String, callback }),
       success: Coordination.Run,
@@ -180,7 +234,7 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
   )
   .add(
     HttpApiEndpoint.post(
-      "coordination.approvals.claim",
+      "coordination.approvalClaim",
       "/api/coordination/v1/threads/:threadId/approvals/:approvalId/claim",
       {
         params: { threadId: Coordination.ThreadID, approvalId: Schema.String },
@@ -192,7 +246,7 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
   )
   .add(
     HttpApiEndpoint.post(
-      "coordination.approvals.decide",
+      "coordination.approvalDecide",
       "/api/coordination/v1/threads/:threadId/approvals/:approvalId/decision",
       {
         params: { threadId: Coordination.ThreadID, approvalId: Schema.String },
@@ -207,7 +261,7 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     ),
   )
   .add(
-    HttpApiEndpoint.get("coordination.projectEvents.replay", "/api/coordination/v1/projects/:projectId/events", {
+    HttpApiEndpoint.get("coordination.projectReplay", "/api/coordination/v1/projects/:projectId/events", {
       params: { projectId: Coordination.ProjectID },
       query: replayQuery,
       success: Schema.Struct({ events: Schema.Array(Coordination.Event), cursor: Schema.Int, hasMore: Schema.Boolean }),
@@ -215,7 +269,7 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.projectEvents.stream", "/api/coordination/v1/projects/:projectId/events/stream", {
+    HttpApiEndpoint.get("coordination.projectStream", "/api/coordination/v1/projects/:projectId/events/stream", {
       params: { projectId: Coordination.ProjectID },
       query: replayQuery,
       success: HttpApiSchema.StreamSse({ data: Coordination.Event }),
@@ -223,7 +277,7 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.threadEvents.replay", "/api/coordination/v1/threads/:threadId/events", {
+    HttpApiEndpoint.get("coordination.threadReplay", "/api/coordination/v1/threads/:threadId/events", {
       params: { threadId: Coordination.ThreadID },
       query: replayQuery,
       success: Schema.Struct({ events: Schema.Array(Coordination.Event), cursor: Schema.Int, hasMore: Schema.Boolean }),
@@ -231,7 +285,7 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.threadEvents.stream", "/api/coordination/v1/threads/:threadId/events/stream", {
+    HttpApiEndpoint.get("coordination.threadStream", "/api/coordination/v1/threads/:threadId/events/stream", {
       params: { threadId: Coordination.ThreadID },
       query: replayQuery,
       success: HttpApiSchema.StreamSse({ data: Coordination.Event }),
@@ -239,14 +293,14 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.workCard.get", "/api/coordination/v1/threads/:threadId/work-card", {
+    HttpApiEndpoint.get("coordination.workCardGet", "/api/coordination/v1/threads/:threadId/work-card", {
       params: { threadId: Coordination.ThreadID },
       success: Schema.Struct({ card: Schema.optional(Coordination.WorkCard) }),
       error: errors,
     }),
   )
   .add(
-    HttpApiEndpoint.put("coordination.workCard.update", "/api/coordination/v1/threads/:threadId/work-card", {
+    HttpApiEndpoint.put("coordination.workCardUpdate", "/api/coordination/v1/threads/:threadId/work-card", {
       params: { threadId: Coordination.ThreadID },
       payload: Schema.Struct({
         expectedVersion: Schema.Int,
@@ -257,6 +311,10 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
           blockers: Schema.Array(Schema.String),
           status: Coordination.WorkCard.fields.status,
           summaryJobId: Schema.String,
+          recentVerifiedOutcome: Coordination.WorkCard.fields.recentVerifiedOutcome,
+          contributors: Coordination.WorkCard.fields.contributors,
+          evidenceRefs: Coordination.WorkCard.fields.evidenceRefs,
+          generatedAt: Coordination.WorkCard.fields.generatedAt,
         }),
       }),
       success: Coordination.WorkCard,
@@ -264,16 +322,16 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.workCards.list", "/api/coordination/v1/projects/:projectId/work-cards", {
+    HttpApiEndpoint.get("coordination.workCardList", "/api/coordination/v1/projects/:projectId/work-cards", {
       params: { projectId: Coordination.ProjectID },
       success: Schema.Array(Coordination.WorkCard),
       error: errors,
     }),
   )
   .add(
-    HttpApiEndpoint.get("coordination.activity.list", "/api/coordination/v1/projects/:projectId/activity", {
+    HttpApiEndpoint.get("coordination.activityList", "/api/coordination/v1/projects/:projectId/activity", {
       params: { projectId: Coordination.ProjectID },
-      success: Schema.Unknown,
+      success: activityView,
       error: errors,
     }),
   )

@@ -43,6 +43,8 @@ export const authorizationLayer = Layer.effect(
     return Authorization.of((effect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
+        // Coordination routes use individually validated Basic credentials in their own middleware.
+        if (new URL(request.url, "http://localhost").pathname.startsWith("/api/coordination/v1/")) return yield* effect
         // Browsers cannot set headers on WebSocket upgrades, so a ticketed PTY connect skips
         // credential checks here; the connect handler consumes and validates the ticket.
         if (hasPtyConnectTicketURL(new URL(request.url, "http://localhost"))) return yield* effect

@@ -194,6 +194,7 @@ export type Event = typeof Event.Type
 
 export const WorkCard = Schema.Struct({
   id: WorkCardID,
+  projectId: ProjectID,
   threadId: ThreadID,
   version: Schema.Int,
   sourceActivitySeq: Schema.Int,
@@ -201,6 +202,11 @@ export const WorkCard = Schema.Struct({
   progress: Schema.String,
   blockers: Schema.Array(Schema.String),
   status: Schema.Literals(["queued", "active", "blocked", "idle", "done"]),
+  recentVerifiedOutcome: Schema.NullOr(Schema.String),
+  contributors: Schema.Array(UserID),
+  evidenceRefs: Schema.Array(Schema.Struct({ threadId: ThreadID, eventId: Schema.String, seq: Schema.Int })),
+  generatedAt: Schema.String,
+  submittedBy: Schema.String,
   updatedAt: Schema.String,
   summaryJobId: Schema.String,
 }).annotate({ identifier: "Coordination.WorkCard" })

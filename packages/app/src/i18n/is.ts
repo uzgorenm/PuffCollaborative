@@ -1,3 +1,4 @@
+import { puff } from "./puff-en"
 import { DESKTOP_NATIVE_KEYS } from "./desktop-native"
 
 const desktop = [
@@ -94,6 +95,7 @@ const desktop = [
 ]
 
 export const dict = {
+  ...puff, // Explicit English fallback for the hackathon feature.
   ...Object.fromEntries(DESKTOP_NATIVE_KEYS.map((key, index) => [key, desktop[index]])),
   "command.category.suggested": "Tillögur",
   "command.category.view": "Skoða",
