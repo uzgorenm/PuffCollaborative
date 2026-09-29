@@ -176,6 +176,11 @@ describe("coordination event journal", () => {
       expect(page.events).toEqual([expected])
       expect(page.cursor).toBe(expected.seq)
       expect(page.hasMore).toBe(false)
+
+      const live = yield* journal.subscribeThread(threadId, page.cursor).pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
+      yield* append(journal, projectId, otherThread, "not selected")
+      const selected = yield* append(journal, projectId, threadId, "next selected")
+      expect(Array.from(yield* Fiber.join(live))).toEqual([selected])
     }),
   )
 
@@ -185,6 +190,8 @@ describe("coordination event journal", () => {
       const { projectId } = ids()
       const invalid = yield* journal.replayProject(projectId, 1, 10).pipe(Effect.flip)
       expect(invalid.code).toBe("invalid")
+      expect((yield* journal.replayProject(projectId, -2, 10).pipe(Effect.flip)).code).toBe("invalid")
+      expect((yield* journal.replayProject(projectId, -1, 0).pipe(Effect.flip)).code).toBe("invalid")
       const denied = Coordination.ThreadID.make(`thr_${crypto.randomUUID()}`)
       const access = yield* journal.replayThread(denied, -1, 10).pipe(Effect.flip)
       expect(access.code).toBe("forbidden")
