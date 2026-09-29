@@ -103,7 +103,7 @@ Build:
 - Cancellation and approval handling connected to the server’s controls.
 Boundary: Executes the server’s assignments; does not create a separate queue or independently decide execution order.
 Demo test: Two threads edit the same filename in separate workspaces without overwriting one another. Both expose their progress and diffs.
-### Talha — Multiplayer interface and activity dashboard
+###       — Multiplayer interface and activity dashboard
 Owns everything teammates see and interact with.
 Build:
 - A project view showing everyone’s shared threads.
