@@ -33,6 +33,7 @@ import type { CoordinationPorts } from "./coordination-composition"
 import { configuredRunnerFactory } from "./runner-harness-composition"
 import { RunnerHarnessConfig } from "./runner-harness-config"
 import { runnerHarnessAuthorizationLayer } from "./runner-harness-authorization"
+import { runnerHarnessBoundaryLayer } from "./runner-harness-boundary"
 
 const applicationServices = LayerNode.group([
   Database.node,
@@ -76,6 +77,7 @@ function makeRoutes<AuthError, AuthServices, R>(
     Layer.provide(sessionLocationLayer),
     Layer.provide(locationLayer),
     Layer.provide(RunnerHarnessConfig.path() ? runnerHarnessAuthorizationLayer : authorizationLayer),
+    Layer.provide(runnerHarnessBoundaryLayer),
     Layer.provide(coordinationAuthLayer),
     Layer.provide(coordinationLayer(coordinationPorts)),
     Layer.provide(CoordinationEvents.layer),
