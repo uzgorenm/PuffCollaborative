@@ -1,0 +1,134 @@
+{
+  "synthetic": true,
+  "projectId": "prj_demo",
+  "principals": [
+    { "kind": "member", "id": "usr_alice", "projectIds": ["prj_demo"] },
+    { "kind": "member", "id": "usr_bob", "projectIds": ["prj_demo"] },
+    { "kind": "member", "id": "usr_eve", "projectIds": ["prj_elsewhere"] }
+  ],
+  "threads": [
+    {
+      "id": "thr_auth",
+      "projectId": "prj_demo",
+      "sessionId": "ses_auth",
+      "workerId": "wrk_alice",
+      "title": "Authentication helper",
+      "createdBy": "usr_alice",
+      "createdAt": "2026-09-29T18:00:00.000Z",
+      "activitySeq": 4
+    },
+    {
+      "id": "thr_client",
+      "projectId": "prj_demo",
+      "sessionId": "ses_client",
+      "workerId": "wrk_bob",
+      "title": "Client integration",
+      "createdBy": "usr_bob",
+      "createdAt": "2026-09-29T18:01:00.000Z",
+      "activitySeq": 2
+    }
+  ],
+  "instructions": [
+    {
+      "id": "ins_running",
+      "requestId": "req_running",
+      "threadId": "thr_auth",
+      "actorId": "usr_alice",
+      "text": "Implement the auth helper.",
+      "queueSeq": 1,
+      "submittedAt": "2026-09-29T18:02:00.000Z",
+      "runId": "run_running"
+    },
+    {
+      "id": "ins_queued",
+      "requestId": "req_queued",
+      "threadId": "thr_auth",
+      "actorId": "usr_bob",
+      "text": "Add the client usage example.",
+      "queueSeq": 2,
+      "submittedAt": "2026-09-29T18:03:00.000Z",
+      "runId": "run_queued"
+    }
+  ],
+  "runs": [
+    {
+      "id": "run_running",
+      "threadId": "thr_auth",
+      "instructionId": "ins_running",
+      "state": "waiting_approval",
+      "attempt": 1,
+      "runnerMessageId": "msg_run_running",
+      "executionOwner": { "workerId": "wrk_alice", "instanceId": "opencode_fixture_1" },
+      "leaseUntil": "2026-09-29T18:05:00.000Z",
+      "createdAt": "2026-09-29T18:02:00.000Z",
+      "startedAt": "2026-09-29T18:02:01.000Z"
+    },
+    {
+      "id": "run_queued",
+      "threadId": "thr_auth",
+      "instructionId": "ins_queued",
+      "state": "queued",
+      "attempt": 0,
+      "runnerMessageId": "msg_run_queued",
+      "createdAt": "2026-09-29T18:03:00.000Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt_tool",
+      "projectId": "prj_demo",
+      "threadId": "thr_auth",
+      "seq": 3,
+      "kind": "run.tool",
+      "occurredAt": "2026-09-29T18:02:20.000Z",
+      "runId": "run_running",
+      "instructionId": "ins_running",
+      "payload": { "tool": "read", "status": "completed" }
+    },
+    {
+      "id": "evt_approval",
+      "projectId": "prj_demo",
+      "threadId": "thr_auth",
+      "seq": 4,
+      "kind": "run.approval.requested",
+      "occurredAt": "2026-09-29T18:02:21.000Z",
+      "runId": "run_running",
+      "instructionId": "ins_running",
+      "payload": { "approvalId": "apr_fixture", "tool": "write", "status": "pending" }
+    },
+    {
+      "id": "evt_card",
+      "projectId": "prj_demo",
+      "threadId": "thr_client",
+      "seq": 3,
+      "kind": "work-card.updated",
+      "occurredAt": "2026-09-29T18:03:10.000Z",
+      "payload": { "workCardId": "wc_client", "version": 2, "sourceActivitySeq": 2 }
+    }
+  ],
+  "approvals": [
+    {
+      "id": "apr_fixture",
+      "threadId": "thr_auth",
+      "runId": "run_running",
+      "toolCallId": "tool_write_fixture",
+      "version": 1,
+      "state": "pending",
+      "requestedAt": "2026-09-29T18:02:21.000Z"
+    }
+  ],
+  "workCards": [
+    {
+      "id": "wc_client",
+      "threadId": "thr_client",
+      "version": 2,
+      "sourceActivitySeq": 2,
+      "currentTask": "Connect the client to the auth helper",
+      "progress": "Client call site drafted",
+      "blockers": ["Waiting for the auth helper interface"],
+      "status": "blocked",
+      "updatedAt": "2026-09-29T18:03:10.000Z",
+      "summaryJobId": "jev_fixture_1"
+    }
+  ]
+}
