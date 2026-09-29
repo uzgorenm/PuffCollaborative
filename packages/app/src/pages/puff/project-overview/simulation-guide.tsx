@@ -26,7 +26,7 @@ export function SimulationGuide(props: {
       <span class="puff-simulation-tag">{language.t("puff.simulation.banner")}</span>
       <div>
         <h2 id="puff-simulation-guide-title">{language.t("puff.simulation.guide")}</h2>
-        <p>{language.t("puff.simulation.bannerDetail")}</p>
+        <p>{language.t("puff.simulation.rail.guideHint")}</p>
       </div>
     </header>
     <nav aria-label={language.t("puff.simulation.guide")}>
@@ -39,6 +39,8 @@ export function SimulationGuide(props: {
         >{label(scenario.id)}</button>}
       </For>
     </nav>
+    <details class="puff-simulation-details">
+      <summary>{language.t("puff.simulation.rail.showControls")}</summary>
     <Show when={current()}>
       {(scenario) => <article class="puff-simulation-current">
         <span class="puff-overview-label">{language.t("puff.simulation.current")}</span>
@@ -91,5 +93,6 @@ export function SimulationGuide(props: {
       <span>{language.t("puff.simulation.resetHint")}</span>
       <Show when={props.error}><p role="alert">{language.t("puff.simulation.actionError")}</p></Show>
     </div>
+    </details>
   </section>
 }
