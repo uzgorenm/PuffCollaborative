@@ -51,6 +51,6 @@ The MVP keeps historical numeric event cursors indefinitely. An out-of-scope or 
 
 ## Runner-output citation repair
 
-At `e83a0bb`, `I regression: runner output must advance the citable activity revision` failed: a `run.output` event committed at sequence 8 while the thread's `activitySeq` remained 4. A card citing sequence 8 was rejected. The event journal now advances the activity revision in the same transaction as a thread event, excluding card updates. The test passed at `b3eeb0c`, and the card citation received HTTP 200. The [recheck receipt](hackathon/evidence/2026-09-29-coordination-activity-revision.md) records that run.
+At `e83a0bb`, `I regression: runner output must advance the citable activity revision` failed: a `run.output` event committed at sequence 8 while the thread's `activitySeq` remained 4. A card citing sequence 8 was rejected. The journal advances the activity revision with a thread's comment or runner content event in the same transaction. The test passed at `b3eeb0c`, and the card citation received HTTP 200. The [recheck receipt](hackathon/evidence/2026-09-29-coordination-activity-revision.md) records that run.
 
 The process entry point uses the real route layer and migrations but is not the normal `opencode serve` CLI. The live OpenCode RunnerPort, workspace and Session history implementation, frontend subscribers, and Jev/Flower analysis service still require their own integration runs.
