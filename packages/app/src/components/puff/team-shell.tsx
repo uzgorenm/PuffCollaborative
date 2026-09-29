@@ -200,8 +200,7 @@ export function TeamShell(props: ParentProps) {
                   <For each={group.startedTopics}>{(topic) => <p>{topic}</p>}</For>
                 </Show>
                 <Show when={group.reports.length}>
-                  <strong>{language.t("puff.team.people.contributorReports")}</strong>
-                  <For each={group.reports}>{(report) => <p>{report.text}</p>}</For>
+                  <p>{group.summary}</p>
                   <details class="team-person-sources">
                     <summary>{language.t("puff.team.people.reportSources")}</summary>
                     <For each={group.reports}>{(report) => <A href={`/puff/thread/${encodeURIComponent(report.threadId)}`}>
@@ -290,7 +289,6 @@ export function TeamShell(props: ParentProps) {
             <details class="team-simulation-details">
               <summary>{language.t("puff.team.connectionSettings")}</summary>
               <p>{language.t("puff.simulation.bannerDetail")}</p>
-              <A href="/puff?demo-controls=1">{language.t("puff.team.people.demoControls")}</A>
             </details>
           </Show>
         </div>

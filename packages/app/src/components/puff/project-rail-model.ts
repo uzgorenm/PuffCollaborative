@@ -52,13 +52,14 @@ export function projectRail(input: {
       const card = row.currentCard
       const sourceRef = card?.evidenceRefs.find((ref) => ref.threadId === row.thread.id && ref.eventId.trim())
       if (!card?.contributors.includes(member.userId) || !sourceRef) return []
-      const text = (card.status === "done" ? card.recentVerifiedOutcome?.trim() : card.progress.trim()) || card.currentTask.trim()
+      const text = card.progress.trim() || card.recentVerifiedOutcome?.trim() || card.currentTask.trim()
       return text ? [{ threadId: row.thread.id, threadTitle: row.thread.title, text, sourceRef }] : []
     })
     const reported = new Set(reports.map((report) => report.threadId))
     const startedTopics = [...new Set(sessions.filter((row) => !reported.has(row.thread.id))
       .map((row) => row.currentCard?.currentTask.trim()).filter((task): task is string => !!task))]
-    return { member, sessions, startedTopics, reports }
+    const summary = [...new Set(reports.map((report) => report.text))].join(" ")
+    return { member, sessions, startedTopics, reports, summary }
   })
   return { members, rows, groups, unknownRows: rows.filter((row) => !row.creatorIsMember) }
 }

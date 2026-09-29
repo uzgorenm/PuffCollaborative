@@ -6,6 +6,7 @@ export const puff = {
   ...overviewEnglish,
   ...simulationEnglish,
   ...fixReuseEnglish,
+  "puff.team.people.demoProject.wf04": "Project list recovery",
   "puff.team.sourceMissing": "This source event is unavailable in the permitted conversation history.",
   "puff.team.sourceLoading": "Loading source event…",
   "puff.team.sourceNoAccess": "You do not have access to this source event.",

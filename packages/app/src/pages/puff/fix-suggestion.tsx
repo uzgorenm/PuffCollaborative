@@ -11,7 +11,11 @@ export function FixSuggestion() {
   const language = useLanguage()
   const [view, set] = createStore({ inspect: false })
   const attempt = () => team.state.fixAttempts[team.state.threadId]
-  const fix = () => attempt()?.fix ?? team.state.fixProposal
+  const fix = () =>
+    team.state.snapshot?.thread.id === team.state.threadId &&
+    team.state.snapshot.thread.projectId === team.state.projectId
+      ? (attempt()?.fix ?? team.state.fixProposal)
+      : undefined
   const person = () => {
     const id = fix()?.actorId ?? ""
     return (
