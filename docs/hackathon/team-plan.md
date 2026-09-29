@@ -96,6 +96,15 @@ The six Agent roles inside the backend contract are Serhat's implementation subd
 
 ## Task 4 — Ferit: actual Flower cooperation and useful findings
 
+**Agent 1 checkpoint:** Two distinct AgentApp projects and the local chain adapter
+are implemented in `hackathon/flower/`. Local source/unit/build evidence and the
+blocked live attempt are recorded in the [Flower receipt](evidence/2026-09-29-flower-chain.md).
+SuperGrid authentication must be refreshed before real result retrieval can be
+verified. The requested provisional `ContextRequest`/`ProjectSnapshot` boundary
+is explicit; mapping it to project `seq`, `Thread.activitySeq` and the current
+job/result API still requires Serhat at C3/C8. No shared schema or Agent 2
+`activity/`/`fixtures/` file is changed. The live checkboxes remain open.
+
 **Consumes:** bounded selected evidence, explicit alternative labels, source IDs/sequences and stable job identity. **Produces:** version-compatible AgentApps, actual useful agent exchange, validated report and bounded errors. **Gates:** G2, G3, G4, G6.
 
 - [ ] Inspect the product project's dependency declaration and preserve its compatible environment. Verify build and a small hosted result before adding detailed classification.

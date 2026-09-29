@@ -35,6 +35,13 @@ The [backend mock integration receipt](evidence/2026-09-29-coordination-backend-
 
 ## Rules for checking a box
 
+**Flower checkpoint — September 29:** Agent 1's
+[receipt](evidence/2026-09-29-flower-chain.md) records two separate AgentApp builds,
+local boundary/lifecycle checks and a blocked synthetic SuperGrid attempt.
+Authentication failed before run IDs were returned. G2/WF10 remain open; no
+live collaboration or publication is claimed. Serhat's C3/C8 mapping is still
+needed before the provisional input/output adapter can be called integrated.
+
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.
 - `NOT RUN`: no matching evidence. Leave unchecked even if code or fixtures exist.
 - `FAIL`: a run contradicted the expectation. Record actual behavior and the next fix.
