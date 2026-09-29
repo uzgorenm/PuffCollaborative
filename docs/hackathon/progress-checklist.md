@@ -27,6 +27,12 @@ This adds implementation evidence to T3; it closes no live gate or WF01–WF07 c
 
 The [backend mock integration receipt](evidence/2026-09-29-coordination-backend-mock.md) is tied to pushed commit [`4124e1a`](https://github.com/uzgorenm/PuffCollaborative/commit/4124e1a). It records the registered `/api/coordination/v1` handlers, individual Basic identities, real SQLite/EventV2 persistence, a two-client HTTP flow, restart reads, migrations, generated client and the explicit mock runner. The core coordination suite passed 39 tests; the server integration passed seven consecutive 51-assertion runs after an ordering assumption was fixed. This is an integrated multiplayer backend result with a mock execution port. It does not close G0 or a WF01–WF07 case because the Puff awareness contract, real OpenCode execution and Flower pipeline have not been exercised together.
 
+## Coordination process checkpoint — September 29
+
+The [process test receipt](evidence/2026-09-29-coordination-process-e2e.md) tests commit `e83a0bb71203c14c3ad996ea155187ad5453763d` through real HTTP and SQLite with a separate fake runner process. The smoke test, typecheck, existing mock integration test, fresh initialization and preceding-schema migration passed. The broader suite had eight passing cases and one failing regression: `run.output` commits without advancing `Thread.activitySeq`, preventing a source-cited work card for that output. Seed `12648430` completed 100 accepted instructions across 20 threads, with five queued cancellations and 95 starts.
+
+This is backend integration evidence against external simulators. It does not change the G0 through G7 or WF01 through WF10 statuses. The real OpenCode runner, shared frontend, and Jev/Flower exchange still need live receipts.
+
 ## Rules for checking a box
 
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.
