@@ -37,6 +37,8 @@ The [content revision recheck](evidence/2026-09-29-coordination-content-revision
 
 The [activity-feed receipt](evidence/2026-09-29-coordination-activity-feed.md) verifies the `run.output` read-model projection with fixture events at `a0ee1dd` (3 tests, 16 assertions) and authenticated HTTP delivery at `c2f24b5` (1 focused process case, 14 assertions). Real runner output in the live view remains to be checked.
 
+The [recovery isolation receipt](evidence/2026-09-29-coordination-recovery-isolation.md) at `204d9d6` verifies that an unverifiable Run holds its own Thread without blocking another Thread of the same worker. A focused Queue/SQLite regression passed 13 tests and 66 assertions with a mocked execution port. The full HTTP process suite passed 9 cases and 1,088 assertions with a separate fake runner, including reserved delivery after disconnect and exact recovery on reconnect. The retained OpenCode process test is being checked separately.
+
 This is backend integration evidence against external simulators. It does not change the G0 through G7 or WF01 through WF10 statuses. The real OpenCode runner, shared frontend, and Jev/Flower exchange still need live receipts.
 
 ## Rules for checking a box
