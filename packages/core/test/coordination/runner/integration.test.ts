@@ -28,6 +28,12 @@ const thread = Schema.decodeUnknownSync(Coordination.Thread)({
   createdAt: date,
   activitySeq: 0,
 })
+const otherThread = Schema.decodeUnknownSync(Coordination.Thread)({
+  ...thread,
+  id: "thr_runner_other",
+  sessionId: "ses_runner_other",
+  title: "Other runner thread",
+})
 const member = Schema.decodeUnknownSync(Coordination.AuthContext)({ kind: "member", userId: thread.createdBy })
 const secondMember = Schema.decodeUnknownSync(Coordination.AuthContext)({ kind: "member", userId: "usr_second" })
 const owner = Schema.decodeUnknownSync(Coordination.ExecutionOwner)({
@@ -38,14 +44,16 @@ const runner = Schema.decodeUnknownSync(Coordination.AuthContext)({ kind: "runne
 
 const access: CoordinationContracts.Access = {
   authorize: () => Effect.void,
-  getThread: (principal, threadId) =>
-    threadId === thread.id &&
-    (principal.kind === "member" ||
-      (principal.kind === "runner" &&
-        principal.workerId === thread.workerId &&
-        principal.instanceId === owner.instanceId))
-      ? Effect.succeed(thread)
-      : Effect.fail({ code: "forbidden", message: "Fixture access denied" }),
+  getThread: (principal, threadId) => {
+    const selected = threadId === thread.id ? thread : threadId === otherThread.id ? otherThread : undefined
+    return selected &&
+      (principal.kind === "member" ||
+        (principal.kind === "runner" &&
+          principal.workerId === selected.workerId &&
+          principal.instanceId === owner.instanceId))
+      ? Effect.succeed(selected)
+      : Effect.fail({ code: "forbidden", message: "Fixture access denied" })
+  },
 }
 
 const services = Effect.gen(function* () {
@@ -58,6 +66,63 @@ const services = Effect.gen(function* () {
 })
 
 describe("coordination runner with real Queue, SQLite and EventV2; mocked Access and execution port", () => {
+  it.effect("keeps an uncertain cancellation in its Thread while another Thread reserves work", () =>
+    Effect.gen(function* () {
+      const { queue, approvals } = yield* services
+      const starts: CoordinationContracts.RunnerCommand[] = []
+      const first = yield* queue.submit({
+        principal: member,
+        threadId: thread.id,
+        requestId: "req_uncertain",
+        text: "First Thread work",
+      })
+      const later = yield* queue.submit({
+        principal: member,
+        threadId: thread.id,
+        requestId: "req_held_later",
+        text: "Must stay queued",
+      })
+      const independent = yield* queue.submit({
+        principal: member,
+        threadId: otherThread.id,
+        requestId: "req_independent",
+        text: "Other Thread work",
+      })
+      const port: CoordinationContracts.RunnerPort = {
+        start: (command) =>
+          Effect.sync(() => {
+            starts.push(command)
+            return { messageId: command.runnerMessageId }
+          }),
+        interrupt: () =>
+          Effect.fail({ code: "unavailable", message: "Cancellation outcome is not independently verified" }),
+        resolveApproval: () => Effect.void,
+        reconcile: (runnerMessageId) =>
+          runnerMessageId === first.run.runnerMessageId
+            ? Effect.fail({ code: "unavailable", message: "Cancellation outcome is not independently verified" })
+            : Effect.succeed("missing"),
+      }
+      const adapter = RunnerAdapter.make({ access, queue, port, approvals, now: () => Date.parse(date) })
+
+      expect((yield* adapter.claim(runner, thread.id, owner))?.id).toBe(first.run.id)
+      const cancellation = yield* adapter
+        .cancel({ principal: member, threadId: thread.id, instructionId: first.instruction.id })
+        .pipe(Effect.match({ onFailure: (error) => error, onSuccess: () => undefined }))
+      expect(cancellation?.code).toBe("unavailable")
+      expect((yield* queue.getRun(first.run.id))?.state).toBe("cancelling")
+
+      const held = yield* adapter
+        .claim(runner, thread.id, owner)
+        .pipe(Effect.match({ onFailure: (error) => error, onSuccess: () => undefined }))
+      expect(held?.code).toBe("unavailable")
+      expect((yield* queue.getRun(later.run.id))?.state).toBe("queued")
+      expect((yield* adapter.claim(runner, otherThread.id, owner))?.id).toBe(independent.run.id)
+      expect(starts.map((command) => command.runId)).toEqual([first.run.id, independent.run.id])
+      expect((yield* queue.getRun(first.run.id))?.state).toBe("cancelling")
+      expect((yield* queue.getRun(independent.run.id))?.state).toBe("reserved")
+    }),
+  )
+
   it.effect("reconstructs a reserved start from SQLite after the adapter is replaced", () =>
     Effect.gen(function* () {
       const { queue, approvals } = yield* services

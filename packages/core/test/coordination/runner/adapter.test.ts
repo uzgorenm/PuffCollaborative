@@ -218,9 +218,10 @@ function setup(plan: (command: CoordinationContracts.RunnerCommand) => ReadonlyA
         approval = { ...approval, deliveryState: "delivered" }
         return approval
       }),
-    pendingDecisions: (executionOwner) =>
+    pendingDecisions: (executionOwner, threadId) =>
       Effect.succeed(
         approval?.deliveryState === "pending" &&
+          (!threadId || approval.threadId === threadId) &&
           run.executionOwner?.workerId === executionOwner.workerId &&
           run.executionOwner.instanceId === executionOwner.instanceId
           ? [{ thread, approval }]
