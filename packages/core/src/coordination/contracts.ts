@@ -1,26 +1,83 @@
 export * as CoordinationContracts from "./contracts"
 
 import type { Coordination } from "@opencode-ai/schema/coordination"
-import type { Effect, Stream } from "effect"
+import type { Effect, Redacted, Stream } from "effect"
 
 export type ErrorCode = "invalid" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unavailable"
 export type Failure = { readonly code: ErrorCode; readonly message: string }
 export type Action = "read" | "submit" | "cancel" | "approve" | "runner" | "update_work_card"
 
+export interface Authentication {
+  readonly authenticate: (credentials: {
+    readonly username: string
+    readonly password: Redacted.Redacted
+  }) => Effect.Effect<Coordination.AuthContext, Failure>
+}
+
 export interface Access {
   readonly authorize: (
-    principal: Coordination.Principal,
+    principal: Coordination.AuthContext,
     projectId: Coordination.ProjectID,
     threadId: Coordination.ThreadID | undefined,
     action: Action,
   ) => Effect.Effect<void, Failure>
   readonly getThread: (
-    principal: Coordination.Principal,
+    principal: Coordination.AuthContext,
     threadId: Coordination.ThreadID,
     action: Action,
   ) => Effect.Effect<Coordination.Thread, Failure>
-  readonly snapshot: (
-    principal: Coordination.Principal,
+}
+
+export interface Projects {
+  readonly list: (auth: Coordination.AuthContext) => Effect.Effect<ReadonlyArray<Coordination.SharedProject>, Failure>
+  readonly get: (
+    auth: Coordination.AuthContext,
+    projectId: Coordination.ProjectID,
+  ) => Effect.Effect<
+    { readonly project: Coordination.SharedProject; readonly members: ReadonlyArray<Coordination.Membership> },
+    Failure
+  >
+  readonly create: (input: {
+    readonly auth: Coordination.AuthContext
+    readonly projectId: Coordination.ProjectID
+    readonly name: string
+    readonly requestId: string
+  }) => Effect.Effect<Coordination.SharedProject, Failure>
+  readonly listThreads: (
+    auth: Coordination.AuthContext,
+    projectId: Coordination.ProjectID,
+  ) => Effect.Effect<ReadonlyArray<Coordination.Thread>, Failure>
+  readonly createThread: (input: {
+    readonly auth: Coordination.AuthContext
+    readonly projectId: Coordination.ProjectID
+    readonly sessionId: Coordination.Thread["sessionId"]
+    readonly workerId: Coordination.WorkerID
+    readonly title: string
+    readonly requestId: string
+  }) => Effect.Effect<Coordination.Thread, Failure>
+  readonly contributions: (
+    auth: Coordination.AuthContext,
+    projectId: Coordination.ProjectID,
+    userId?: Coordination.UserID,
+  ) => Effect.Effect<ReadonlyArray<Coordination.Contribution>, Failure>
+}
+
+export interface Comments {
+  readonly list: (
+    auth: Coordination.AuthContext,
+    threadId: Coordination.ThreadID,
+  ) => Effect.Effect<ReadonlyArray<Coordination.Comment>, Failure>
+  readonly create: (input: {
+    readonly auth: Coordination.AuthContext
+    readonly threadId: Coordination.ThreadID
+    readonly requestId: string
+    readonly body: string
+  }) => Effect.Effect<Coordination.Comment, Failure>
+}
+
+export interface Snapshot {
+  readonly thread: (
+    auth: Coordination.AuthContext,
     threadId: Coordination.ThreadID,
   ) => Effect.Effect<ThreadSnapshot, Failure>
 }
@@ -67,19 +124,25 @@ export interface ReplayPage {
 }
 
 export interface Queue {
+  readonly instructions: (
+    threadId: Coordination.ThreadID,
+  ) => Effect.Effect<ReadonlyArray<Coordination.InstructionRequest>, Failure>
   readonly submit: (input: {
-    readonly principal: Coordination.Principal
+    readonly principal: Coordination.AuthContext
     readonly threadId: Coordination.ThreadID
     readonly requestId: string
     readonly text: string
-  }) => Effect.Effect<{ readonly instruction: Coordination.InstructionRequest; readonly run: Coordination.Run }, Failure>
+  }) => Effect.Effect<
+    { readonly instruction: Coordination.InstructionRequest; readonly run: Coordination.Run },
+    Failure
+  >
   readonly cancel: (input: {
-    readonly principal: Coordination.Principal
+    readonly principal: Coordination.AuthContext
     readonly threadId: Coordination.ThreadID
     readonly instructionId: Coordination.InstructionID
   }) => Effect.Effect<Coordination.Run, Failure>
   readonly reserveNext: (input: {
-    readonly principal: Coordination.Principal
+    readonly principal: Coordination.AuthContext
     readonly threadId: Coordination.ThreadID
     readonly executionOwner: Coordination.ExecutionOwner
     readonly leaseUntil: string
@@ -88,14 +151,12 @@ export interface Queue {
     Failure
   >
   readonly transition: (input: {
-    readonly principal: Coordination.Principal
+    readonly principal: Coordination.AuthContext
     readonly runId: Coordination.RunID
     readonly callbackId: string
     readonly callback: RunnerCallback
   }) => Effect.Effect<Coordination.Run, Failure>
-  readonly pending: (
-    executionOwner: Coordination.ExecutionOwner,
-  ) => Effect.Effect<
+  readonly pending: (executionOwner: Coordination.ExecutionOwner) => Effect.Effect<
     ReadonlyArray<{
       readonly thread: Coordination.Thread
       readonly instruction: Coordination.InstructionRequest
@@ -130,7 +191,10 @@ export type RunnerCallback =
 
 export interface RunnerPort {
   readonly start: (command: RunnerCommand) => Effect.Effect<{ readonly messageId: string }, Failure>
-  readonly interrupt: (command: { readonly runId: Coordination.RunID; readonly sessionId: Coordination.Thread["sessionId"] }) => Effect.Effect<void, Failure>
+  readonly interrupt: (command: {
+    readonly runId: Coordination.RunID
+    readonly sessionId: Coordination.Thread["sessionId"]
+  }) => Effect.Effect<void, Failure>
   readonly resolveApproval: (command: {
     readonly approvalId: string
     readonly decisionId: string
@@ -138,34 +202,36 @@ export interface RunnerPort {
     readonly sessionId: Coordination.Thread["sessionId"]
     readonly decision: "approve" | "reject"
   }) => Effect.Effect<void, Failure>
-  readonly reconcile: (runnerMessageId: string) => Effect.Effect<"missing" | "admitted" | "running" | "terminal", Failure>
+  readonly reconcile: (
+    runnerMessageId: string,
+  ) => Effect.Effect<"missing" | "admitted" | "running" | "terminal", Failure>
 }
 
 export interface Runner {
   readonly claim: (
-    principal: Coordination.Principal,
+    principal: Coordination.AuthContext,
     threadId: Coordination.ThreadID,
     executionOwner: Coordination.ExecutionOwner,
   ) => Effect.Effect<Coordination.Run | undefined, Failure>
   readonly report: (input: {
-    readonly principal: Coordination.Principal
+    readonly principal: Coordination.AuthContext
     readonly runId: Coordination.RunID
     readonly callbackId: string
     readonly callback: RunnerCallback
   }) => Effect.Effect<Coordination.Run, Failure>
   readonly cancel: (input: {
-    readonly principal: Coordination.Principal
+    readonly principal: Coordination.AuthContext
     readonly threadId: Coordination.ThreadID
     readonly instructionId: Coordination.InstructionID
   }) => Effect.Effect<Coordination.Run, Failure>
   readonly claimApproval: (input: {
-    readonly principal: Coordination.Principal
+    readonly principal: Coordination.AuthContext
     readonly threadId: Coordination.ThreadID
     readonly approvalId: string
     readonly expectedVersion: number
   }) => Effect.Effect<Coordination.Approval, Failure>
   readonly decideApproval: (input: {
-    readonly principal: Coordination.Principal
+    readonly principal: Coordination.AuthContext
     readonly threadId: Coordination.ThreadID
     readonly approvalId: string
     readonly expectedVersion: number
@@ -180,7 +246,7 @@ export interface Runner {
 export interface WorkCards {
   readonly get: (threadId: Coordination.ThreadID) => Effect.Effect<Coordination.WorkCard | undefined, Failure>
   readonly update: (input: {
-    readonly principal: Coordination.Principal
+    readonly principal: Coordination.AuthContext
     readonly threadId: Coordination.ThreadID
     readonly expectedVersion: number
     readonly sourceActivitySeq: number

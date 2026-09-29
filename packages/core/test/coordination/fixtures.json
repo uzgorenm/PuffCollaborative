@@ -2,9 +2,16 @@
   "synthetic": true,
   "projectId": "prj_demo",
   "principals": [
-    { "kind": "member", "id": "usr_alice", "projectIds": ["prj_demo"] },
-    { "kind": "member", "id": "usr_bob", "projectIds": ["prj_demo"] },
-    { "kind": "member", "id": "usr_eve", "projectIds": ["prj_elsewhere"] }
+    { "kind": "member", "userId": "usr_alice" },
+    { "kind": "member", "userId": "usr_bob" },
+    { "kind": "member", "userId": "usr_eve" }
+  ],
+  "memberships": [
+    { "projectId": "prj_demo", "userId": "usr_alice", "role": "owner", "joinedAt": "2026-09-29T18:00:00.000Z" },
+    { "projectId": "prj_demo", "userId": "usr_bob", "role": "member", "joinedAt": "2026-09-29T18:00:00.000Z" }
+  ],
+  "projects": [
+    { "id": "prj_demo", "name": "Puff demo", "createdBy": "usr_alice", "createdAt": "2026-09-29T18:00:00.000Z" }
   ],
   "threads": [
     {
@@ -114,7 +121,17 @@
       "toolCallId": "tool_write_fixture",
       "version": 1,
       "state": "pending",
+      "deliveryState": "none",
       "requestedAt": "2026-09-29T18:02:21.000Z"
+    }
+  ],
+  "comments": [
+    {
+      "id": "cmt_fixture",
+      "threadId": "thr_client",
+      "authorId": "usr_alice",
+      "body": "I am updating the helper interface; please wait for its final signature.",
+      "createdAt": "2026-09-29T18:02:30.000Z"
     }
   ],
   "workCards": [

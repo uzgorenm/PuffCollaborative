@@ -10,7 +10,7 @@ export const Changed = Event.define({
   schema: {
     aggregateID: Schema.String,
     projectId: Coordination.ProjectID,
-    threadId: Coordination.ThreadID,
+    threadId: Schema.optional(Coordination.ThreadID),
     kind: Coordination.EventKind,
     occurredAt: Schema.String,
     actorId: Schema.optional(Coordination.UserID),

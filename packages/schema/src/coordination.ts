@@ -33,7 +33,10 @@ export const RunState = Schema.Literals([
 export type RunState = typeof RunState.Type
 
 export const EventKind = Schema.Literals([
+  "project.created",
+  "membership.changed",
   "thread.created",
+  "comment.created",
   "instruction.submitted",
   "instruction.cancelled",
   "run.reserved",
@@ -89,6 +92,41 @@ export const Thread = Schema.Struct({
 }).annotate({ identifier: "Coordination.Thread" })
 export type Thread = typeof Thread.Type
 
+export const SharedProject = Schema.Struct({
+  id: ProjectID,
+  name: Schema.String,
+  createdBy: UserID,
+  createdAt: Schema.String,
+}).annotate({ identifier: "Coordination.SharedProject" })
+export type SharedProject = typeof SharedProject.Type
+
+export const Membership = Schema.Struct({
+  projectId: ProjectID,
+  userId: UserID,
+  role: Schema.Literals(["owner", "member"]),
+  joinedAt: Schema.String,
+}).annotate({ identifier: "Coordination.Membership" })
+export type Membership = typeof Membership.Type
+
+export const Comment = Schema.Struct({
+  id: Schema.String,
+  threadId: ThreadID,
+  authorId: UserID,
+  body: Schema.String,
+  createdAt: Schema.String,
+}).annotate({ identifier: "Coordination.Comment" })
+export type Comment = typeof Comment.Type
+
+export const Contribution = Schema.Struct({
+  projectId: ProjectID,
+  threadId: ThreadID,
+  userId: UserID,
+  sourceKind: Schema.Literals(["instruction", "comment"]),
+  sourceId: Schema.String,
+  occurredAt: Schema.String,
+}).annotate({ identifier: "Coordination.Contribution" })
+export type Contribution = typeof Contribution.Type
+
 export const InstructionRequest = Schema.Struct({
   id: InstructionID,
   requestId: Schema.String,
@@ -132,6 +170,9 @@ export const Approval = Schema.Struct({
   requestedAt: Schema.String,
   claimedBy: Schema.optional(UserID),
   claimExpiresAt: Schema.optional(Schema.String),
+  decisionId: Schema.optional(Schema.String),
+  decision: Schema.optional(Schema.Literals(["approve", "reject"])),
+  deliveryState: Schema.Literals(["none", "pending", "delivered", "failed"]),
   decidedBy: Schema.optional(UserID),
   decidedAt: Schema.optional(Schema.String),
 }).annotate({ identifier: "Coordination.Approval" })
@@ -140,7 +181,7 @@ export type Approval = typeof Approval.Type
 export const Event = Schema.Struct({
   id: Schema.String,
   projectId: ProjectID,
-  threadId: ThreadID,
+  threadId: Schema.optional(ThreadID),
   seq: Schema.Int,
   kind: EventKind,
   occurredAt: Schema.String,
@@ -165,23 +206,19 @@ export const WorkCard = Schema.Struct({
 }).annotate({ identifier: "Coordination.WorkCard" })
 export type WorkCard = typeof WorkCard.Type
 
-export const Principal = Schema.Union([
+export const AuthContext = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("member"),
-    id: UserID,
-    projectIds: Schema.Array(ProjectID),
+    userId: UserID,
   }),
   Schema.Struct({
     kind: Schema.Literal("runner"),
-    id: WorkerID,
-    projectId: ProjectID,
     workerId: WorkerID,
     instanceId: Schema.String,
   }),
   Schema.Struct({
     kind: Schema.Literal("analysis"),
-    id: Schema.String,
-    projectId: ProjectID,
+    serviceId: Schema.String,
   }),
-]).annotate({ identifier: "Coordination.Principal" })
-export type Principal = typeof Principal.Type
+]).annotate({ identifier: "Coordination.AuthContext" })
+export type AuthContext = typeof AuthContext.Type
