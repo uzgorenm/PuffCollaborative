@@ -1,4 +1,7 @@
+import { overviewEnglish } from "@/pages/puff/project-overview/overview-copy"
+
 export const puff = {
+  ...overviewEnglish,
   "puff.team.sourceMissing": "This source event is unavailable in the permitted conversation history.",
   "puff.team.sourceLoading": "Loading source event…",
   "puff.team.sourceNoAccess": "You do not have access to this source event.",
@@ -18,7 +21,8 @@ export const puff = {
   "puff.team.newSession": "New session",
   "puff.team.search": "Find a session…",
   "puff.team.yours": "YOUR SESSIONS",
-  "puff.team.shared": "SHARED WITH YOU",
+  "puff.team.shared": "PROJECT WORK",
+  "puff.team.overview": "Project overview",
   "puff.team.workTogether": "Bring your team into the flow",
   "puff.team.connectHint": "Follow shared conversations and contribute without leaving your own work.",
   "puff.team.connect": "Connect team",

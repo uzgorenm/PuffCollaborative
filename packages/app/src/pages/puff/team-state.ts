@@ -56,6 +56,13 @@ type Compartment = {
   decisions: Record<string, Decision | undefined>
 }
 type Read = { controller: AbortController; promise?: Promise<void> }
+type OverviewRead = {
+  project: Coordination.SharedProject
+  members: readonly Coordination.Membership[]
+  threads: readonly Coordination.Thread[]
+  cards: readonly Coordination.WorkCard[]
+  snapshots: readonly TeamThread[]
+}
 
 export function createTeamController(transport?: ProjectTransport) {
   const [state, set] = createStore({
@@ -65,6 +72,10 @@ export function createTeamController(transport?: ProjectTransport) {
     context: true,
     projects: [] as readonly Coordination.SharedProject[],
     threads: [] as readonly Coordination.Thread[],
+    overview: undefined as OverviewRead | undefined,
+    overviewLoading: false,
+    overviewError: "" as "" | ProjectApiError["code"],
+    overviewLastSuccess: 0,
     projectId: "",
     threadId: "",
     serviceUrl: "",
@@ -93,6 +104,7 @@ export function createTeamController(transport?: ProjectTransport) {
   let connecting: AbortController | undefined
   let reading: Read | undefined
   let roster: Read | undefined
+  let overviewRead: Read | undefined
 
   const writable = () =>
     state.connected &&
@@ -126,6 +138,8 @@ export function createTeamController(transport?: ProjectTransport) {
     invalidateThread()
     roster?.controller.abort()
     roster = undefined
+    overviewRead?.controller.abort()
+    overviewRead = undefined
     connecting?.abort()
     connecting = undefined
     api = undefined
@@ -140,6 +154,10 @@ export function createTeamController(transport?: ProjectTransport) {
         sourceScope: "",
         projects: [],
         threads: [],
+        overview: undefined,
+        overviewLoading: false,
+        overviewError: "",
+        overviewLastSuccess: 0,
         projectId: "",
         snapshot: undefined,
         events: [],
@@ -221,10 +239,65 @@ export function createTeamController(transport?: ProjectTransport) {
     sourceSelection++
     roster?.controller.abort()
     roster = undefined
-    set({ projectId: id, threads: [] })
+    overviewRead?.controller.abort()
+    overviewRead = undefined
+    set({ projectId: id, threads: [], overview: undefined, overviewError: "", overviewLastSuccess: 0, overviewLoading: false })
     errors.roster = ""
     showError()
     return refreshRoster()
+  }
+
+  function refreshOverview(): Promise<void> {
+    if (!api || !state.projectId) return Promise.resolve()
+    if (overviewRead) return overviewRead.promise ?? Promise.resolve()
+    const current = api
+    const projectId = state.projectId
+    const ticket = connection
+    const read: Read = { controller: new AbortController() }
+    overviewRead = read
+    set("overviewLoading", true)
+    const valid = () =>
+      overviewRead === read && current === api && ticket === connection &&
+      state.projectId === projectId && !read.controller.signal.aborted
+    read.promise = (async () => {
+      try {
+        const [{ project, members }, threads, cards] = await Promise.all([
+          current.project(projectId, read.controller.signal),
+          current.threads(projectId, read.controller.signal),
+          current.workCards(projectId, read.controller.signal),
+        ])
+        if (!valid()) return
+        if (threads.some((thread) => thread.projectId !== projectId) ||
+          cards.some((card) => !threads.some((thread) => thread.id === card.threadId)))
+          throw new ProjectApiError("invalid")
+        const snapshots = await Promise.all(threads.map((thread) => current.thread(thread.id, read.controller.signal)))
+        if (!valid()) return
+        if (snapshots.some((snapshot, index) => {
+          const thread = threads[index]
+          return !thread || snapshot.thread.id !== thread.id || snapshot.thread.projectId !== projectId ||
+            snapshot.thread.sessionId !== thread.sessionId || snapshot.thread.workerId !== thread.workerId ||
+            snapshot.thread.activitySeq !== thread.activitySeq
+        })) throw new ProjectApiError("invalid")
+        set({ overview: { project, members, threads, cards, snapshots }, overviewError: "", overviewLastSuccess: Date.now() })
+      } catch (error) {
+        if (!valid()) return
+        if (error instanceof ProjectApiError && [401, 403].includes(error.status)) {
+          clearConnection("unauthorized")
+          return
+        }
+        set({
+          overview: undefined,
+          overviewLastSuccess: 0,
+          overviewError: error instanceof ProjectApiError ? error.code : "connection",
+        })
+      } finally {
+        if (overviewRead === read) {
+          overviewRead = undefined
+          set("overviewLoading", false)
+        }
+      }
+    })()
+    return read.promise
   }
 
   function refreshRoster(): Promise<void> {
@@ -379,6 +452,29 @@ export function createTeamController(transport?: ProjectTransport) {
     return event
   }
 
+  async function resolveOverviewSource(ref: SourceRef, signal: AbortSignal): Promise<Coordination.Event> {
+    const current = api
+    const read = state.overview
+    const projectId = state.projectId
+    const identity = account
+    const scope = state.sourceScope
+    const ticket = connection
+    const generation = sourceSelection
+    const expected = { threadId: ref.threadId, eventId: ref.eventId, seq: ref.seq }
+    const cited = (overview: OverviewRead | undefined) => !!overview && overview.project.id === projectId &&
+      overview.cards.some((card) => card.threadId === expected.threadId &&
+        card.evidenceRefs.some((item) => item.threadId === expected.threadId && item.eventId === expected.eventId && item.seq === expected.seq))
+    if (!current || !state.connected || !identity || !scope || !projectId || !cited(read) || signal.aborted)
+      throw new ProjectApiError("invalid")
+    const event = await current.source(projectId, expected, signal)
+    if (signal.aborted || current !== api || ticket !== connection || identity !== account ||
+      scope !== state.sourceScope || generation !== sourceSelection || state.projectId !== projectId ||
+      !cited(state.overview) || event.projectId !== projectId || event.threadId !== expected.threadId ||
+      event.id !== expected.eventId || event.seq !== expected.seq)
+      throw new ProjectApiError("invalid")
+    return event
+  }
+
   async function send() {
     const id = state.threadId
     const draft = state.drafts[id]
@@ -482,7 +578,9 @@ export function createTeamController(transport?: ProjectTransport) {
     loadProject,
     selectThread,
     refresh,
+    refreshOverview,
     resolveSource,
+    resolveOverviewSource,
     send,
     control,
     canRetryDecision,

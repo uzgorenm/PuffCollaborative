@@ -119,6 +119,9 @@ export function TeamShell(props: ParentProps) {
             <span>{language.t("puff.team.shared")}</span>
             <span class="team-mini-count">{team.state.threads.length || "—"}</span>
           </div>
+          <A href="/puff" class="team-overview-link" activeClass="team-overview-active">
+            <span aria-hidden="true">◈</span>{language.t("puff.team.overview")}
+          </A>
           <Show
             when={team.state.connected}
             fallback={
@@ -171,7 +174,19 @@ export function TeamShell(props: ParentProps) {
                       <span class="team-avatar" aria-hidden="true">
                         {thread.createdBy.replace(/^usr_/, "").slice(0, 2).toUpperCase()}
                       </span>
-                      <SessionIdentity {...identity()} density="rail" />
+                      <span class="team-session-copy">
+                        <SessionIdentity {...identity()} density="rail" />
+                        <small class="team-session-summary">
+                          {(() => {
+                            const card = team.state.overview?.project.id === team.state.projectId
+                              ? team.state.overview.cards.find((value) => value.threadId === thread.id)
+                              : undefined
+                            return card?.sourceActivitySeq === thread.activitySeq
+                              ? card.currentTask
+                              : language.t("puff.overview.noCurrentReport")
+                          })()}
+                        </small>
+                      </span>
                     </A>
                   )
                 }}

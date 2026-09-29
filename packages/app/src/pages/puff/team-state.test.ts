@@ -146,6 +146,97 @@ test("roster_refresh_discovers_a_shared_thread_while_another_is_open", async () 
   team.dispose()
 })
 
+test("overview_refresh_reads_exact_project_and_thread_snapshots", async () => {
+  const project = { id: "prj_test" as Coordination.ProjectID, name: "Project", createdBy: "alice" as Coordination.UserID, createdAt: "2026-09-29T19:00:00Z" }
+  const members = [{ projectId: project.id, userId: "alice" as Coordination.UserID, role: "owner" as const, joinedAt: project.createdAt }]
+  const team = await connected(service((path) => {
+    if (path === "/projects/prj_test") return Response.json({ project, members })
+    if (path === "/projects/prj_test/work-cards") return Response.json([])
+    return
+  }))
+  await team.refreshOverview()
+  expect(team.state.overview?.project).toEqual(project)
+  expect(team.state.overview?.members).toEqual(members)
+  expect(team.state.overview?.threads.map((value) => String(value.id))).toEqual(["a"])
+  expect(team.state.overview?.snapshots.map((value) => String(value.thread.id))).toEqual(["a"])
+  expect(team.state.overviewError).toBe("")
+  team.dispose()
+})
+
+test("overview_switch_aborts_old_read_and_never_publishes_a_partial_project", async () => {
+  const pending = Promise.withResolvers<Response>()
+  let oldSignal: AbortSignal | null | undefined
+  const second = { id: "prj_other" as Coordination.ProjectID, name: "Other", createdBy: "bob", createdAt: "2026-09-29T19:00:00Z" }
+  const team = await connected(service((path, init) => {
+    if (path === "/projects/prj_test") {
+      oldSignal = init.signal
+      return pending.promise
+    }
+    if (path === "/projects/prj_other") return Response.json({ project: second, members: [] })
+    if (path === "/projects/prj_other/threads" || path === "/projects/prj_other/work-cards") return Response.json([])
+    if (path === "/projects") return Response.json([
+      { id: "prj_test", name: "Project", createdBy: "alice", createdAt: second.createdAt }, second,
+    ])
+    return
+  }))
+  const old = team.refreshOverview()
+  await team.loadProject(second.id)
+  expect(oldSignal?.aborted).toBe(true)
+  await team.refreshOverview()
+  pending.resolve(Response.json({ project: { ...second, id: "prj_test" }, members: [] }))
+  await old
+  expect(team.state.overview?.project.id).toBe(second.id)
+  expect(team.state.overview?.threads).toEqual([])
+  team.dispose()
+})
+
+test("overview_rejects_mixed_activity_revisions_instead_of_showing_a_card_as_current", async () => {
+  const project = { id: "prj_test", name: "Project", createdBy: "alice", createdAt: "2026-09-29T19:00:00Z" }
+  const team = await connected(service((path) => {
+    if (path === "/projects/prj_test") return Response.json({ project, members: [] })
+    if (path === "/projects/prj_test/work-cards") return Response.json([])
+    if (path === "/threads/a") return Response.json({ ...snapshot(), thread: { ...thread(), activitySeq: 1 } })
+    return
+  }))
+  await team.refreshOverview()
+  expect(team.state.overview).toBeUndefined()
+  expect(team.state.overviewError).toBe("invalid")
+  team.dispose()
+})
+
+test("overview_inspects_an_exact_non_conversation_source_without_changing_the_target_draft", async () => {
+  const stamp = "2026-09-29T19:00:00Z"
+  const cited = {
+    id: "work-card-event", projectId: "prj_test" as Coordination.ProjectID,
+    threadId: "a" as Coordination.ThreadID, seq: 1,
+    kind: "work-card.updated" as const, occurredAt: stamp, payload: { version: 1 },
+  } satisfies Coordination.Event
+  const card = {
+    id: "card-a", projectId: "prj_test", threadId: "a", version: 1, sourceActivitySeq: 1,
+    currentTask: "Review", progress: "In progress", blockers: [], status: "active",
+    recentVerifiedOutcome: null, contributors: [], evidenceRefs: [{ threadId: "a", eventId: cited.id, seq: 1 }],
+    generatedAt: stamp, submittedBy: "analyst", updatedAt: stamp, summaryJobId: "job-a",
+  }
+  const team = await connected(service((path) => {
+    if (path === "/projects/prj_test") return Response.json({
+      project: { id: "prj_test", name: "Project", createdBy: "alice", createdAt: stamp }, members: [],
+    })
+    if (path === "/projects/prj_test/threads") return Response.json([{ ...thread(), activitySeq: 1 }])
+    if (path === "/projects/prj_test/work-cards") return Response.json([card])
+    if (path === "/threads/a") return Response.json({ ...snapshot(), thread: { ...thread(), activitySeq: 1 } })
+    if (path === "/projects/prj_test/events?after=0&limit=1")
+      return Response.json({ events: [cited], cursor: 1, hasMore: false })
+    return
+  }))
+  await team.refreshOverview()
+  team.selectThread("a")
+  team.set("drafts", "a", { text: "Keep this draft", kind: "comment" })
+  expect(await team.resolveOverviewSource(card.evidenceRefs[0]!, new AbortController().signal)).toEqual(cited)
+  expect(team.state.threadId).toBe("a")
+  expect(team.state.drafts.a?.text).toBe("Keep this draft")
+  team.dispose()
+})
+
 test("capped_replay_stays_nonwritable_and_continues_until_the_backlog_is_complete", async () => {
   const tail = Promise.withResolvers<Response>()
   const team = await connected(

@@ -94,6 +94,43 @@ const sourceEvent = {
 const sourceRef = { threadId: sourceEvent.threadId, eventId: sourceEvent.id, seq: sourceEvent.seq }
 const sourceConfig = { baseUrl: "https://team.example", username: "serdar", password: "test-only" }
 
+test("project_overview_reads_exact_member_and_card_contracts", async () => {
+  const calls: string[] = []
+  const project = { id: Coordination.ProjectID.make("project/one"), name: "Puff", createdBy: Coordination.UserID.make("serdar"), createdAt: "2026-09-29T20:00:00Z" }
+  const members = [{ projectId: project.id, userId: Coordination.UserID.make("serdar"), role: "owner" as const, joinedAt: project.createdAt }]
+  const api = createTeamApi({
+    ...sourceConfig,
+    transport: async (url, init) => {
+      calls.push(String(url))
+      expect(init.method).toBe("GET")
+      expect(new Headers(init.headers).get("authorization")).toBe("Basic c2VyZGFyOnRlc3Qtb25seQ==")
+      if (String(url).endsWith("/projects/project%2Fone")) return Response.json({ project, members })
+      if (String(url).endsWith("/projects/project%2Fone/work-cards")) return Response.json([])
+      throw new Error("Unexpected route")
+    },
+  })
+  expect(await api.project(project.id)).toEqual({ project, members })
+  expect(await api.workCards(project.id)).toEqual([])
+  expect(calls).toEqual([
+    "https://team.example/api/coordination/v1/projects/project%2Fone",
+    "https://team.example/api/coordination/v1/projects/project%2Fone/work-cards",
+  ])
+})
+
+test("project_overview_rejects_cross_project_and_malformed_reads", async () => {
+  const api = createTeamApi({
+    ...sourceConfig,
+    transport: async (url) => String(url).endsWith("work-cards")
+      ? Response.json([{ projectId: "other", threadId: "thread-a" }])
+      : Response.json({
+        project: { id: "other", name: "Other", createdBy: "serdar", createdAt: "2026-09-29T20:00:00Z" },
+        members: [],
+      }),
+  })
+  await expect(api.project("project/one")).rejects.toMatchObject({ code: "invalid" })
+  await expect(api.workCards("project/one")).rejects.toMatchObject({ code: "invalid" })
+})
+
 test("source_resolves_only_the_exact_authenticated_project_event", async () => {
   const abort = new AbortController()
   const api = createTeamApi({

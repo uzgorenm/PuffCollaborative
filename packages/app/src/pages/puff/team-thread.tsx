@@ -1,11 +1,12 @@
 import { For, Show, createEffect, createMemo, onCleanup, on } from "solid-js"
-import { useParams, useLocation, A } from "@solidjs/router"
+import { useParams, useLocation } from "@solidjs/router"
 import { Button } from "@opencode-ai/ui/button"
 import { useLanguage } from "@/context/language"
 import { useTeam } from "./team-context"
 import { ContextPanel } from "@/components/puff/context-panel"
 import { SessionIdentity, type SessionIdentityProps } from "@/components/puff/session-identity"
 import { teamEventText } from "./team-state"
+import { ProjectHome } from "./project-overview/project-home"
 
 export default function TeamThreadPage() {
   const params = useParams<{ threadId: string }>()
@@ -376,13 +377,5 @@ export default function TeamThreadPage() {
 }
 
 export function TeamHome() {
-  const language = useLanguage()
-  return (
-    <div class="team-conversation-empty team-welcome">
-      <span class="team-empty-symbol">✳</span>
-      <h1>{language.t("puff.team.welcome")}</h1>
-      <p>{language.t("puff.team.welcomeHint")}</p>
-      <A href="/">{language.t("puff.team.backToSessions")} ↗</A>
-    </div>
-  )
+  return <ProjectHome />
 }

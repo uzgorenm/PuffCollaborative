@@ -85,6 +85,27 @@ export function createTeamApi(config: {
   return {
     projects: (signal?: AbortSignal) =>
       request("/projects", Schema.Array(Coordination.SharedProject), undefined, signal),
+    async project(id: string, signal?: AbortSignal) {
+      const result = await request(
+        `/projects/${encodeURIComponent(id)}`,
+        Schema.Struct({ project: Coordination.SharedProject, members: Schema.Array(Coordination.Membership) }),
+        undefined,
+        signal,
+      )
+      if (result.project.id !== id || result.members.some((member) => member.projectId !== id))
+        throw new ProjectApiError("invalid")
+      return result
+    },
+    async workCards(id: string, signal?: AbortSignal) {
+      const result = await request(
+        `/projects/${encodeURIComponent(id)}/work-cards`,
+        Schema.Array(Coordination.WorkCard),
+        undefined,
+        signal,
+      )
+      if (result.some((card) => card.projectId !== id)) throw new ProjectApiError("invalid")
+      return result
+    },
     threads: (projectId: string, signal?: AbortSignal) =>
       request(
         `/projects/${encodeURIComponent(projectId)}/threads`,
