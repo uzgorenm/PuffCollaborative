@@ -12,6 +12,15 @@ September 29, 2026. Serdar authorized continued development through the existing
 - **Clean publication checkout:** `/Users/mac/Desktop/Coding/Hackathon/Puff/PuffCollaborative-publication`, coordinator-only. It starts from committed integration state and has its own locked dependencies. Advance it only with reviewed ready commits, verify that exact source, then push main normally. This prevents unrelated in-progress frontend files from blocking publication. Preserve the active implementation checkout and never copy its unfinished work wholesale.
 - **Follow-up:** the coordinator checks progress every ten minutes through a thread heartbeat, stays quiet on unchanged state, and assigns only meaningful next work within the agreed MVP. Completed work is not restarted merely to keep a chat busy.
 
+### Source-inspection round completed; ownership handoff
+
+The lead/panel/controller/identity/focus slice is committed as `e332cbf539` after independent review, 67 focused tests, 46 browser tests, app/desktop typechecks and app build. See the [coordinator receipt](evidence/2026-09-29-source-inspection.md). These source results do not close native or live-awareness gates.
+
+- Freeze the main-integration UI source for QA. `Summarize current team work` alone may launch and interact with a separate native instance, under the current [desktop access record](desktop-coordination.md).
+- The earlier frontend lead has released its files. `Build Puff project overview and coordination` now owns the next host/client/i18n integration in its separate overview checkout, preserving this committed checkpoint after a coordinator fast-forward. The old ownership table below is the completed round's boundary, not permission to resume competing host edits.
+- R1 and panel use their exclusive local overview backend/detail handoff documents when cross-chat messages are unavailable. The overview owner reviews those contracts in its own handoff. Cross-chat permission rejection does not block independent local source work.
+- Next durable overview target: an authenticated project brief plus self-authored person focus, with explicit new backend file ownership agreed before registration/migration edits. Session intent/share still requires trusted Session ownership; membership alone cannot supply it. Delivery/redirection/use remain separate unimplemented records.
+
 ## File ownership
 
 All paths are relative to the next implementation checkout unless a separately isolated checkout is explicitly named.
