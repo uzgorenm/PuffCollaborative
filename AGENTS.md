@@ -1,16 +1,18 @@
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
-- The default branch in this repo is `dev`.
-- Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
+- `main` is the default and only shared development branch for this hackathon.
+- Serdar's instruction: no pull requests and no feature branches. Commit and push completed work directly to `origin/main` each time. Verify the relevant changes first, fetch the current remote state, and integrate teammates' commits. Never force-push or reset away another person's work.
+- Use `main` or `origin/main` for hackathon diffs. This workflow overrides the inherited upstream contribution/PR workflow.
+- Find team assignments and feature status in `docs/hackathon/README.md`; detailed task checklists are in `docs/hackathon/team-plan.md`, and feature acceptance criteria are in `docs/hackathon/mvp-spec.md`. Update the board when taking a task, becoming blocked, or completing verified work.
 
-## Branch Names
+## Shared Branch Workflow
 
-Use short-lived `codex/` feature branches targeting `dev`. Delete feature branches after their changes merge into `dev`.
+Each teammate uses a separate local clone checked out on `main`. Keep changes within the assigned file areas. Commit verified work, fetch `origin/main`, merge incoming commits if needed, rerun affected checks, and push normally. If a push is rejected because another teammate pushed first, repeat the fetch/integration step; do not force-push.
 
-## Commits and PR Titles
+## Commit Messages
 
-Use conventional commit-style messages and PR titles: `type(scope): summary`.
+Use conventional commit-style messages: `type(scope): summary`.
 
 Valid types are `feat`, `fix`, `docs`, `chore`, `refactor`, and `test`. Scopes are optional; use the affected package or area when helpful, e.g. `core`, `opencode`, `tui`, `app`, `desktop`, `sdk`, or `plugin`.
 
