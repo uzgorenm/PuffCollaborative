@@ -4,13 +4,15 @@
 
 The current target is a seamless desktop coding experience: retain the existing chat, composer, tools and diffs; make personal/shared sessions easy to reach; show collaboration beside the active conversation; use polished, restrained motion and keyboard support. The `/puff` browser dashboard is existing prototype material, not the acceptance surface for this increment.
 
+**Additional sessions:** use [six focused review/creative assignments](serdar-parallel-reviews.md), including Serhat-to-desktop integration. Those assignments preserve the three implementation/QA roles here. Their lead handoff and latest source checkpoint supersede older checkpoint details below.
+
 ## What the frontend chat is doing
 
-**Review README for task workflow** is active on persistent session navigation and a collapsible context panel beside the conversation. It reported desktop dependencies installed and was investigating native launch. It was still using the original checkout on `main` when inspected; no tracked desktop implementation diff was visible at that checkpoint. The coordinator has not sent instructions or moved that work automatically. Paste Agent 1’s handoff first.
+**Review README for task workflow** is active on persistent session navigation and a collapsible context panel beside the conversation. The latest inspection found dirty desktop initialization, app routing/layout and new `team-*` client/state/shell/thread files in the original checkout on `main`. The prepared `serdar/ui` checkout does not yet contain that work or the latest backend. The coordinator has not moved it automatically. Paste the updated [lead handoff](serdar-parallel-reviews.md#current-ownership-and-first-handoff) first.
 
-An inspected native predev attempt failed with `preload not found "@opentui/solid/preload"` while invoking the existing OpenCode build from `packages/desktop/scripts/predev.ts`. This is an observed failure, not a diagnosed current cause. Its latest update says a helper is investigating startup/server wiring while the lead builds the shared-session interface. Keep that investigation with the existing team; do not launch a duplicate startup agent.
+An earlier predev attempt failed on `@opentui/solid/preload`; later native QA observed `Service not found: @opencode/CoordinationRuntime`. The lead already has a helper investigating the retained OpenCode host's server composition. Keep that investigation with the existing team; do not launch a duplicate startup agent. Recheck the latest failure rather than assuming either historical symptom remains current.
 
-**Read the project README** is idle after a skills review. **Summarize current team work** is idle after explaining ownership and sharing. They can take Agents 2 and 3 below.
+**Read the project README** received Agent 2's assignment and is waiting for the lead's panel file/props handoff. **Summarize current team work** prepared native QA and reported the runtime blocker; D02–D06 still need a working target-build window. Continue those assignments instead of giving them duplicate work.
 
 ## Prepared workspace and limits
 
@@ -80,9 +82,9 @@ navigation, shared layout/i18n and the panel’s host/open-close motion.
 Reserve packages/app/src/components/puff/context-panel/ for Agent 2.
 If you already wrote equivalent panel content, hand it off for reuse.
 
-First reproduce and resolve native launch. The last observed predev
-failure mentioned @opentui/solid/preload; investigate the actual cause
-rather than guessing dependencies or bypassing checks. Verify the
+First reproduce and resolve native launch with your existing helper.
+The latest QA report mentioned missing @opencode/CoordinationRuntime;
+inspect the actual current cause rather than bypassing checks. Verify the
 native window, intended checkout and backend before saying setup is
 ready. Report a backend-owned blocker if one remains.
 

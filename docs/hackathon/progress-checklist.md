@@ -4,6 +4,8 @@ This is the coordinator's working checklist. A feature counts as progress when i
 
 ## Current checkpoint
 
+**Later source review, September 29 around 13:04 PDT:** [independent backend/UI receipt](evidence/2026-09-29-parallel-source-review.md) inspected main `0a91f6231a` and the active dirty desktop files. Serhat's backend now has a reported mock integration receipt; the existing desktop client targets its real routes. Runtime host wiring and native verification remain open, with concrete revision/retry findings assigned for reproduction. [R1–R6](serdar-parallel-reviews.md) extend the existing UI team. This review executed no tests and closes no gates; the earlier table below is historical baseline evidence.
+
 Baseline reviewed on September 29 at source commit `e42a799cf6aefe1cc6d6907310b3ff8bf467ed43`, with incoming-source updates through `5c8e111931`. The [baseline receipt](evidence/2026-09-29-coordinator-baseline.md) distinguishes those inspections. Later changes need their own evidence.
 
 | Area | Evidence available at the baseline | Next demonstrable result |

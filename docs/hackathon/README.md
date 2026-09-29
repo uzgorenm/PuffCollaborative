@@ -6,16 +6,17 @@ This is the team's shared task board. **Start with the [progress checklist](prog
 - [Integration gates](integration-gates.md): shared contract decisions and producer/consumer handoffs.
 - [Owner checklists](team-plan.md): the next verifiable result for each teammate.
 - [Product spec](mvp-spec.md): required behavior; [shared backend contract](../coordination-contract.md): current implementation interfaces.
+- [Serdar's additional agents](serdar-parallel-reviews.md): six scoped review/creative prompts and the existing frontend handoffs. [Independent source review](evidence/2026-09-29-parallel-source-review.md) records current backend/UI findings.
 
 ## Our tasks
 
-**Confirmed ownership:** Serhat — server; Talha — OpenCode execution; Serdar — interface/dashboard; Ferit — intelligence/Flower.
+**Confirmed ownership:** Serhat — server; Talha — OpenCode execution; Serdar — desktop interface; Ferit — intelligence/Flower.
 
 | Task | Owner | Deliverable | Status | Verified commit / blocker |
 | --- | --- | --- | --- | --- |
-| T1 — Shared state and API | Serhat | Shared topics/evidence, validated awareness routing, state and events. | In progress — service modules and protocol | Incoming source through [5c8e111931](https://github.com/uzgorenm/PuffCollaborative/commit/5c8e111931) adds access/projects/comments, journal, runner/approval controls, snapshot composition, protocol declarations and test source. Full handlers, executed tests and actual awareness integration remain unverified here; G0 stays open. |
+| T1 — Shared state and API | Serhat | Shared topics/evidence, validated awareness routing, state and events. | Backend slice implemented; mock receipt reported; awareness integration open | Reviewed main at [0a91f6231a](https://github.com/uzgorenm/PuffCollaborative/commit/0a91f6231a), with Serhat's mock test receipt at `4124e1af73`. Independent source review flags runner-summary freshness and concurrent comment retry for regression checks; no tests rerun by this audit. [Receipt and owners](evidence/2026-09-29-parallel-source-review.md). G0 stays open. |
 | T2 — OpenCode adapter | Talha | Export selected activity; admit awareness into an already active Session and reconcile retries. | Integration unverified | Prove G1 and WF02; the existing upstream queue alone does not prove active-session awareness. |
-| T3 — Team interface | Serdar | Show distinct experiments, inspectable evidence and admission/promotion/use. | In progress — local UI | Local preview/adapter/components observed; ongoing UI changes are not yet a live-service receipt. Provisional API/auth differs from backend; close G0 and G5. |
+| T3 — Team interface | Serdar | Show distinct experiments, inspectable evidence and admission/promotion/use. | In progress — desktop UI; native handoff blocked | Active dirty `team-*` client/state/thread/shell consume the real coordination endpoints. Existing helper owns native host composition; panel waits for file handoff and QA waits for a working window. Move safely into `serdar/ui`; R1 verifies the connection. G0/G5 remain open. |
 | T4 — Flower coordinator | Ferit | Real cooperating Flower agents distinguish alternatives and produce a usable finding. | Product exchange unverified | Upstream template smoke test is recorded; G2/WF10 and team-owned publication still need evidence. See the [official brief review](../../README.md#official-hackathon-requirements-and-readiness). |
 
 Open [the task checklists](team-plan.md) and find the numbered task with your name. Each has file ownership, inputs/outputs, acceptance checks, and a scope cut if time gets short.
