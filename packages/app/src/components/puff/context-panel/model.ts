@@ -25,10 +25,12 @@ export interface ContextView {
   alternatives: Coordination.Thread[]
   activeRuns: Coordination.Run[]
   approvals: Coordination.Approval[]
+  // Tool-decision forwarding, distinct from cross-session awareness delivery.
+  deliveryIssues: Coordination.Approval[]
 }
 
 function empty(state: ContextView["state"]): ContextView {
-  return { state, stale: false, sources: [], alternatives: [], activeRuns: [], approvals: [] }
+  return { state, stale: false, sources: [], alternatives: [], activeRuns: [], approvals: [], deliveryIssues: [] }
 }
 
 export function selectContext(input: ContextSelection): ContextView {
@@ -66,5 +68,19 @@ export function selectContext(input: ContextSelection): ContextView {
     alternatives: [],
     activeRuns: snapshot.runs.filter((run) => run.threadId === thread.id && !["completed", "failed", "cancelled"].includes(run.state)),
     approvals: snapshot.approvals.filter((approval) => approval.threadId === thread.id && (approval.state === "pending" || approval.state === "claimed")),
+    deliveryIssues: snapshot.approvals.filter((approval) =>
+      approval.threadId === thread.id &&
+      (approval.state === "approved" || approval.state === "rejected") &&
+      (approval.deliveryState === "pending" || approval.deliveryState === "failed")),
   }
+}
+
+export function canOfferDecisionRetry(
+  approval: Coordination.Approval,
+  canRetry?: (approval: Coordination.Approval) => boolean,
+  onRetry?: (approval: Coordination.Approval) => void | Promise<void>,
+) {
+  return approval.state === "rejected" &&
+    (approval.deliveryState === "pending" || approval.deliveryState === "failed") &&
+    !!onRetry && !!canRetry?.(approval)
 }

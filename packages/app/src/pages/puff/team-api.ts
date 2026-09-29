@@ -85,6 +85,27 @@ export function createTeamApi(config: {
   return {
     projects: (signal?: AbortSignal) =>
       request("/projects", Schema.Array(Coordination.SharedProject), undefined, signal),
+    async project(id: string, signal?: AbortSignal) {
+      const result = await request(
+        `/projects/${encodeURIComponent(id)}`,
+        Schema.Struct({ project: Coordination.SharedProject, members: Schema.Array(Coordination.Membership) }),
+        undefined,
+        signal,
+      )
+      if (result.project.id !== id || result.members.some((member) => member.projectId !== id))
+        throw new ProjectApiError("invalid")
+      return result
+    },
+    async workCards(id: string, signal?: AbortSignal) {
+      const result = await request(
+        `/projects/${encodeURIComponent(id)}/work-cards`,
+        Schema.Array(Coordination.WorkCard),
+        undefined,
+        signal,
+      )
+      if (result.some((card) => card.projectId !== id)) throw new ProjectApiError("invalid")
+      return result
+    },
     threads: (projectId: string, signal?: AbortSignal) =>
       request(
         `/projects/${encodeURIComponent(projectId)}/threads`,
@@ -95,6 +116,40 @@ export function createTeamApi(config: {
     thread: (id: string, signal?: AbortSignal) => request(thread(id), TeamThread, undefined, signal),
     events: (id: string, after = 0, signal?: AbortSignal) =>
       request(`${thread(id)}/events?after=${after}&limit=200`, Replay, undefined, signal),
+    async source(
+      projectId: string,
+      ref: { threadId: string; eventId: string; seq: number },
+      signal?: AbortSignal,
+    ): Promise<Coordination.Event> {
+      const expected = { threadId: ref.threadId, eventId: ref.eventId, seq: ref.seq }
+      if (
+        !projectId ||
+        !expected.threadId ||
+        !expected.eventId ||
+        !Number.isSafeInteger(expected.seq) ||
+        expected.seq < 1
+      )
+        throw new ProjectApiError("invalid")
+      signal?.throwIfAborted()
+      const page = await request(
+        `/projects/${encodeURIComponent(projectId)}/events?after=${expected.seq - 1}&limit=1`,
+        Replay,
+        undefined,
+        signal,
+      )
+      signal?.throwIfAborted()
+      const event = page.events[0]
+      if (
+        page.events.length !== 1 ||
+        !event ||
+        event.projectId !== projectId ||
+        event.threadId !== expected.threadId ||
+        event.id !== expected.eventId ||
+        event.seq !== expected.seq
+      )
+        throw new ProjectApiError("invalid")
+      return event
+    },
     comments: (id: string, signal?: AbortSignal) =>
       request(`${thread(id)}/comments`, Schema.Array(Coordination.Comment), undefined, signal),
     submit: (id: string, text: string, requestId: string) =>

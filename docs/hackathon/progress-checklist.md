@@ -43,6 +43,8 @@ This is backend integration evidence against external simulators. It does not ch
 
 **Later backend quality checkpoint:** [receipt at `dec2fb31c0`](evidence/2026-09-29-backend-quality.md) records 17 passing local integration tests, 177 assertions, core typecheck and independent source review for atomic activity revisions and overlapping comment retry. The same checks passed again in a clean publication checkout. This is partial implementation evidence for G4/F2; live gates remain open, and `run.output` inclusion in the separate activity feed is a follow-up.
 
+**Later source-inspection checkpoint:** [receipt at `e332cbf539`](evidence/2026-09-29-source-inspection.md) records exact inline citation lookup, original-attempt tool-decision retry and real Session identity. Coordinator checks passed 67 focused tests, 46 browser tests, app/desktop typechecks and app build. Native N1/N2/N3 acceptance and live WF02/WF10 remain open; a synthetic HTTP response is not a Flower delivery receipt.
+
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.
 - `NOT RUN`: no matching evidence. Leave unchecked even if code or fixtures exist.
 - `FAIL`: a run contradicted the expectation. Record actual behavior and the next fix.

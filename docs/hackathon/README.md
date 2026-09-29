@@ -6,6 +6,8 @@ This is the team's shared task board. **Start with the [progress checklist](prog
 
 **Current development:** [chat assignments and handoffs](next-development.md) track the ongoing frontend work, isolated Project overview scope and backend integration. The [backend quality receipt](evidence/2026-09-29-backend-quality.md) records verified activity-revision and exact-comment-retry fixes at `dec2fb31c0`. These checks do not close live-awareness gates.
 
+**Source-inspection checkpoint:** `e332cbf539` adds exact inline evidence inspection, distinct Session identities and recovery of uncertain tool-decision delivery. The [UI receipt](evidence/2026-09-29-source-inspection.md) records 67 focused and 46 browser tests, typechecks and build; native acceptance is the next QA task.
+
 - [Ten concrete acceptance workflows](acceptance-workflows.md): exact scenarios, expected behavior and failure controls.
 - [Integration gates](integration-gates.md): shared contract decisions and producer/consumer handoffs.
 - [Owner checklists](team-plan.md): the next verifiable result for each teammate.
