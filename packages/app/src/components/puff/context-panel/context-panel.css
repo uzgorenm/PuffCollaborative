@@ -1,0 +1,45 @@
+.puff-context {
+  box-sizing: border-box;
+  width: 270px;
+  height: 100%;
+  overflow: auto;
+  padding: 24px 20px;
+  scrollbar-width: thin;
+}
+.puff-context h2 { font-size: 12px; font-weight: 600; margin-bottom: 7px; }
+.puff-context h3 { margin-top: 9px; color: var(--text-strong); font-size: 13px; font-weight: 500; line-height: 1.6; }
+.puff-context p { font-size: 12px; line-height: 1.7; margin-top: 9px; overflow-wrap: anywhere; }
+.puff-context-caption { color: var(--text-weak); font-size: 11px !important; }
+.puff-context-kicker { color: var(--text-weak); font-size: 10px; font-weight: 600; letter-spacing: .04em; }
+.puff-context-section { margin-top: 24px; border-top: 1px solid var(--team-border); padding-top: 20px; }
+.puff-context-identity { margin-top: 12px; }
+.puff-context-identity div { margin-top: 9px; }
+.puff-context-identity dt { color: var(--text-weak); font-size: 10px; }
+.puff-context-identity dd { margin-top: 3px; color: var(--text-base); font-size: 11px; overflow-wrap: anywhere; }
+.puff-context-empty { color: var(--text-weak); display: flex; flex-direction: column; align-items: center; padding: 40px 0; gap: 16px; text-align: center; }
+.puff-context-empty > span { font-size: 23px; opacity: .55; }
+.puff-context-notice { border-left: 2px solid var(--text-weak); padding-left: 9px; }
+.puff-context-sources summary { cursor: pointer; color: var(--text-base); font-size: 11px; }
+.puff-context-sources summary:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 3px; }
+.puff-context-source-row { display: flex; flex-wrap: wrap; gap: 4px 7px; margin: 12px 0; color: var(--text-weak); font-size: 10px; overflow-wrap: anywhere; }
+.puff-context-source-row button { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-width: 0; color: var(--text-base); text-align: left; cursor: pointer; }
+.puff-context-source-row button:hover { color: var(--text-strong); }
+.puff-context-source-row button:focus-visible, .puff-context-peek-close:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 3px; }
+.puff-context-source-row code { min-width: 0; }
+.puff-context-source-row small { flex-basis: 100%; padding-left: 16px; }
+.puff-context-peek { margin-top: 12px; padding: 12px; border: 1px solid var(--team-border); border-radius: 8px; background: var(--surface-raised-base); overflow-wrap: anywhere; }
+.puff-context-peek-close { display: block; margin-left: auto; color: var(--text-base); font-size: 11px; cursor: pointer; }
+.puff-context-source-detail { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; font-size: 10px; }
+.puff-context-source-detail p { margin-top: 6px; white-space: pre-wrap; }
+.puff-context-queue { border: 1px solid var(--team-border); border-radius: 8px; padding: 12px; margin-top: 12px; }
+.puff-context-queue > span { font-size: 10px; color: var(--text-weak); }
+.puff-context-queue p { max-height: 100px; overflow: auto; }
+.puff-context-queue button { margin-top: 9px; }
+.puff-context-approval { margin-top: 24px; padding: 14px; border: 1px solid #b5966633; border-radius: 9px; background: #b5966609; }
+.puff-context-approval h3 { font-size: 12px; font-weight: 550; }
+.puff-context-approval code { display: block; font-size: 10px; margin: 10px 0; overflow-wrap: anywhere; }
+.puff-context-approval p { font-size: 11px; color: var(--text-weak); }
+.puff-context-approval > div { display: flex; gap: 8px; margin-top: 12px; }
+@media (max-width: 1050px) { .puff-context { width: 230px; padding: 20px 16px; } }
+@media (max-width: 800px) { .puff-context { width: 260px; } }
+@media (prefers-reduced-motion: reduce) { .puff-context * { scroll-behavior: auto !important; transition-duration: 0ms !important; animation-duration: 0ms !important; } }

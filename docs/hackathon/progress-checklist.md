@@ -41,7 +41,29 @@ This adds implementation evidence to T3; it closes no live gate or WF01–WF07 c
 
 The [backend mock integration receipt](evidence/2026-09-29-coordination-backend-mock.md) is tied to pushed commit [`4124e1a`](https://github.com/uzgorenm/PuffCollaborative/commit/4124e1a). It records the registered `/api/coordination/v1` handlers, individual Basic identities, real SQLite/EventV2 persistence, a two-client HTTP flow, restart reads, migrations, generated client and the explicit mock runner. The core coordination suite passed 39 tests; the server integration passed seven consecutive 51-assertion runs after an ordering assumption was fixed. This is an integrated multiplayer backend result with a mock execution port. It does not close G0 or a WF01–WF07 case because the Puff awareness contract, real OpenCode execution and Flower pipeline have not been exercised together.
 
+## Coordination process checkpoint — September 29
+
+The [process test receipt](evidence/2026-09-29-coordination-process-e2e.md) tests commit `e83a0bb71203c14c3ad996ea155187ad5453763d` through real HTTP and SQLite with a separate fake runner process. The smoke test, typecheck, existing mock integration test, fresh initialization and preceding-schema migration passed. The broader suite had eight passing cases and one failing regression: `run.output` commits without advancing `Thread.activitySeq`, preventing a source-cited work card for that output. Seed `12648430` completed 100 accepted instructions across 20 threads, with five queued cancellations and 95 starts.
+
+The [activity revision recheck](evidence/2026-09-29-coordination-activity-revision.md) at `b3eeb0c` passed all nine process cases and 1,084 assertions, including the previously failing work-card citation. The separate in-process mock HTTP test passed 51 assertions. These results use fake execution; real OpenCode execution and the Puff awareness exchange remain unverified.
+
+The [content revision recheck](evidence/2026-09-29-coordination-content-revision.md) at `8bf5459` passed the focused SQLite freshness and comment tests (2 tests, 26 assertions) and all nine process cases (1,084 assertions). Content events now advance `Thread.activitySeq`; queue, lifecycle and card events keep their project cursor without changing that revision. The process worker remains fake.
+
+The [activity-feed receipt](evidence/2026-09-29-coordination-activity-feed.md) verifies the `run.output` read-model projection with fixture events at `a0ee1dd` (3 tests, 16 assertions) and authenticated HTTP delivery at `c2f24b5` (1 focused process case, 14 assertions). Real runner output in the live view remains to be checked.
+
+The [recovery isolation receipt](evidence/2026-09-29-coordination-recovery-isolation.md) at `204d9d6` verifies that an unverifiable Run holds its own Thread without blocking another Thread of the same worker. A focused Queue/SQLite regression passed 13 tests and 66 assertions with a mocked execution port. The full HTTP process suite passed 9 cases and 1,088 assertions with a separate fake runner, including reserved delivery after disconnect and exact recovery on reconnect. The retained OpenCode process has separate evidence below.
+
+## Runner process checkpoint — September 29
+
+The [runner integration receipt](evidence/runner-2026-09-29-r13-integration.md) tests commit `a694a8f3a4d3763c4c447e9ccaea8b7e2a45ac93` with pinned OpenCode, the embedded coordinator, SQLite, isolated Git worktrees and a deterministic local model. Two process cases passed with 93 assertions. They cover Session and workspace continuity, concurrent Threads, native tool approval and a write, authenticated callbacks, an uncertain cancellation held through restart while another Thread completes, and ordered callback recovery after a typed outage. R1 and Agent 1 independently repeated both cases at published `46dc9e8` with 93 assertions; Agent 1 also passed server typecheck. The [Agent 1 recheck](evidence/2026-09-29-coordination-real-runner-recheck.md) records its evidence boundary. The local model spent no credits. The receipts keep component, process and external deployment evidence separate.
+
+These checkpoints do not close G0 through G7 or WF01 through WF10. Selected activity export, awareness admission into an already active Session, frontend use and the Jev/Flower exchange still need their own receipts.
+
 ## Rules for checking a box
+
+**Later backend quality checkpoint:** [receipt at `dec2fb31c0`](evidence/2026-09-29-backend-quality.md) records 17 passing local integration tests, 177 assertions, core typecheck and independent source review for atomic activity revisions and overlapping comment retry. The same checks passed again in a clean publication checkout. This is partial implementation evidence for G4/F2; live gates remain open, and `run.output` inclusion in the separate activity feed is a follow-up.
+
+**Later source-inspection checkpoint:** [receipt at `e332cbf539`](evidence/2026-09-29-source-inspection.md) records exact inline citation lookup, original-attempt tool-decision retry and real Session identity. Coordinator checks passed 67 focused tests, 46 browser tests, app/desktop typechecks and app build. Native N1/N2/N3 acceptance and live WF02/WF10 remain open; a synthetic HTTP response is not a Flower delivery receipt.
 
 **Flower checkpoint — September 29:** Agent 1's
 [receipt](evidence/2026-09-29-flower-chain.md) records two separate AgentApp builds,
@@ -182,3 +204,7 @@ Next action and owner if not PASS:
 ```
 
 For a source/unit-only gate, mark irrelevant runtime fields `not exercised`; do not fill them with example IDs. A fixture containing `example-flower-042` is never a live run receipt.
+
+## Serdar desktop checkpoint — September 29
+
+Native/UI code `f4c8ad9ee4f9c9e411e161e6ea6980099ecc85c0` on serdar/ui: session rail, original coding composer/tools/inline diff, exact-bound panel and motion; focused checks/builds/production comparison recorded in [native receipt](evidence/2026-09-29-serdar-native.md). Full app suite retains one known Punjabi locale failure. Actual native rendering uses synthetic fixtures plus external mock-backed coordination service. Final independent D01–D06 retest remains in the QA receipt; this does not close live WF02/WF10 or sharing/export/awareness contract gates. No main integration by the UI lead.

@@ -213,12 +213,16 @@ export function make(input: Dependencies): ApprovalStore {
       return approval(current)
     })
 
-  const pendingDecisions: ApprovalStore["pendingDecisions"] = (executionOwner) =>
+  const pendingDecisions: ApprovalStore["pendingDecisions"] = (executionOwner, threadId) =>
     Effect.gen(function* () {
       const rows = yield* input.db
         .select()
         .from(ApprovalTable)
-        .where(eq(ApprovalTable.delivery_state, "pending"))
+        .where(
+          threadId
+            ? and(eq(ApprovalTable.delivery_state, "pending"), eq(ApprovalTable.thread_id, threadId))
+            : eq(ApprovalTable.delivery_state, "pending"),
+        )
         .orderBy(asc(ApprovalTable.requested_at))
         .all()
         .pipe(Effect.orDie)

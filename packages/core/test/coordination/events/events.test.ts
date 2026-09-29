@@ -1,41 +1,92 @@
 import { describe, expect } from "bun:test"
 import { Deferred, Effect, Exit, Fiber, Stream } from "effect"
 import { Coordination } from "@opencode-ai/schema/coordination"
+import { AbsolutePath } from "@opencode-ai/core/schema"
 import { Database } from "@opencode-ai/core/database/database"
 import { EventV2 } from "@opencode-ai/core/event"
 import { EventTable } from "@opencode-ai/core/event/sql"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { CoordinationEvents } from "@opencode-ai/core/coordination/events/events"
+import { SharedProjectTable } from "@opencode-ai/core/coordination/projects/sql"
+import { ThreadTable } from "@opencode-ai/core/coordination/threads/sql"
+import { ProjectTable } from "@opencode-ai/core/project/sql"
+import { SessionTable } from "@opencode-ai/core/session/sql"
 import type { CoordinationContracts } from "@opencode-ai/core/coordination/contracts"
 import { eq } from "drizzle-orm"
 import { testEffect } from "../../lib/effect"
 
-// The journal and SQLite are real; this suite injects thread lookup to isolate journal behavior.
-const threadProjects = new Map<string, Coordination.ProjectID>()
 const it = testEffect(
   AppNodeBuilder.build(LayerNode.group([Database.node, EventV2.node, CoordinationEvents.node]), [
-    [
-      CoordinationEvents.node,
-      CoordinationEvents.layerWith({
-        subscriberCapacity: 4,
-        resolveThreadProject: (threadId) => {
-          const projectId = threadProjects.get(threadId)
-          return projectId
-            ? Effect.succeed(projectId)
-            : Effect.fail({ code: "forbidden" as const, message: "Thread is outside the authorized fixture" })
-        },
-      }),
-    ],
+    [CoordinationEvents.node, CoordinationEvents.layerWith({ subscriberCapacity: 4 })],
   ]),
 )
 
-const ids = () => {
-  const projectId = Coordination.ProjectID.make(`prj_${crypto.randomUUID()}`)
-  const threadId = Coordination.ThreadID.make(`thr_${crypto.randomUUID()}`)
-  threadProjects.set(threadId, projectId)
-  return { projectId, threadId }
-}
+const addThread = (projectId: Coordination.ProjectID, createdBy: Coordination.UserID) =>
+  Effect.gen(function* () {
+    const { db } = yield* Database.Service
+    const now = Date.now()
+    const threadId = Coordination.ThreadID.make(`thr_${crypto.randomUUID()}`)
+    const sessionId = Coordination.Thread.fields.sessionId.make(`ses_${crypto.randomUUID()}`)
+    yield* db
+      .insert(SessionTable)
+      .values({
+        id: sessionId,
+        project_id: projectId,
+        slug: threadId,
+        directory: "/tmp/coordination-events-test",
+        title: "Event test thread",
+        version: "test",
+        time_created: now,
+        time_updated: now,
+      })
+      .run()
+    yield* db
+      .insert(ThreadTable)
+      .values({
+        id: threadId,
+        project_id: projectId,
+        session_id: sessionId,
+        worker_id: Coordination.WorkerID.make(`wrk_${crypto.randomUUID()}`),
+        title: "Event test thread",
+        created_by: createdBy,
+        created_at: now,
+        activity_seq: -1,
+        request_id: threadId,
+      })
+      .run()
+    return threadId
+  })
+
+const ids = () =>
+  Effect.gen(function* () {
+    const { db } = yield* Database.Service
+    const projectId = Coordination.ProjectID.make(`prj_${crypto.randomUUID()}`)
+    const createdBy = Coordination.UserID.make(`usr_${crypto.randomUUID()}`)
+    const now = Date.now()
+    yield* db
+      .insert(ProjectTable)
+      .values({
+        id: projectId,
+        worktree: AbsolutePath.make("/tmp/coordination-events-test"),
+        sandboxes: [],
+        time_created: now,
+        time_updated: now,
+      })
+      .run()
+    yield* db
+      .insert(SharedProjectTable)
+      .values({
+        id: projectId,
+        name: "Event test project",
+        created_by: createdBy,
+        created_at: now,
+        request_id: projectId,
+      })
+      .run()
+    const threadId = yield* addThread(projectId, createdBy)
+    return { projectId, threadId, createdBy }
+  })
 
 const append = (
   journal: CoordinationContracts.Events,
@@ -61,9 +112,13 @@ describe("coordination event journal", () => {
   it.effect("delivers the same ordered durable events to two clients", () =>
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service
-      const { projectId, threadId } = ids()
-      const first = yield* journal.subscribeProject(projectId, -1).pipe(Stream.take(3), Stream.runCollect, Effect.forkScoped)
-      const second = yield* journal.subscribeProject(projectId, -1).pipe(Stream.take(3), Stream.runCollect, Effect.forkScoped)
+      const { projectId, threadId } = yield* ids()
+      const first = yield* journal
+        .subscribeProject(projectId, -1)
+        .pipe(Stream.take(3), Stream.runCollect, Effect.forkScoped)
+      const second = yield* journal
+        .subscribeProject(projectId, -1)
+        .pipe(Stream.take(3), Stream.runCollect, Effect.forkScoped)
       yield* Effect.yieldNow
 
       const committed = []
@@ -79,7 +134,7 @@ describe("coordination event journal", () => {
   it.effect("replays missed events by the exclusive durable cursor", () =>
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service
-      const { projectId, threadId } = ids()
+      const { projectId, threadId } = yield* ids()
       const first = yield* append(journal, projectId, threadId, "seen")
       const missed = yield* append(journal, projectId, threadId, "missed")
 
@@ -93,7 +148,7 @@ describe("coordination event journal", () => {
   it.live("uses commit order when event IDs were allocated in the opposite order", () =>
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service
-      const { projectId, threadId } = ids()
+      const { projectId, threadId } = yield* ids()
       const olderID = EventV2.ID.create()
       const newerID = EventV2.ID.create()
       const firstEntered = yield* Deferred.make<void>()
@@ -127,7 +182,7 @@ describe("coordination event journal", () => {
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service
       const { db } = yield* Database.Service
-      const { projectId, threadId } = ids()
+      const { projectId, threadId } = yield* ids()
       const marker = EventV2.ID.create()
       yield* db.run("CREATE TABLE IF NOT EXISTS coordination_event_probe (marker text PRIMARY KEY)")
 
@@ -146,6 +201,13 @@ describe("coordination event journal", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       expect(yield* db.all(`SELECT marker FROM coordination_event_probe WHERE marker = '${marker}'`)).toEqual([])
       expect(yield* db.select().from(EventTable).where(eq(EventTable.id, marker)).all()).toEqual([])
+      expect(
+        (yield* db
+          .select({ seq: ThreadTable.activity_seq })
+          .from(ThreadTable)
+          .where(eq(ThreadTable.id, threadId))
+          .get())?.seq,
+      ).toBe(-1)
     }),
   )
 
@@ -153,7 +215,7 @@ describe("coordination event journal", () => {
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service
       const { db } = yield* Database.Service
-      const { projectId, threadId } = ids()
+      const { projectId, threadId } = yield* ids()
       const marker = EventV2.ID.create()
       const conflict = { code: "conflict" as const, message: "Approval version changed" }
       yield* db.run("CREATE TABLE IF NOT EXISTS coordination_event_probe (marker text PRIMARY KEY)")
@@ -173,6 +235,13 @@ describe("coordination event journal", () => {
       expect(failure).toEqual(conflict)
       expect(yield* db.all(`SELECT marker FROM coordination_event_probe WHERE marker = '${marker}'`)).toEqual([])
       expect(yield* db.select().from(EventTable).where(eq(EventTable.id, marker)).all()).toEqual([])
+      expect(
+        (yield* db
+          .select({ seq: ThreadTable.activity_seq })
+          .from(ThreadTable)
+          .where(eq(ThreadTable.id, threadId))
+          .get())?.seq,
+      ).toBe(-1)
     }),
   )
 
@@ -180,7 +249,7 @@ describe("coordination event journal", () => {
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service
       const { db } = yield* Database.Service
-      const { projectId, threadId } = ids()
+      const { projectId, threadId } = yield* ids()
       yield* append(journal, projectId, threadId, "snapshot state")
       const cursor = yield* db.transaction(() => journal.latestSequence(projectId))
       const afterSnapshot = yield* append(journal, projectId, threadId, "during handoff")
@@ -193,9 +262,8 @@ describe("coordination event journal", () => {
   it.effect("filters thread replay while retaining the project cursor", () =>
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service
-      const { projectId, threadId } = ids()
-      const otherThread = Coordination.ThreadID.make(`thr_${crypto.randomUUID()}`)
-      threadProjects.set(otherThread, projectId)
+      const { projectId, threadId, createdBy } = yield* ids()
+      const otherThread = yield* addThread(projectId, createdBy)
       yield* append(journal, projectId, otherThread, "other")
       const expected = yield* append(journal, projectId, threadId, "selected")
 
@@ -204,24 +272,30 @@ describe("coordination event journal", () => {
       expect(page.cursor).toBe(expected.seq)
       expect(page.hasMore).toBe(false)
 
-      const live = yield* journal.subscribeThread(threadId, page.cursor).pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
+      const live = yield* journal
+        .subscribeThread(threadId, page.cursor)
+        .pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
       yield* append(journal, projectId, otherThread, "not selected")
       const selected = yield* append(journal, projectId, threadId, "next selected")
       expect(Array.from(yield* Fiber.join(live))).toEqual([selected])
     }),
   )
 
-  it.effect("rejects invalid cursors and a denied fixture thread", () =>
+  it.effect("rejects invalid cursors and a missing thread", () =>
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service
-      const { projectId } = ids()
+      const { projectId } = yield* ids()
       const invalid = yield* journal.replayProject(projectId, 1, 10).pipe(Effect.flip)
       expect(invalid.code).toBe("invalid")
       expect((yield* journal.replayProject(projectId, -2, 10).pipe(Effect.flip)).code).toBe("invalid")
       expect((yield* journal.replayProject(projectId, -1, 0).pipe(Effect.flip)).code).toBe("invalid")
       const denied = Coordination.ThreadID.make(`thr_${crypto.randomUUID()}`)
       const access = yield* journal.replayThread(denied, -1, 10).pipe(Effect.flip)
-      expect(access.code).toBe("forbidden")
+      expect(access.code).toBe("not_found")
+      const other = yield* ids()
+      const mismatch = yield* append(journal, projectId, other.threadId, "wrong project").pipe(Effect.flip)
+      expect(mismatch.code).toBe("not_found")
+      expect(yield* journal.latestSequence(projectId)).toBe(-1)
 
       const auth = { kind: "member" as const, userId: Coordination.UserID.make(`usr_${crypto.randomUUID()}`) }
       const deniedAccess: CoordinationContracts.Access = {
@@ -260,7 +334,7 @@ describe("coordination event journal", () => {
   it.live("disconnects a slow client without blocking event commits", () =>
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service
-      const { projectId, threadId } = ids()
+      const { projectId, threadId } = yield* ids()
       const firstSeen = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
       yield* append(journal, projectId, threadId, "seed")

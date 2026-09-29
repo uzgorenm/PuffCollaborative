@@ -3,6 +3,10 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { EventV2 } from "@opencode-ai/core/event"
+import { Git } from "@opencode-ai/core/git"
+import { AppProcess } from "@opencode-ai/core/process"
+import { ProjectV2 } from "@opencode-ai/core/project"
+import { EffectFlock } from "@opencode-ai/core/util/effect-flock"
 import { CoordinationEvents } from "@opencode-ai/core/coordination/events/events"
 import { Credential } from "@opencode-ai/core/credential"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
@@ -26,13 +30,22 @@ import { sessionLocationLayer } from "./middleware/session-location"
 import { coordinationAuthLayer } from "./middleware/coordination-auth"
 import { coordinationLayer } from "./coordination-composition"
 import type { CoordinationPorts } from "./coordination-composition"
+import { configuredRunnerFactory } from "./runner-harness-composition"
+import { RunnerHarnessConfig } from "./runner-harness-config"
+import { runnerHarnessAuthorizationLayer } from "./runner-harness-authorization"
+import { runnerHarnessBoundaryLayer } from "./runner-harness-boundary"
 
 const applicationServices = LayerNode.group([
   Database.node,
   EventV2.node,
+  Git.node,
+  AppProcess.node,
+  ProjectV2.node,
+  EffectFlock.node,
   httpClient,
   ToolOutputStore.cleanupNode,
   SessionV2.node,
+  SessionExecution.node,
   PermissionSaved.node,
   PtyTicket.node,
   Credential.node,
@@ -40,7 +53,7 @@ const applicationServices = LayerNode.group([
   LocationServiceMap.node,
 ])
 
-export function createRoutes(password?: string, coordinationPorts: CoordinationPorts = {}) {
+export function createRoutes<R = never>(password?: string, coordinationPorts: CoordinationPorts<R> = {}) {
   return makeRoutes(
     password
       ? ServerAuth.Config.configLayer({ username: "opencode", password: Option.some(password) })
@@ -49,13 +62,13 @@ export function createRoutes(password?: string, coordinationPorts: CoordinationP
   )
 }
 
-export function createEmbeddedRoutes(coordinationPorts: CoordinationPorts = {}) {
+export function createEmbeddedRoutes<R = never>(coordinationPorts: CoordinationPorts<R> = {}) {
   return makeRoutes(ServerAuth.Config.configLayer({ username: "opencode", password: Option.none() }), coordinationPorts)
 }
 
-function makeRoutes<AuthError, AuthServices>(
+function makeRoutes<AuthError, AuthServices, R>(
   auth: Layer.Layer<ServerAuth.Config, AuthError, AuthServices>,
-  coordinationPorts: CoordinationPorts,
+  coordinationPorts: CoordinationPorts<R>,
 ) {
   const serviceLayer = AppNodeBuilder.build(applicationServices, [[SessionExecution.node, SessionExecutionLocal.node]])
 
@@ -63,7 +76,8 @@ function makeRoutes<AuthError, AuthServices>(
     Layer.provide(handlers),
     Layer.provide(sessionLocationLayer),
     Layer.provide(locationLayer),
-    Layer.provide(authorizationLayer),
+    Layer.provide(RunnerHarnessConfig.path() ? runnerHarnessAuthorizationLayer : authorizationLayer),
+    Layer.provide(runnerHarnessBoundaryLayer),
     Layer.provide(coordinationAuthLayer),
     Layer.provide(coordinationLayer(coordinationPorts)),
     Layer.provide(CoordinationEvents.layer),
@@ -73,7 +87,8 @@ function makeRoutes<AuthError, AuthServices>(
   )
 }
 
-export const routes = createRoutes()
+const runnerFactory = configuredRunnerFactory()
+export const routes = createRoutes(undefined, runnerFactory ? { runnerFactory } : {})
 
 export const webHandler = () =>
   HttpRouter.toWebHandler(routes.pipe(Layer.provide(HttpServer.layerServices)), { disableLogger: true })

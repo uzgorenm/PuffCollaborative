@@ -3,6 +3,10 @@
   "extends": "@tsconfig/bun/tsconfig.json",
   "compilerOptions": {
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "noUncheckedIndexedAccess": false
-  }
+    "noUncheckedIndexedAccess": false,
+    "paths": {
+      "@/*": ["../opencode/src/*"]
+    }
+  },
+  "include": ["src", "test", "../opencode/src/audio.d.ts"]
 }
