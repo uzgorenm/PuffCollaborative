@@ -122,7 +122,15 @@ function setup(plan: (command: CoordinationContracts.RunnerCommand) => ReadonlyA
             return yield* Effect.fail({ code: "conflict" as const, message: "Callback ID conflict" })
           return current
         }
-        if (callback.kind === "state" && current.state !== callback.expectedState)
+        if (
+          callback.kind === "state" &&
+          current.state !== callback.expectedState &&
+          !(
+            current.state === "recovery_required" &&
+            callback.expectedState === "reserved" &&
+            callback.nextState === "running"
+          )
+        )
           return yield* Effect.fail({ code: "conflict" as const, message: "Stale callback" })
         if (callback.kind === "activity" && current.state !== callback.state)
           return yield* Effect.fail({ code: "conflict" as const, message: "Stale activity" })
@@ -210,7 +218,14 @@ function setup(plan: (command: CoordinationContracts.RunnerCommand) => ReadonlyA
         approval = { ...approval, deliveryState: "delivered" }
         return approval
       }),
-    pendingDecisions: () => Effect.succeed([]),
+    pendingDecisions: (executionOwner) =>
+      Effect.succeed(
+        approval?.deliveryState === "pending" &&
+          run.executionOwner?.workerId === executionOwner.workerId &&
+          run.executionOwner.instanceId === executionOwner.instanceId
+          ? [{ thread, approval }]
+          : [],
+      ),
   }
 
   let adapter: CoordinationContracts.Runner
@@ -227,6 +242,9 @@ function setup(plan: (command: CoordinationContracts.RunnerCommand) => ReadonlyA
     getRun: () => run,
     getLaterRun: () => laterRun,
     getApproval: () => approval,
+    markRecoveryRequired: () => {
+      run = { ...run, state: "recovery_required" }
+    },
   }
 }
 
@@ -281,6 +299,20 @@ describe("coordination runner with mocked access, queue and approval storage", (
     await Effect.runPromise(test.adapter.recoverPending(owner))
     await test.mock.wait(initialRun.id)
     expect(test.mock.starts).toHaveLength(1)
+    expect(test.getRun().state).toBe("completed")
+  })
+
+  test("retries the same Run after an unconfirmed reservation expires", async () => {
+    const test = setup(() => [{ kind: "complete" }])
+    test.mock.setConnected(false)
+    const first = await Effect.runPromise(result(test.adapter.claim(runner, thread.id, owner)))
+    expect(first.ok).toBe(false)
+    test.markRecoveryRequired()
+    test.mock.setConnected(true)
+    await Effect.runPromise(test.adapter.recoverPending(owner))
+    await test.mock.wait(initialRun.id)
+    expect(test.mock.starts).toHaveLength(1)
+    expect(test.mock.starts[0]?.runId).toBe(initialRun.id)
     expect(test.getRun().state).toBe("completed")
   })
 
@@ -360,6 +392,35 @@ describe("coordination runner with mocked access, queue and approval storage", (
     await test.mock.wait(initialRun.id)
     expect(decisions.map((item) => item.ok).sort()).toEqual([false, true])
     expect(test.mock.decisions).toHaveLength(1)
+  })
+
+  test("recovers a committed approval decision after delivery fails", async () => {
+    const test = setup(() => [
+      { kind: "approval", approvalId: "apr_recovery", toolCallId: "tool_recovery" },
+      { kind: "complete" },
+    ])
+    await Effect.runPromise(test.adapter.claim(runner, thread.id, owner))
+    await until(() => test.getApproval()?.state === "pending")
+    test.mock.setConnected(false)
+    const first = await Effect.runPromise(
+      result(
+        test.adapter.decideApproval({
+          principal: member,
+          threadId: thread.id,
+          approvalId: "apr_recovery",
+          expectedVersion: 1,
+          decisionId: "dec_recovery",
+          decision: "approve",
+        }),
+      ),
+    )
+    expect(first.ok).toBe(false)
+    expect(test.getApproval()?.deliveryState).toBe("pending")
+    test.mock.setConnected(true)
+    await Effect.runPromise(test.adapter.recoverPending(owner))
+    await test.mock.wait(initialRun.id)
+    expect(test.mock.decisions).toEqual([{ runId: initialRun.id, decisionId: "dec_recovery" }])
+    expect(test.getApproval()?.deliveryState).toBe("delivered")
   })
 
   test("deduplicates repeated callbacks and rejects untrusted or stale ones", async () => {
