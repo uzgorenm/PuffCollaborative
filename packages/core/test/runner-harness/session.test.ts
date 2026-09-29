@@ -183,7 +183,19 @@ describe("runner Session binding", () => {
       })
       expect(yield* SessionInput.promoteNextQueued(db, events, id)).toBe(true)
       const restarted = binding(db, session, [first, second])
+      second.run = Schema.decodeUnknownSync(Coordination.Run)({
+        ...second.run,
+        state: "running",
+        attempt: 2,
+        startedAt: timestamp,
+      })
+      expect(yield* restarted.currentRun(second.command)).toMatchObject({
+        state: "running",
+        attempt: 2,
+        startedAt: timestamp,
+      })
       const next = yield* restarted.authorize(second.command)
+      expect(next.attempt).toBe(2)
       const handedOff = yield* restarted.attach({ run: next, workspace, runtime })
       expect(handedOff.id).toBe(id)
       expect((yield* session.context(handedOff.id)).filter((message) => message.type === "user")).toMatchObject([
@@ -193,6 +205,13 @@ describe("runner Session binding", () => {
         (yield* db.select().from(ThreadBindingTable).where(eq(ThreadBindingTable.thread_id, first.thread.id)).all())
           .length,
       ).toBe(1)
+      second.run = Schema.decodeUnknownSync(Coordination.Run)({
+        ...second.run,
+        state: "completed",
+        endedAt: timestamp,
+      })
+      expect((yield* restarted.currentRun(second.command)).state).toBe("completed")
+      expect((yield* restarted.authorize(second.command)).session.id).toBe(id)
     }),
   )
 
@@ -251,6 +270,7 @@ describe("runner Session binding", () => {
         (yield* service.authorize({ ...first.command, sessionId: second.thread.sessionId }).pipe(Effect.flip)).code,
       ).toBe("conflict")
       expect((yield* service.authorize({ ...first.command, text: "Changed" }).pipe(Effect.flip)).code).toBe("conflict")
+      expect((yield* service.currentRun({ ...first.command, text: "Changed" }).pipe(Effect.flip)).code).toBe("conflict")
       expect((yield* service.authorize(wrongProject.command).pipe(Effect.flip)).code).toBe("conflict")
       expect(
         (yield* service

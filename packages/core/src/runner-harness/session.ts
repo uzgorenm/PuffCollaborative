@@ -44,46 +44,57 @@ export function make(input: Dependencies): RunnerHarnessContracts.SessionBinding
     binding.workspace_id === info.location.workspaceID &&
     binding.directory === info.location.directory
 
+  const verified = Effect.fnUntraced(function* (command: RunnerHarnessContracts.StartCommand) {
+    if (command.executionOwner.workerId !== input.workerId) return yield* Effect.fail(wrongWorker)
+    const run = yield* input.queue.getRun(command.runId)
+    if (!run) return yield* Effect.fail(missingRun)
+    if (
+      run.threadId !== command.threadId ||
+      run.runnerMessageId !== command.runnerMessageId ||
+      run.executionOwner?.workerId !== command.executionOwner.workerId ||
+      run.executionOwner.instanceId !== command.executionOwner.instanceId
+    )
+      return yield* Effect.fail(wrongCommand)
+    const thread = yield* input.access.getThread(
+      { kind: "runner", workerId: input.workerId, instanceId: command.executionOwner.instanceId },
+      command.threadId,
+      "runner",
+    )
+    if (thread.sessionId !== command.sessionId || thread.workerId !== input.workerId)
+      return yield* Effect.fail(wrongCommand)
+    const instruction = (yield* input.queue.instructions(thread.id)).find((item) => item.id === run.instructionId)
+    if (
+      !instruction ||
+      instruction.runId !== run.id ||
+      instruction.threadId !== thread.id ||
+      instruction.text !== command.text
+    )
+      return yield* Effect.fail(wrongCommand)
+    const info = yield* session(thread.sessionId)
+    if (info.projectID !== thread.projectId || info.time.archived) return yield* Effect.fail(incompatible)
+    const binding = yield* input.db
+      .select()
+      .from(ThreadBindingTable)
+      .where(eq(ThreadBindingTable.thread_id, thread.id))
+      .get()
+      .pipe(Effect.orDie)
+    if (binding && (!validateStored(binding, info) || binding.worker_id !== thread.workerId))
+      return yield* Effect.fail(incompatible)
+    return { run, thread, info }
+  })
+
   const authorize: RunnerHarnessContracts.SessionBinding["authorize"] = Effect.fn("RunnerHarnessSession.authorize")(
     function* (command) {
-      if (command.executionOwner.workerId !== input.workerId) return yield* Effect.fail(wrongWorker)
-      const run = yield* input.queue.getRun(command.runId)
-      if (!run) return yield* Effect.fail(missingRun)
+      const current = yield* verified(command)
       // Recovery may inspect a terminal Run, but a queued Run has never been delivered to this worker.
-      if (
-        run.threadId !== command.threadId ||
-        run.runnerMessageId !== command.runnerMessageId ||
-        run.executionOwner?.workerId !== command.executionOwner.workerId ||
-        run.executionOwner.instanceId !== command.executionOwner.instanceId ||
-        run.state === "queued"
-      )
-        return yield* Effect.fail(wrongCommand)
-      const thread = yield* input.access.getThread(
-        { kind: "runner", workerId: input.workerId, instanceId: command.executionOwner.instanceId },
-        command.threadId,
-        "runner",
-      )
-      if (thread.sessionId !== command.sessionId || thread.workerId !== input.workerId)
-        return yield* Effect.fail(wrongCommand)
-      const instruction = (yield* input.queue.instructions(thread.id)).find((item) => item.id === run.instructionId)
-      if (
-        !instruction ||
-        instruction.runId !== run.id ||
-        instruction.threadId !== thread.id ||
-        instruction.text !== command.text
-      )
-        return yield* Effect.fail(wrongCommand)
-      const info = yield* session(thread.sessionId)
-      if (info.projectID !== thread.projectId || info.time.archived) return yield* Effect.fail(incompatible)
-      const binding = yield* input.db
-        .select()
-        .from(ThreadBindingTable)
-        .where(eq(ThreadBindingTable.thread_id, thread.id))
-        .get()
-        .pipe(Effect.orDie)
-      if (binding && (!validateStored(binding, info) || binding.worker_id !== thread.workerId))
-        return yield* Effect.fail(incompatible)
-      return { command, projectId: thread.projectId, attempt: run.attempt, session: info }
+      if (current.run.state === "queued") return yield* Effect.fail(wrongCommand)
+      return { command, projectId: current.thread.projectId, attempt: current.run.attempt, session: current.info }
+    },
+  )
+
+  const currentRun: RunnerHarnessContracts.SessionBinding["currentRun"] = Effect.fn("RunnerHarnessSession.currentRun")(
+    function* (command) {
+      return (yield* verified(command)).run
     },
   )
 
@@ -164,5 +175,5 @@ export function make(input: Dependencies): RunnerHarnessContracts.SessionBinding
     }),
   }
 
-  return { authorize, attach, coordinator }
+  return { authorize, currentRun, attach, coordinator }
 }
