@@ -14,7 +14,7 @@ bun test test/coordination-e2e/smoke.test.ts
 bun test test/coordination-e2e/suite.test.ts
 ```
 
-The smoke test prints `COORDINATION_TRACE`, an ordered project event trace for Alice and Bob in one thread while Dan's separate thread executes. The broader suite prints `COORDINATION_STRESS_SEED` and its accepted, started, and event counts. The suite currently exits 1 because its runner-output citation regression is failing. Other cases continue and report their own results.
+The smoke test prints `COORDINATION_TRACE`, an ordered project event trace for Alice and Bob in one thread while Dan's separate thread executes. The broader suite prints `COORDINATION_STRESS_SEED` and its accepted, started, and event counts. At `b3eeb0c` on `origin/serhat`, the suite passed all nine cases, including the runner-output citation regression.
 
 Each test allocates local ports and a fresh directory under the system temporary directory. The harness writes eight distinct Bun password hashes, a trusted project admission file, real OpenCode `project` and `session` fixture rows, and the database created by the normal server migration layer. Its Session binding adapter reads the seeded `session` table and returns the stored project. Project admission comes from the configured allowlist. Server handlers use the production identity resolver and authorization checks. The test entry point passes only the external Session binding and RunnerPort into `createRoutes`.
 
@@ -49,8 +49,8 @@ The smoke and suite verify backend behavior through real HTTP and SQLite. The te
 
 The MVP keeps historical numeric event cursors indefinitely. An out-of-scope or expired cursor format is not defined by the current contract. The suite tests malformed, future, and oversized cursors.
 
-## Current regression
+## Runner-output citation repair
 
-`I regression: runner output must advance the citable activity revision` fails. A `run.output` event is committed at sequence 8, but the thread's `activitySeq` remains 4. A work card that cites sequence 8 is rejected because evidence is newer than its source activity sequence. The queue's runner-activity projection is the likely fix: update `Thread.activitySeq` in the same event transaction for content that can support a card. The test stays failing until the product behavior changes.
+At `e83a0bb`, `I regression: runner output must advance the citable activity revision` failed: a `run.output` event committed at sequence 8 while the thread's `activitySeq` remained 4. A card citing sequence 8 was rejected. The event journal now advances the activity revision in the same transaction as a thread event, excluding card updates. The test passed at `b3eeb0c`, and the card citation received HTTP 200. The [recheck receipt](hackathon/evidence/2026-09-29-coordination-activity-revision.md) records that run.
 
 The process entry point uses the real route layer and migrations but is not the normal `opencode serve` CLI. The live OpenCode RunnerPort, workspace and Session history implementation, frontend subscribers, and Jev/Flower analysis service still require their own integration runs.
