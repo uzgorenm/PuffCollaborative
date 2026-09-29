@@ -2,6 +2,8 @@
 
 **Browser UI preview (September 29):** Next.js/React source `b23f29418d` adds the Codex-style workspace at `apps/web`. Production compilation/TypeScript and observed session navigation, filters, dock controls, and local draft persistence passed. [Evidence and limitations](evidence/2026-09-29-react-web-preview.md). Simulator fixtures are labeled synthetic; no live-awareness, real-presence, or execution gate is closed by this preview.
 
+**Main browser sidebar (September 29):** source `790518a2c9688e9fc1d09f3b6b02a29b965c7a03` adds the Stanford Hackathon project tree, personal threads, teammate sections, and rolling 90-minute summaries to `apps/web`; the separate `/puff` overview page is removed. Production builds, app typecheck, 47 browser tests, and desktop/mobile browser inspection passed. [Evidence and limits](evidence/2026-09-29-main-web-sidebar.md). Activity comes from demo or simulator sessions; WF01/WF02 and G5 remain open.
+
 This is the coordinator's working checklist. A feature counts as progress when its behavior can be demonstrated with evidence. Use the [workflow cases](acceptance-workflows.md) to run the checks and the [integration gates](integration-gates.md) to resolve interfaces. Human ownership remains Serhat (server), Talha (OpenCode), Serdar (interface), Ferit (Flower).
 
 ## Current checkpoint
