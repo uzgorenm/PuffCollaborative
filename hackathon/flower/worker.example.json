@@ -1,0 +1,11 @@
+{
+  "serverUrl": "http://127.0.0.1:4096",
+  "projectId": "<opencode-project-id>",
+  "threads": {
+    "<thread-id-A>": { "featureTopic": "navigation", "relationship": "alternative" },
+    "<thread-id-B>": { "featureTopic": "navigation", "relationship": "alternative" }
+  },
+  "debounceSeconds": 2,
+  "fallbackSeconds": 15,
+  "jevTimeoutSeconds": 5
+}
