@@ -269,7 +269,6 @@ export function make(input: Dependencies): Recovery {
       return "terminal" as const
     }
     if (assessment.kind === "terminal") return "terminal" as const
-    yield* hold(assessment)
     return yield* Effect.fail({ code: "unavailable", message: assessment.reason } satisfies Failure)
   })
 

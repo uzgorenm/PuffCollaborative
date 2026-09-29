@@ -378,6 +378,9 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
         .reconcile(setup.command.runnerMessageId)
         .pipe(Effect.catch((error) => Effect.succeed(error)))
       expect(unknown).toMatchObject({ code: "unavailable" })
+      expect(setup.state.execution.phase).toBe("admitted")
+      expect(setup.state.transitions).toHaveLength(0)
+      yield* setup.make().recover
       expect(setup.state.execution.phase).toBe("recovery_required")
       expect(setup.state.wakes).toBe(0)
     }),
@@ -392,6 +395,9 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
         .reconcile(setup.command.runnerMessageId)
         .pipe(Effect.catch((error) => Effect.succeed(error)))
       expect(unknown).toMatchObject({ code: "unavailable" })
+      expect(setup.state.execution.phase).toBe("prepared")
+      expect(setup.state.transitions).toHaveLength(0)
+      yield* setup.make().recover
       expect(setup.state.execution.phase).toBe("recovery_required")
       expect(setup.state.starts).toHaveLength(0)
       expect(setup.state.wakes).toBe(0)
@@ -495,6 +501,9 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
         .reconcile(setup.command.runnerMessageId)
         .pipe(Effect.catch((error) => Effect.succeed(error)))
       expect(unknown).toMatchObject({ code: "unavailable" })
+      expect(setup.state.execution.phase).toBe("running")
+      expect(setup.state.transitions).toHaveLength(0)
+      yield* setup.make().recover
       expect(setup.state.execution.phase).toBe("recovery_required")
       expect(setup.state.starts).toHaveLength(0)
     }),
