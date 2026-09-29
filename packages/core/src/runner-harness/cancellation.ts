@@ -59,6 +59,11 @@ export function make(input: Dependencies): RunnerHarnessContracts.Cancellations 
       return yield* Effect.fail({ code: "conflict" as const, message: "Trusted Run binding changed" })
 
     if (terminal(current.phase) || current.phase === "recovery_required") return undefined
+    const cancelling = yield* input.lifecycle.cancellationRequested(command.runId)
+    if (terminal(cancelling.phase) || cancelling.phase === "recovery_required") return undefined
+    if (cancelling.phase !== "cancelling")
+      return yield* Effect.fail({ code: "conflict" as const, message: "Run did not enter cancelling" })
+
     const claimed = yield* Effect.sync(() => {
       if (inFlight.has(command.runId)) return false
       inFlight.add(command.runId)
@@ -67,11 +72,6 @@ export function make(input: Dependencies): RunnerHarnessContracts.Cancellations 
     if (!claimed) return undefined
 
     return yield* Effect.gen(function* () {
-      const cancelling = yield* input.lifecycle.cancellationRequested(command.runId)
-      if (terminal(cancelling.phase) || cancelling.phase === "recovery_required") return undefined
-      if (cancelling.phase !== "cancelling")
-        return yield* Effect.fail({ code: "conflict" as const, message: "Run did not enter cancelling" })
-
       const result = cancelling.runtime ? yield* Effect.result(input.runtimes.interrupt(cancelling)) : undefined
       const observed =
         result && Result.isSuccess(result)
