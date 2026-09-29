@@ -439,10 +439,25 @@ class Worker:
             )
             result["model"] = meta.get("model") or "unknown"
             card = result.get("myCard") or {}
+            before = [
+                item.get("text")
+                for item in (self.board.get(thread_id, {}).get("discoveries") or [])
+            ]
             self.board[thread_id] = card
             self.record("board.jsonl", {"threadId": thread_id, "runId": run_id, **result})
             await asyncio.to_thread(self.write_card, thread_id, card, run_id, result)
             await asyncio.to_thread(self.deliver, thread_id, run_id, result)
+            after = [
+                item.get("text")
+                for item in (card.get("discoveries") or [])
+                if isinstance(item, dict)
+            ]
+            if set(after) - set(before):
+                # A new discovery on this card is news for every other agent's guardian.
+                for other in self.threads:
+                    if other != thread_id and other not in self.busy:
+                        self.busy.add(other)
+                        asyncio.create_task(self.run_guardian(other, f"discovery from {thread_id}"))
             self.retry.pop(thread_id, None)
         except Exception as error:  # noqa: BLE001 - coding sessions never wait on us
             attempts = self.retry.get(thread_id, (0, 0))[1] + 1
@@ -525,6 +540,15 @@ class Worker:
             for event_id in result.get("evidenceEventIds") or []
             if event_id in seqs and seqs[event_id] <= seq
         ]
+        if not refs:
+            # The server requires evidence on every card; fall back to the flagged
+            # events the guardian actually read (else the newest known event).
+            usable = [item for item in self.feed.get(thread_id, []) if item["seq"] <= seq]
+            flagged = [item for item in usable if item["seq"] in self.flagged.get(thread_id, set())]
+            refs = [
+                {"threadId": thread_id, "eventId": item["eventId"], "seq": item["seq"]}
+                for item in (flagged or usable)[-3:]
+            ]
         files = ", ".join(str(item) for item in (card.get("filesTouched") or [])[:10])
         model = result.get("model", "unknown")
         found = "; ".join(
