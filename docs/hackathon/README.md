@@ -2,6 +2,8 @@
 
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
 
+**Repeatable React walkthrough:** source `a5624203ac` adds Reset workspace with persistent Undo, product copy without scripted/demo labels, and narrow saved-copy migration. All 19 tests, typecheck, build, and setup/overlap/source-reuse/personal-context browser checks pass. [Receipt and boundary](evidence/2026-09-29-repeatable-web-walkthrough.md); [click-by-click test instructions](../../apps/web/README.md#test-the-full-experience). Live workflow gates remain open.
+
 **Native error-reuse correction:** `d9609a30aa` adds automatic error matching, Inspect / Apply fix / No thanks, exact source/revision rechecks, application receipts, and person -> aggregate summary -> sessions in the desktop. The internally synthetic backend applies a real patch to a disposable workspace and runs its tests; the live producer/Flower boundary remains open. [Verification receipt](evidence/2026-09-29-error-fix-reuse.md).
 
 **React backend handoff:** the compact sidebar uses colored status dots with hover/accessibility labels. Source `1497e7cbbf` preserves incoming main and passes 14 tests, typecheck, build, and browser interaction checks. [Receipt and backend integration boundary](evidence/2026-09-29-compact-web-sidebar.md). The React workspace is ready for teammates to connect its local demo actions to the authoritative backend; live gates remain open.

@@ -1,5 +1,7 @@
 # Puff progress and verification
 
+**Repeatable React walkthrough:** source `a5624203ac` passes 19 tests, typecheck, build, and browser checks for reset/reload/undo, setup, Sam overlap, Alice's source reuse, and personal context. The app uses product copy; [receipt](evidence/2026-09-29-repeatable-web-walkthrough.md) records the scripted local-data boundary. Live gates are unchanged.
+
 **Compact React sidebar:** source `1497e7cbbf` removes visible status words while retaining colored dots, tooltips, and accessible labels. Fourteen tests, typecheck, production build, and sidebar navigation pass. [Backend handoff receipt](evidence/2026-09-29-compact-web-sidebar.md). The interface remains a local demo pending backend wiring.
 
 **Browser UI workflows (September 29):** Next.js/React source `0c002da6c9` adds person → total summary → sessions, project setup/task assignment, overlap choices, attributed finding reuse, and private local sessions at `apps/web`. Fourteen tests, package typecheck, production build, browser persistence/source-deduplication checks, and a 2:26 cursor walkthrough passed. [Evidence and limitations](evidence/2026-09-29-react-web-workflows.md). The interface is explicitly an interactive demo; no live-awareness, real-presence, or execution gate is closed by these checks.
