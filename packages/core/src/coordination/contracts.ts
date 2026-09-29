@@ -7,6 +7,12 @@ export type ErrorCode = "invalid" | "unauthorized" | "forbidden" | "not_found" |
 export type Failure = { readonly code: ErrorCode; readonly message: string }
 export type Action = "read" | "submit" | "cancel" | "approve" | "runner" | "update_work_card"
 
+export class ProjectionFailure extends Error {
+  constructor(readonly failure: Failure) {
+    super(failure.message)
+  }
+}
+
 export interface Authentication {
   readonly authenticate: (credentials: {
     readonly username: string
@@ -94,7 +100,7 @@ export interface ThreadSnapshot {
 export interface Events {
   readonly append: (
     input: Omit<Coordination.Event, "id" | "seq"> & { readonly id?: string },
-    project: (seq: number) => Effect.Effect<void>,
+    project: (seq: number) => Effect.Effect<void, Failure>,
   ) => Effect.Effect<Coordination.Event, Failure>
   readonly replayProject: (
     projectId: Coordination.ProjectID,
@@ -155,6 +161,7 @@ export interface Queue {
     readonly runId: Coordination.RunID
     readonly callbackId: string
     readonly callback: RunnerCallback
+    readonly commitApproval?: (seq: number) => Effect.Effect<void, Failure>
   }) => Effect.Effect<Coordination.Run, Failure>
   readonly pending: (executionOwner: Coordination.ExecutionOwner) => Effect.Effect<
     ReadonlyArray<{
@@ -182,6 +189,7 @@ export type RunnerCallback =
       readonly expectedState: Coordination.RunState
       readonly nextState: Coordination.RunState
       readonly approvalId?: string
+      readonly toolCallId?: string
     }
   | {
       readonly kind: "activity"
