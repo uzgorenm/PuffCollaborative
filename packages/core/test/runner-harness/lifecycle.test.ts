@@ -429,6 +429,22 @@ test("rejects a coordinator Run that is no longer reserved before acceptance", (
     }),
   ))
 
+test("does not prepare an accepted Run after its reservation is revoked", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("revoked-after-accept")
+      const bound = session(first)
+      yield* harness.service.accept({ command: first, projectId: bound.projectID, attempt: 1, session: bound })
+      harness.state.coordinatorState = "cancelling"
+      const rejected = yield* harness.service.start(first).pipe(Effect.flip)
+      expect(rejected.code).toBe("conflict")
+      expect((yield* harness.service.get(first.runId))?.phase).toBe("accepted")
+      expect(harness.calls.workspaces).toBe(0)
+      expect(harness.calls.prompts).toBe(0)
+    }),
+  ))
+
 test("rechecks coordinator reservation before submitting a prepared prompt", () =>
   withDatabase((db) =>
     Effect.gen(function* () {

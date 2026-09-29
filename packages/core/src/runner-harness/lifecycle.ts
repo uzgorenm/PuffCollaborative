@@ -827,6 +827,7 @@ export function make(input: Dependencies): Lifecycle {
           return yield* Effect.fail(failure("conflict", "Trusted Run command differs from delivered command"))
         const accepted = yield* accept(run)
         if (terminal.has(accepted.phase)) return { messageId: command.runnerMessageId }
+        if (accepted.phase === "accepted" || accepted.phase === "prepared") yield* requireReservation(run)
         if (accepted.phase === "recovery_required") {
           if (accepted.workspace && accepted.runtime) {
             yield* watch(accepted)
