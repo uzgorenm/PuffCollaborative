@@ -159,7 +159,7 @@ Build:
 - Cancellation and approval handling connected to the server’s controls.
 Boundary: Executes the server’s assignments; does not create a separate queue or independently decide execution order.
 Demo test: Two threads edit the same filename in separate workspaces without overwriting one another. Both expose their progress and diffs.
-###       — Multiplayer interface and activity dashboard
+### Serdar — Multiplayer interface and activity dashboard
 Owns everything teammates see and interact with.
 Build:
 - A project view showing everyone’s shared threads.
@@ -169,7 +169,7 @@ Build:
 - Navigation from an activity summary directly into its source thread.
 Boundary: Displays server state and generated summaries; does not determine execution order or write summaries itself.
 Demo test: Two browsers can watch and contribute to the same thread. The dashboard distinguishes active work from queued work and recent completed work.
-### Serdar — Activity intelligence, Jev, and Flower
+### Ferit — Activity intelligence, Jev, and Flower
 Owns understanding what everyone is working on and keeping summaries current.
 Build:
 - Event processing that produces a compact work card for each thread: objective, current step, blocker, recent outcome, and contributors.
