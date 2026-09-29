@@ -34,6 +34,8 @@ export type RunState = typeof RunState.Type
 
 export const EventKind = Schema.Literals([
   "project.created",
+  "project.brief.updated",
+  "person.focus.updated",
   "membership.changed",
   "thread.created",
   "comment.created",
@@ -107,6 +109,34 @@ export const Membership = Schema.Struct({
   joinedAt: Schema.String,
 }).annotate({ identifier: "Coordination.Membership" })
 export type Membership = typeof Membership.Type
+
+export interface ProjectBriefContent extends Schema.Schema.Type<typeof ProjectBriefContent> {}
+export const ProjectBriefContent = Schema.Struct({
+  goal: Schema.String,
+  successCriteria: Schema.Array(Schema.String),
+  roles: Schema.Array(Schema.Struct({ userId: UserID, label: Schema.String })),
+  tools: Schema.Array(Schema.String),
+  sharingDefault: Schema.Literal("private"),
+  suggestedAwarenessMode: Schema.Literals(["off", "review-each-note", "allow-validated-topic-notes"]),
+}).annotate({ identifier: "Coordination.ProjectBriefContent" })
+
+export interface ProjectBrief extends Schema.Schema.Type<typeof ProjectBrief> {}
+export const ProjectBrief = Schema.Struct({
+  ...ProjectBriefContent.fields,
+  projectId: ProjectID,
+  version: Schema.Int,
+  updatedBy: UserID,
+  updatedAt: Schema.String,
+}).annotate({ identifier: "Coordination.ProjectBrief" })
+
+export interface PersonFocus extends Schema.Schema.Type<typeof PersonFocus> {}
+export const PersonFocus = Schema.Struct({
+  projectId: ProjectID,
+  userId: UserID,
+  version: Schema.Int,
+  text: Schema.NullOr(Schema.String),
+  updatedAt: Schema.String,
+}).annotate({ identifier: "Coordination.PersonFocus" })
 
 export const Comment = Schema.Struct({
   id: Schema.String,

@@ -34,6 +34,20 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
           ? invoke(runtime.services, principal).pipe(Effect.mapError(httpFailure))
           : Effect.fail(unavailable()),
       )
+    const useContext = <A>(
+      invoke: (
+        context: CoordinationContracts.ProjectContext,
+        principal: AuthContext,
+      ) => Effect.Effect<A, CoordinationContracts.Failure>,
+    ) =>
+      use((services, principal) => {
+        // Composition owns this service after the backend freeze; until then these routes fail closed.
+        const context =
+          "projectContext" in services ? (services.projectContext as CoordinationContracts.ProjectContext) : undefined
+        return context
+          ? invoke(context, principal)
+          : Effect.fail({ code: "unavailable", message: "Project context is not configured" })
+      })
 
     return handlers
       .handle("coordination.projectList", () => use((services, auth) => services.projects.list(auth)))
@@ -42,6 +56,24 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
       )
       .handle("coordination.projectGet", (ctx) =>
         use((services, auth) => services.projects.get(auth, ctx.params.projectId)),
+      )
+      .handle("coordination.projectBriefGet", (ctx) =>
+        useContext((context, auth) =>
+          context.readBrief(auth, ctx.params.projectId).pipe(Effect.map((brief) => ({ brief }))),
+        ),
+      )
+      .handle("coordination.projectBriefPut", (ctx) =>
+        useContext((context, principal) =>
+          context.putBrief({ principal, projectId: ctx.params.projectId, ...ctx.payload }),
+        ),
+      )
+      .handle("coordination.personFocusList", (ctx) =>
+        useContext((context, auth) => context.listFocus(auth, ctx.params.projectId)),
+      )
+      .handle("coordination.personFocusPut", (ctx) =>
+        useContext((context, principal) =>
+          context.putFocus({ principal, projectId: ctx.params.projectId, ...ctx.payload }),
+        ),
       )
       .handle("coordination.memberGrant", (ctx) =>
         use((services, auth) =>

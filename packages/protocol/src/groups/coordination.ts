@@ -142,6 +142,44 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
+    HttpApiEndpoint.get("coordination.projectBriefGet", "/api/coordination/v1/projects/:projectId/brief", {
+      params: { projectId: Coordination.ProjectID },
+      success: Schema.Struct({ brief: Schema.optional(Coordination.ProjectBrief) }),
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.put("coordination.projectBriefPut", "/api/coordination/v1/projects/:projectId/brief", {
+      params: { projectId: Coordination.ProjectID },
+      payload: Schema.Struct({
+        requestId: Schema.String,
+        expectedVersion: Schema.Int,
+        content: Coordination.ProjectBriefContent,
+      }),
+      success: Coordination.ProjectBrief,
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("coordination.personFocusList", "/api/coordination/v1/projects/:projectId/focus", {
+      params: { projectId: Coordination.ProjectID },
+      success: Schema.Array(Coordination.PersonFocus),
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.put("coordination.personFocusPut", "/api/coordination/v1/projects/:projectId/focus/me", {
+      params: { projectId: Coordination.ProjectID },
+      payload: Schema.Struct({
+        requestId: Schema.String,
+        expectedVersion: Schema.Int,
+        text: Schema.NullOr(Schema.String),
+      }),
+      success: Coordination.PersonFocus,
+      error: errors,
+    }),
+  )
+  .add(
     HttpApiEndpoint.post("coordination.memberGrant", "/api/coordination/v1/projects/:projectId/members", {
       params: { projectId: Coordination.ProjectID },
       payload: Schema.Struct({ targetUserId: Coordination.UserID, requestId: Schema.String }),

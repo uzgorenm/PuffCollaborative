@@ -73,6 +73,31 @@ export interface Projects {
   ) => Effect.Effect<ReadonlyArray<Coordination.Contribution>, Failure>
 }
 
+export interface ProjectContext {
+  readonly readBrief: (
+    principal: Coordination.AuthContext,
+    projectId: Coordination.ProjectID,
+  ) => Effect.Effect<Coordination.ProjectBrief | undefined, Failure>
+  readonly putBrief: (input: {
+    readonly principal: Coordination.AuthContext
+    readonly projectId: Coordination.ProjectID
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly content: Coordination.ProjectBriefContent
+  }) => Effect.Effect<Coordination.ProjectBrief, Failure>
+  readonly listFocus: (
+    principal: Coordination.AuthContext,
+    projectId: Coordination.ProjectID,
+  ) => Effect.Effect<ReadonlyArray<Coordination.PersonFocus>, Failure>
+  readonly putFocus: (input: {
+    readonly principal: Coordination.AuthContext
+    readonly projectId: Coordination.ProjectID
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly text: string | null
+  }) => Effect.Effect<Coordination.PersonFocus, Failure>
+}
+
 export interface SessionBinding {
   readonly resolve: (
     sessionId: Coordination.Thread["sessionId"],
