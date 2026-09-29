@@ -92,6 +92,8 @@ jobs:
     runs-on: ${{ matrix.settings.host }}
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
+      # Leave CPU capacity for the dev server on GitHub-hosted runners.
+      PLAYWRIGHT_WORKERS: "2"
     defaults:
       run:
         shell: bash
