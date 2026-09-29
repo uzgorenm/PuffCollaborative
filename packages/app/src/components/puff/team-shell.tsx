@@ -10,6 +10,7 @@ import { useGlobal, type ServerCtx } from "@/context/global"
 import { ServerConnection, serverName, useServer } from "@/context/server"
 import { useTabs } from "@/context/tabs"
 import { useTeam } from "@/pages/puff/team-context"
+import { FixSuggestion } from "@/pages/puff/fix-suggestion"
 import { loadHomeSessionIndex, type HomeSessionEvents } from "@/context/global-sync/home-session-index"
 import { sessionHref } from "@/utils/session-route"
 import { ContextPanel } from "./context-panel"
@@ -317,6 +318,7 @@ export function TeamShell(props: ParentProps) {
             </button>
           </div>
         </Show>
+        <Show when={localSnapshot()}><FixSuggestion /></Show>
         <div class="team-local-grid">
           <div class="team-local-chat">{props.children}</div>
           <aside
