@@ -11,6 +11,18 @@ other’s work without manually transferring context.
 
 > Status: Proposed MVP. The capabilities below describe the intended design.
 
+## Team workspace
+
+**Start here: [Team task board and feature status](docs/hackathon/README.md).**
+
+- [Your assigned task and implementation checklist](docs/hackathon/team-plan.md)
+- [Feature scope, acceptance criteria, and shared contracts](docs/hackathon/mvp-spec.md)
+- [README review against the original idea](docs/hackathon/README-review.md)
+
+Everyone works on **`main`**, the default branch. Commit and push verified work
+directly to `main`; **no PRs or feature branches**. Each person uses a separate
+local clone and integrates incoming commits before pushing. Never force-push.
+
 ## Features
 
 - **Shared threads:** View conversations, tool activity, and changes in real

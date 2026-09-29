@@ -10,7 +10,7 @@
 
 **Spec:** [mvp-spec.md](mvp-spec.md). Also read [README-review.md](README-review.md).
 
-**Delivery instruction:** Serdar requested that completed work be committed and pushed to `origin/main` every time. The workstream branch names below are optional local isolation names; the shared delivery branch is `main`. Synchronize with remote `main` before integrating and pushing, preserve teammates' commits, and never force-push.
+**Delivery instruction:** `main` is the default and only shared development branch. Commit and push completed, verified work directly to `origin/main` every time. No PRs or feature branches. Each teammate uses a separate clone on main, integrates incoming commits before pushing, and never force-pushes. Track ownership and progress in [the team board](README.md).
 
 ## Global constraints
 
@@ -22,16 +22,16 @@
 - Per-session ownership, stable event/action IDs, source revisions, and attributed approvals are required, not optional polish.
 - Reuse existing OpenCode execution and permissions; no second coding loop and no remote shell endpoint.
 - Root/package AGENTS.md apply. Run tests and `bun typecheck` from package/task directories, never tests from repo root. UI copy uses the existing i18n mechanism.
-- Branch names have at most three hyphen-separated words; use conventional commits. Do not change upstream runtime architecture to implement this MVP.
+- Use main directly and conventional commits. Do not change upstream runtime architecture to implement this MVP.
 
 ## Owners and file boundaries
 
-| Owner | Workstream / branch | Owns | First usable output |
+| Owner | Workstream | Owns | First usable output |
 | --- | --- | --- | --- |
-| Serhat | OpenCode adapter / `session-bridge` | hackathon/worker/ | One real session exported and one approved input admitted to that same session. |
-| Ferit | Shared state and API / `shared-project-state` | hackathon/hub/, hackathon/contracts/ | Contract fixtures and hub snapshot/event/approval endpoints. |
-| Serdar | Flower coordination / `flower-coordinator` | hackathon/flower/ | A real SuperGrid run returning a validated report over the common fixtures. |
-| Talha | Team overview / `team-overview` | packages/app/src/pages/puff/, packages/app/src/components/puff/, packages/app/src/app.tsx route, app i18n keys | Two-session view and proposal review against the fixtures. |
+| Serhat | OpenCode adapter | hackathon/worker/ | One real session exported and one approved input admitted to that same session. |
+| Ferit | Shared state and API | hackathon/hub/, hackathon/contracts/ | Contract fixtures and hub snapshot/event/approval endpoints. |
+| Serdar | Flower coordination | hackathon/flower/ | A real SuperGrid run returning a validated report over the common fixtures. |
+| Talha | Team overview | packages/app/src/pages/puff/, packages/app/src/components/puff/, packages/app/src/app.tsx route, app i18n keys | Two-session view and proposal review against the fixtures. |
 
 This uses Serhat's OpenCode familiarity and Serdar's already-verified Flower setup. Ferit and Talha have equally important ownership; their assignments do not assume different skill levels.
 
@@ -155,7 +155,7 @@ Ferit is the integration owner for shared schemas and the root manifest/lockfile
 - Read the spec and your task card before coding. Contract changes go through Ferit with all four owners informed; schema version changes require fixture updates.
 - Each owner shares the working command, exact pushed commit, evidence of their checks, and known limitations. This document does not itself notify anyone or assign GitHub issues.
 - Ferit coordinates integration order: contracts and fixtures first; hub, worker, Flower, and UI slices follow as their interfaces work. Check each slice before committing and pushing it to main; authors preserve another person's in-progress changes.
-- Use separate checkouts. The optional local isolation branches are `session-bridge`, `shared-project-state`, `flower-coordinator`, and `team-overview`; completed work goes to main. Fetch before every integration. If a push is rejected because main advanced, reconcile the incoming commits, rerun affected checks, and push normally.
+- Use separate local clones, all on main. Fetch before every integration. If a push is rejected because main advanced, merge the incoming commits, rerun affected checks, and push normally. Do not create a PR or feature branch.
 - Each owner reserves the final hour for integration and testing. Serdar narrates the Flower run; Serhat and Ferit operate the two demo workers; Talha operates the overview and shows the approval flow.
 - Checkpoints measure observed outcomes. A build, fixture response, live Flower run, and successful context delivery prove different things.
 
