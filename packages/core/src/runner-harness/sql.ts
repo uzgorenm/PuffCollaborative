@@ -4,6 +4,7 @@ import type { Coordination } from "@opencode-ai/schema/coordination"
 import type { Session } from "@opencode-ai/schema/session"
 import { sql } from "drizzle-orm"
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
+import type { RunnerArtifacts } from "./artifacts"
 import type { LocalPhase, StartCommand } from "./contracts"
 
 export const ThreadBindingTable = sqliteTable(
@@ -42,6 +43,8 @@ export const ExecutionTable = sqliteTable(
     workspace_directory: text(),
     runtime_id: text(),
     admitted_message_id: text(),
+    artifact_baseline: text({ mode: "json" }).$type<RunnerArtifacts.Baseline>(),
+    artifact_report: text({ mode: "json" }).$type<RunnerArtifacts.Report>(),
     last_session_seq: integer(),
     interrupt_abort: text().$type<"acknowledged" | "unknown" | "not_delivered">(),
     interrupt_state: text().$type<"stopped" | "already_idle" | "uncertain">(),

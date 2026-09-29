@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ae45e733-d884-432c-8b50-67fc75a50fea",
+  "id": "67fdca1e-afc3-4662-bffa-c34025f9f78b",
   "prevIds": [
-    "57170f7e-b734-4fb2-98d1-c1ce1b7713c0"
+    "4ec74f26-06eb-45e7-9ca2-6e1f12bd1dc9"
   ],
   "ddl": [
     {
@@ -12,6 +12,10 @@
     },
     {
       "name": "data_migration",
+      "entityType": "tables"
+    },
+    {
+      "name": "runner_harness_approval",
       "entityType": "tables"
     },
     {
@@ -229,6 +233,166 @@
       "name": "time_completed",
       "entityType": "columns",
       "table": "data_migration"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "approval_id",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "run_id",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "session_id",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "permission_request_id",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "tool_call_id",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "source_message_id",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "scope_hash",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "tool_name",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "summary",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "decision_id",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "decision",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "delivery",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "invalidated_reason",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "requested_at",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "runner_harness_approval"
     },
     {
       "type": "text",
@@ -1851,6 +2015,26 @@
       "table": "runner_harness_execution"
     },
     {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "artifact_baseline",
+      "entityType": "columns",
+      "table": "runner_harness_execution"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "artifact_report",
+      "entityType": "columns",
+      "table": "runner_harness_execution"
+    },
+    {
       "type": "integer",
       "notNull": false,
       "autoincrement": false,
@@ -3085,6 +3269,15 @@
     },
     {
       "columns": [
+        "approval_id"
+      ],
+      "nameExplicit": false,
+      "name": "runner_harness_approval_pk",
+      "table": "runner_harness_approval",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
         "callback_id"
       ],
       "nameExplicit": false,
@@ -3307,6 +3500,66 @@
       "name": "session_share_pk",
       "table": "session_share",
       "entityType": "pks"
+    },
+    {
+      "columns": [
+        {
+          "value": "permission_request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "runner_harness_approval_permission_idx",
+      "entityType": "indexes",
+      "table": "runner_harness_approval"
+    },
+    {
+      "columns": [
+        {
+          "value": "decision_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "runner_harness_approval_decision_idx",
+      "entityType": "indexes",
+      "table": "runner_harness_approval"
+    },
+    {
+      "columns": [
+        {
+          "value": "run_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"runner_harness_approval\".\"delivery\" IN ('pending', 'unknown')",
+      "origin": "manual",
+      "name": "runner_harness_approval_active_run_idx",
+      "entityType": "indexes",
+      "table": "runner_harness_approval"
+    },
+    {
+      "columns": [
+        {
+          "value": "run_id",
+          "isExpression": false
+        },
+        {
+          "value": "requested_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "runner_harness_approval_run_idx",
+      "entityType": "indexes",
+      "table": "runner_harness_approval"
     },
     {
       "columns": [
