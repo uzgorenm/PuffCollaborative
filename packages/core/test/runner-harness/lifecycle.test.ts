@@ -5,9 +5,12 @@ import { Permission } from "@opencode-ai/schema/permission"
 import { Session } from "@opencode-ai/schema/session"
 import { SessionInput } from "@opencode-ai/schema/session-input"
 import { AbsolutePath } from "@opencode-ai/schema/schema"
+import { WorkspaceID } from "@opencode-ai/schema/workspace-id"
 import { Database } from "@opencode-ai/core/database/database"
 import { RunnerLifecycle } from "@opencode-ai/core/runner-harness/lifecycle"
 import { ExecutionTable } from "@opencode-ai/core/runner-harness/sql"
+import { Hash } from "@opencode-ai/core/util/hash"
+import type { RunnerArtifacts } from "@opencode-ai/core/runner-harness/artifacts"
 import type { RunnerHarnessContracts } from "@opencode-ai/core/runner-harness/contracts"
 import { eq } from "drizzle-orm"
 
@@ -33,8 +36,31 @@ function session(command: RunnerHarnessContracts.StartCommand) {
     cost: 0,
     tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
     time: { created: DateTime.makeUnsafe(0), updated: DateTime.makeUnsafe(0) },
-    location: { directory: AbsolutePath.make(`/tmp/runner-${command.threadId}`) },
+    location: {
+      directory: AbsolutePath.make(`/tmp/runner-${command.threadId}`),
+      workspaceID: WorkspaceID.make(`wrk_${command.threadId}`),
+    },
   })
+}
+
+function artifactBaseline(execution: RunnerHarnessContracts.LocalExecution): RunnerArtifacts.Baseline {
+  return {
+    projectId: execution.run.projectId,
+    threadId: execution.run.command.threadId,
+    runId: execution.run.command.runId,
+    workspaceId: execution.workspace!.id,
+    directoryHash: Hash.sha256(execution.workspace!.directory),
+    revision: "baseline-revision",
+    dirtyPaths: [],
+    head: "head-revision",
+    branchBase: "base-revision",
+    branchBaseKind: "origin/main",
+    untrackedPaths: [],
+    skipped: [],
+    skippedTruncated: false,
+    excludedCount: 0,
+    state: "complete",
+  }
 }
 
 function setup(db: Database.Interface["db"]) {
@@ -43,12 +69,15 @@ function setup(db: Database.Interface["db"]) {
     (observation: RunnerHarnessContracts.Observation) => Effect.Effect<void, RunnerHarnessContracts.Failure>
   >()
   const drafts: RunnerHarnessContracts.CallbackDraft[] = []
-  const calls = { prompts: 0, workspaces: 0, watches: 0, wakes: 0, order: [] as string[] }
+  const calls = { prompts: 0, workspaces: 0, watches: 0, wakes: 0, collections: 0, order: [] as string[] }
   const state = {
     promptFailure: false,
     workspaceFailure: false,
     reconciliation: "missing" as RunnerHarnessContracts.Reconciliation,
     activeTools: 0,
+    artifactActivities: [] as Coordination.RunnerActivity[],
+    runtimeId: undefined as string | undefined,
+    authorizedAttempt: 1,
   }
   const sessions = new Map<string, Session.Info>()
   const principal: Extract<Coordination.AuthContext, { kind: "runner" }> = {
@@ -80,7 +109,12 @@ function setup(db: Database.Interface["db"]) {
       authorize: (value) => {
         const bound = session(value)
         sessions.set(value.sessionId, bound)
-        return Effect.succeed({ command: value, projectId: bound.projectID, attempt: 1, session: bound })
+        return Effect.succeed({
+          command: value,
+          projectId: bound.projectID,
+          attempt: state.authorizedAttempt,
+          session: bound,
+        })
       },
       attach: ({ run }) => Effect.succeed(run.session),
       coordinator: {
@@ -112,7 +146,7 @@ function setup(db: Database.Interface["db"]) {
           if (state.workspaceFailure)
             return yield* Effect.fail({ code: "conflict" as const, message: "Workspace binding changed" })
           return {
-            id: `workspace_${run.command.threadId}`,
+            id: `wrk_${run.command.threadId}`,
             threadId: run.command.threadId,
             projectId: run.projectId,
             directory: run.session.location.directory,
@@ -120,18 +154,32 @@ function setup(db: Database.Interface["db"]) {
         }),
     },
     runtimes: {
-      ensure: ({ run }) => Effect.succeed({ id: `runtime_${run.command.threadId}`, ...run.command.executionOwner }),
+      ensure: ({ run }) =>
+        Effect.succeed({ id: state.runtimeId ?? `runtime_${run.command.threadId}`, ...run.command.executionOwner }),
       health: (runtime) => Effect.succeed({ runtime, state: "ready", checkedAt: 0 }),
-      watch: () =>
-        Effect.sync(() => {
+      watch: ({ observe }) =>
+        Effect.gen(function* () {
           calls.watches++
           calls.order.push("watch")
+          yield* observe(
+            Effect.sync(() => {
+              calls.order.push("ready")
+            }),
+          )
         }),
       wake: () =>
         Effect.sync(() => {
           calls.wakes++
         }),
       inspect: (execution) =>
+        Effect.succeed({
+          runtime: execution.runtime!,
+          sessionId: execution.run.session.id,
+          state: "idle",
+          activeTools: state.activeTools,
+          checkedAt: 0,
+        }),
+      awaitIdle: (execution) =>
         Effect.succeed({
           runtime: execution.runtime!,
           sessionId: execution.run.session.id,
@@ -151,10 +199,11 @@ function setup(db: Database.Interface["db"]) {
       shutdown: () => Effect.void,
     },
     ingestion: {
-      observe: ({ execution, onObservation }) => {
-        observations.set(execution.run.command.runId, onObservation)
-        return Effect.void
-      },
+      observe: ({ execution, onObservation, onReady }) =>
+        Effect.gen(function* () {
+          observations.set(execution.run.command.runId, onObservation)
+          if (onReady) yield* onReady
+        }),
     },
     delivery: {
       append: (_tx, input) =>
@@ -170,6 +219,36 @@ function setup(db: Database.Interface["db"]) {
       pending: () => Effect.succeed([]),
       drainDue: () => Effect.succeed(0),
       diagnostics: Effect.succeed({ pending: 0, failed: 0 }),
+    },
+    artifacts: {
+      baseline: (execution) =>
+        Effect.sync(() => {
+          calls.order.push("baseline")
+          return artifactBaseline(execution)
+        }),
+      collect: ({ execution }) =>
+        Effect.sync(() => {
+          calls.collections++
+          const baseline = execution.artifactBaseline!
+          const scope = { state: "complete" as const, changed: [], excludedCount: 0, omittedCount: 0 }
+          return {
+            state: "complete" as const,
+            changed: [],
+            activity: state.artifactActivities,
+            projectId: execution.run.projectId,
+            threadId: execution.run.command.threadId,
+            runId: execution.run.command.runId,
+            sessionId: execution.run.command.sessionId,
+            workspaceId: execution.workspace!.id,
+            baseline: baseline.revision,
+            final: "final-revision",
+            head: baseline.head,
+            branchBase: baseline.branchBase,
+            branchBaseKind: baseline.branchBaseKind,
+            excludedCount: 0,
+            scopes: { run: scope, beforeRun: scope, overall: scope },
+          }
+        }),
     },
     approvals: {
       requested: () => Effect.fail({ code: "unavailable", message: "No approval fixture" }),
@@ -206,7 +285,7 @@ test("deduplicates exact starts and rejects changed Run payloads", () =>
       expect(yield* harness.service.start(first)).toEqual({ messageId: first.runnerMessageId })
       expect(yield* harness.service.start(first)).toEqual({ messageId: first.runnerMessageId })
       expect(harness.calls.prompts).toBe(1)
-      expect(harness.calls.order.slice(0, 2)).toEqual(["watch", "prompt"])
+      expect(harness.calls.order.slice(0, 4)).toEqual(["baseline", "watch", "ready", "prompt"])
       const conflict = yield* harness.service.start({ ...first, text: "Changed text" }).pipe(Effect.flip)
       expect(conflict.code).toBe("conflict")
       expect(harness.calls.prompts).toBe(1)
@@ -264,18 +343,31 @@ test("holds a prepared retry when durable admission exists but scheduling is unv
       const harness = setup(db)
       const first = command("prepared")
       const bound = session(first)
-      yield* harness.service.accept({ command: first, projectId: bound.projectID, attempt: 1, session: bound })
-      yield* harness.service.prepared({
+      const accepted = yield* harness.service.accept({
+        command: first,
+        projectId: bound.projectID,
+        attempt: 1,
+        session: bound,
+      })
+      const workspace = {
+        id: `wrk_${first.threadId}`,
+        threadId: first.threadId,
+        projectId: bound.projectID,
+        directory: bound.location.directory,
+      }
+      const preparation = {
         runId: first.runId,
-        workspace: {
-          id: `workspace_${first.threadId}`,
-          threadId: first.threadId,
-          projectId: bound.projectID,
-          directory: bound.location.directory,
-        },
+        workspace,
         runtime: { id: `runtime_${first.threadId}`, ...first.executionOwner },
         sessionId: first.sessionId,
-      })
+        artifactBaseline: artifactBaseline({ ...accepted, workspace }),
+      }
+      yield* harness.service.prepared(preparation)
+      expect((yield* harness.service.prepared(preparation)).artifactBaseline).toEqual(preparation.artifactBaseline)
+      const changedBaseline = yield* harness.service
+        .prepared({ ...preparation, artifactBaseline: { ...preparation.artifactBaseline, revision: "different" } })
+        .pipe(Effect.flip)
+      expect(changedBaseline.code).toBe("conflict")
       harness.state.reconciliation = "admitted"
       const retry = yield* harness.service.start(first).pipe(Effect.flip)
       expect(retry.code).toBe("unavailable")
@@ -303,11 +395,35 @@ test("records a deterministic preparation failure before prompt side effects", (
     }),
   ))
 
+test("reattaches only the same authorized Run to this process's runtime", () =>
+  withDatabase((db) =>
+    Effect.gen(function* () {
+      const harness = setup(db)
+      const first = command("reattach")
+      yield* harness.service.start(first)
+      harness.state.runtimeId = "runtime_after_restart"
+      harness.state.authorizedAttempt = 2
+      const changedAttempt = yield* harness.service.reattach(first.runId).pipe(Effect.flip)
+      expect(changedAttempt.code).toBe("conflict")
+      expect((yield* harness.service.get(first.runId))?.runtime?.id).toBe(`runtime_${first.threadId}`)
+      harness.state.authorizedAttempt = 1
+      const restored = yield* harness.service.reattach(first.runId)
+      expect(restored.phase).toBe("admitted")
+      expect(restored.runtime?.id).toBe("runtime_after_restart")
+      expect(restored.admittedMessageId).toBe(first.runnerMessageId)
+      expect(restored.artifactBaseline?.runId).toBe(first.runId)
+      expect((yield* harness.service.reattach(first.runId)).runtime?.id).toBe("runtime_after_restart")
+      expect(harness.calls.prompts).toBe(1)
+      expect(harness.calls.wakes).toBe(1)
+    }),
+  ))
+
 test("records output before the matching terminal callback", () =>
   withDatabase((db) =>
     Effect.gen(function* () {
       const harness = setup(db)
       const first = command("output")
+      harness.state.artifactActivities = [{ kind: "run.diff", ref: "runner-artifact:output" }]
       yield* harness.service.start(first)
       yield* harness.emit(first.runId, {
         kind: "promoted",
@@ -355,11 +471,17 @@ test("records output before the matching terminal callback", () =>
         "promoted",
         "output",
         "output:next-chunk",
+        "artifact:settled:0",
         "settled",
       ])
       expect(harness.drafts[1]?.callback.kind).toBe("activity")
-      expect(harness.drafts[3]?.callback).toMatchObject({ kind: "state", nextState: "completed" })
-      expect((yield* harness.service.get(first.runId))?.phase).toBe("completed")
+      expect(harness.drafts[3]?.callback.kind).toBe("activity")
+      expect(harness.drafts[4]?.callback).toMatchObject({ kind: "state", nextState: "completed" })
+      expect(harness.calls.collections).toBe(1)
+      const completed = yield* harness.service.get(first.runId)
+      expect(completed?.phase).toBe("completed")
+      expect(completed?.artifactReport?.baseline).toBe("baseline-revision")
+      expect(completed?.artifactReport?.activity).toEqual(harness.state.artifactActivities)
     }),
   ))
 
@@ -421,7 +543,7 @@ test("waits for outstanding tools before accepting settled turn evidence", () =>
         messageId: first.runnerMessageId,
         sourceKey: "early-idle",
       })
-      expect((yield* harness.service.get(first.runId))?.phase).toBe("running")
+      expect((yield* harness.service.get(first.runId))?.phase).toBe("recovery_required")
       expect(
         harness.drafts.some((draft) => draft.callback.kind === "state" && draft.callback.nextState === "completed"),
       ).toBe(false)
@@ -432,7 +554,7 @@ test("waits for outstanding tools before accepting settled turn evidence", () =>
         messageId: first.runnerMessageId,
         sourceKey: "settled",
       })
-      expect((yield* harness.service.get(first.runId))?.phase).toBe("completed")
+      expect((yield* harness.service.get(first.runId))?.phase).toBe("recovery_required")
     }),
   ))
 
@@ -567,5 +689,13 @@ test("persists exact cancellation evidence and rejects an older observation", ()
       expect(row?.interrupt_abort).toBe("acknowledged")
       expect(row?.interrupt_state).toBe("uncertain")
       expect(row?.interrupt_checked_at).toBe(10)
+      harness.state.runtimeId = "runtime_after_cancel_restart"
+      const restored = yield* harness.service.reattach(first.runId)
+      expect(restored.phase).toBe("cancelling")
+      const after = yield* db.select().from(ExecutionTable).where(eq(ExecutionTable.run_id, first.runId)).get()
+      expect(after?.runtime_id).toBe("runtime_after_cancel_restart")
+      expect(after?.interrupt_abort).toBe("acknowledged")
+      expect(after?.interrupt_state).toBe("uncertain")
+      expect(after?.interrupt_checked_at).toBe(10)
     }),
   ))
