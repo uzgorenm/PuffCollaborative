@@ -8,18 +8,12 @@ import { Database } from "../../database/database"
 import { EventV2 } from "../../event"
 import { EventTable } from "../../event/sql"
 import { makeGlobalNode } from "../../effect/app-node"
-import type { CoordinationContracts } from "../contracts"
+import { CoordinationContracts } from "../contracts"
 
 const maxPageSize = 256
 const defaultSubscriberCapacity = 256
 const storedType = EventV2.versionedType(CoordinationEvent.Changed.type, 1)
 const decodeData = Schema.decodeUnknownSync(CoordinationEvent.Changed.data)
-
-class ProjectionFailure extends Error {
-  constructor(readonly failure: CoordinationContracts.Failure) {
-    super(failure.message)
-  }
-}
 
 export interface LayerOptions {
   readonly subscriberCapacity?: number
@@ -29,6 +23,50 @@ export interface LayerOptions {
 }
 
 export class Service extends Context.Service<Service, CoordinationContracts.Events>()("@opencode/CoordinationEvents") {}
+
+export const authorizedReplayProject = (
+  access: CoordinationContracts.Access,
+  journal: CoordinationContracts.Events,
+  auth: Coordination.AuthContext,
+  projectId: Coordination.ProjectID,
+  after: number,
+  limit: number,
+) => access.authorize(auth, projectId, undefined, "read").pipe(Effect.andThen(journal.replayProject(projectId, after, limit)))
+
+export const authorizedReplayThread = (
+  access: CoordinationContracts.Access,
+  journal: CoordinationContracts.Events,
+  auth: Coordination.AuthContext,
+  threadId: Coordination.ThreadID,
+  after: number,
+  limit: number,
+) => access.getThread(auth, threadId, "read").pipe(Effect.andThen(journal.replayThread(threadId, after, limit)))
+
+export const authorizedSubscribeProject = (
+  access: CoordinationContracts.Access,
+  journal: CoordinationContracts.Events,
+  auth: Coordination.AuthContext,
+  projectId: Coordination.ProjectID,
+  after: number,
+) =>
+  Effect.gen(function* () {
+    yield* access.authorize(auth, projectId, undefined, "read")
+    yield* journal.replayProject(projectId, after, 1)
+    return journal.subscribeProject(projectId, after)
+  })
+
+export const authorizedSubscribeThread = (
+  access: CoordinationContracts.Access,
+  journal: CoordinationContracts.Events,
+  auth: Coordination.AuthContext,
+  threadId: Coordination.ThreadID,
+  after: number,
+) =>
+  Effect.gen(function* () {
+    yield* access.getThread(auth, threadId, "read")
+    yield* journal.replayThread(threadId, after, 1)
+    return journal.subscribeThread(threadId, after)
+  })
 
 export const layerWith = (options?: LayerOptions) =>
   Layer.effect(
@@ -166,12 +204,15 @@ export const layerWith = (options?: LayerOptions) =>
               { ...input, aggregateID: aggregateID(input.projectId) },
               {
                 ...(input.id ? { id: input.id as EventV2.ID } : {}),
-                commit: (seq) => project(seq).pipe(Effect.catch((error) => Effect.die(new ProjectionFailure(error)))),
+                commit: (seq) =>
+                  project(seq).pipe(Effect.catch((error) => Effect.die(new CoordinationContracts.ProjectionFailure(error)))),
               },
             ).pipe(
               Effect.catchCause((cause) => {
                 const defect = Cause.squash(cause)
-                return defect instanceof ProjectionFailure ? Effect.fail(defect.failure) : Effect.failCause(cause)
+                return defect instanceof CoordinationContracts.ProjectionFailure
+                  ? Effect.fail(defect.failure)
+                  : Effect.failCause(cause)
               }),
             )
             return {

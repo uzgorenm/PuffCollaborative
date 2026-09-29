@@ -222,6 +222,38 @@ describe("coordination event journal", () => {
       const denied = Coordination.ThreadID.make(`thr_${crypto.randomUUID()}`)
       const access = yield* journal.replayThread(denied, -1, 10).pipe(Effect.flip)
       expect(access.code).toBe("forbidden")
+
+      const auth = { kind: "member" as const, userId: Coordination.UserID.make(`usr_${crypto.randomUUID()}`) }
+      const deniedAccess: CoordinationContracts.Access = {
+        authorize: () => Effect.fail({ code: "forbidden", message: "Not a member" }),
+        getThread: () => Effect.fail({ code: "forbidden", message: "Not a member" }),
+      }
+      const streamDenied = yield* CoordinationEvents.authorizedSubscribeProject(
+        deniedAccess,
+        journal,
+        auth,
+        projectId,
+        -1,
+      ).pipe(Effect.flip)
+      expect(streamDenied.code).toBe("forbidden")
+      const threadStreamDenied = yield* CoordinationEvents.authorizedSubscribeThread(
+        deniedAccess,
+        journal,
+        auth,
+        denied,
+        -1,
+      ).pipe(Effect.flip)
+      expect(threadStreamDenied.code).toBe("forbidden")
+
+      const allowedAccess: CoordinationContracts.Access = { ...deniedAccess, authorize: () => Effect.void }
+      const streamInvalid = yield* CoordinationEvents.authorizedSubscribeProject(
+        allowedAccess,
+        journal,
+        auth,
+        projectId,
+        1,
+      ).pipe(Effect.flip)
+      expect(streamInvalid.code).toBe("invalid")
     }),
   )
 
