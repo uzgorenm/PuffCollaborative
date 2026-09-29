@@ -1,0 +1,93 @@
+.puff-fix {
+  margin: 20px auto;
+  width: min(100%, 740px);
+  padding: 20px;
+  border: 1px solid #41534c;
+  border-radius: 14px;
+  background: #19221e;
+  color: #e5eee8;
+  line-height: 1.55;
+}
+.puff-fix-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 16px;
+}
+.puff-fix-heading > span {
+  color: #b6d7bb;
+  font-size: 23px;
+}
+.puff-fix p {
+  margin: 8px 0;
+}
+.puff-fix-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.puff-fix button,
+.puff-fix-status button {
+  border: 1px solid #536259;
+  border-radius: 8px;
+  padding: 7px 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.puff-fix button:focus-visible,
+.puff-fix-review a:focus-visible {
+  outline: 2px solid #cee7d3;
+  outline-offset: 3px;
+}
+.puff-fix button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.puff-fix .puff-fix-primary {
+  background: #c3dbc7;
+  color: #122219;
+  border-color: #c3dbc7;
+}
+.puff-fix-review {
+  border-top: 1px solid #41534c;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+.puff-fix-review a {
+  text-decoration: underline;
+  font-size: 13px;
+}
+.puff-fix-review h3 {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 16px 0 6px;
+}
+.puff-fix pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.7 monospace;
+  background: #111714;
+  padding: 12px;
+  border-radius: 8px;
+  max-height: 260px;
+  overflow: auto;
+}
+.puff-fix code {
+  font: 12px monospace;
+}
+.puff-fix-status {
+  font-size: 13px;
+  margin: 16px auto;
+  max-width: 740px;
+}
+.puff-fix-receipt {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #25342b;
+}
+.puff-fix-receipt[data-state="failed"] {
+  background: #412c27;
+}

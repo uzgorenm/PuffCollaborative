@@ -20,9 +20,10 @@ export const SimulationManifest = Schema.Struct({
   simulated: Schema.Literal(true),
   mode: Schema.Literal("synthetic"),
   label: Schema.Literal("SIMULATED"),
-  selectedScenarioId: Schema.Literals(["wf01", "wf02", "wf03"]),
+  selectedScenarioId: Schema.Literals(["wf01", "wf02", "wf03", "wf04"]),
+  capabilities: Schema.optional(Schema.Struct({ fixReuse: Schema.Boolean })),
   scenarios: Schema.Array(Schema.Struct({
-    id: Schema.Literals(["wf01", "wf02", "wf03"]),
+    id: Schema.Literals(["wf01", "wf02", "wf03", "wf04"]),
     projectId: Coordination.ProjectID,
     title: Schema.String,
     classification: Schema.String,

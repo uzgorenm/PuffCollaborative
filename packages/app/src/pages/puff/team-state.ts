@@ -4,6 +4,9 @@ import { createTeamApi, type TeamThread } from "./team-api"
 import { ProjectApiError, serviceUrl, type ProjectTransport } from "./project-api"
 import type { Coordination } from "@opencode-ai/schema/coordination"
 import { scenarioForProject, type SimulationManifest } from "./project-overview/simulation-contract"
+import { activeFailure, verifiedFix, fixInstruction, type VerifiedFix } from "./fix-reuse"
+
+export type FixAttempt = { fix: VerifiedFix; requestId: string; runId?: string; uncertain: boolean }
 
 export type Submission = {
   threadId: string
@@ -55,6 +58,8 @@ type Compartment = {
   pending: Record<string, Submission | undefined>
   positions: Record<string, Position>
   decisions: Record<string, Decision | undefined>
+  fixAttempts: Record<string, FixAttempt | undefined>
+  dismissedFixes: Record<string, boolean>
 }
 type Read = { controller: AbortController; promise?: Promise<void> }
 type OverviewRead = {
@@ -96,6 +101,11 @@ export function createTeamController(transport?: ProjectTransport) {
     pending: {} as Record<string, Submission | undefined>,
     positions: {} as Record<string, Position>,
     action: "",
+    fixProposal: undefined as VerifiedFix | undefined,
+    fixLoading: false,
+    fixError: "" as "" | ProjectApiError["code"],
+    fixAttempts: {} as Record<string, FixAttempt | undefined>,
+    dismissedFixes: {} as Record<string, boolean>,
     approvalIds: {} as Record<string, string>,
   })
   const compartments = new Map<string, Compartment>()
@@ -110,6 +120,8 @@ export function createTeamController(transport?: ProjectTransport) {
   let reading: Read | undefined
   let roster: Read | undefined
   let overviewRead: Read | undefined
+  let fixRead: AbortController | undefined
+  let fixStamp = ""
 
   const writable = () =>
     state.connected &&
@@ -126,6 +138,10 @@ export function createTeamController(transport?: ProjectTransport) {
     selection++
     reading?.controller.abort()
     reading = undefined
+    fixRead?.abort()
+    fixRead = undefined
+    fixStamp = ""
+    set({ fixProposal: undefined, fixLoading: false, fixError: "" })
   }
 
   function clearConnection(error: typeof state.error = "") {
@@ -137,6 +153,8 @@ export function createTeamController(transport?: ProjectTransport) {
           pending: unwrap(state.pending),
           positions: unwrap(state.positions),
           decisions,
+          fixAttempts: unwrap(state.fixAttempts),
+          dismissedFixes: unwrap(state.dismissedFixes),
         }),
       )
     connection++
@@ -181,6 +199,8 @@ export function createTeamController(transport?: ProjectTransport) {
       set("pending", reconcile({}))
       set("positions", reconcile({}))
       set("approvalIds", reconcile({}))
+      set("fixAttempts", reconcile({}))
+      set("dismissedFixes", reconcile({}))
     })
   }
 
@@ -211,13 +231,22 @@ export function createTeamController(transport?: ProjectTransport) {
       api = client
       account = JSON.stringify([url, member])
       const saved = structuredClone(
-        compartments.get(account) ?? { drafts: {}, pending: {}, positions: {}, decisions: {} },
+        compartments.get(account) ?? {
+          drafts: {},
+          pending: {},
+          positions: {},
+          decisions: {},
+          fixAttempts: {},
+          dismissedFixes: {},
+        },
       )
       decisions = saved.decisions
       batch(() => {
         set("drafts", reconcile(saved.drafts))
         set("pending", reconcile(saved.pending))
         set("positions", reconcile(saved.positions))
+        set("fixAttempts", reconcile(saved.fixAttempts))
+        set("dismissedFixes", reconcile(saved.dismissedFixes))
         set({
           connected: true,
           projects,
@@ -231,7 +260,8 @@ export function createTeamController(transport?: ProjectTransport) {
         })
       })
       const selected = simulation?.scenarios.find((scenario) => scenario.id === simulation.selectedScenarioId)
-      if (selected && projects.some((project) => project.id === selected.projectId)) await loadProject(selected.projectId)
+      if (selected && projects.some((project) => project.id === selected.projectId))
+        await loadProject(selected.projectId)
       else if (projects[0]) await loadProject(projects[0].id)
       if (ticket !== connection) return false
       void refreshThread()
@@ -261,23 +291,33 @@ export function createTeamController(transport?: ProjectTransport) {
     const ticket = connection
     set({ simulationAction: kind, simulationError: "" })
     try {
-      const next = kind === "advance" ? await current.advanceSimulation()
-        : kind === "reset" ? await current.resetSimulation()
-          : await current.selectSimulation(scenario!.id)
+      const next =
+        kind === "advance"
+          ? await current.advanceSimulation()
+          : kind === "reset"
+            ? await current.resetSimulation()
+            : await current.selectSimulation(scenario!.id)
       if (ticket !== connection || current !== api) return false
       set("simulation", reconcile(next))
       const selected = next.scenarios.find((item) => item.id === next.selectedScenarioId)
       if (kind === "select" && projectId) await loadProject(projectId)
-      else if (kind === "reset" && selected && state.projectId !== selected.projectId) await loadProject(selected.projectId)
+      else if (kind === "reset" && selected && state.projectId !== selected.projectId)
+        await loadProject(selected.projectId)
       overviewRead?.controller.abort()
       overviewRead = undefined
       invalidateThread()
-      set({ overview: undefined, overviewLastSuccess: 0, snapshot: undefined, events: [], cursor: 0, loading: !!state.threadId })
+      set({
+        overview: undefined,
+        overviewLastSuccess: 0,
+        snapshot: undefined,
+        events: [],
+        cursor: 0,
+        loading: !!state.threadId,
+      })
       await Promise.all([refreshOverview(), refreshThread()])
       return true
     } catch (error) {
-      if (ticket === connection)
-        set("simulationError", error instanceof ProjectApiError ? error.code : "connection")
+      if (ticket === connection) set("simulationError", error instanceof ProjectApiError ? error.code : "connection")
       return false
     } finally {
       if (ticket === connection) set("simulationAction", "")
@@ -291,8 +331,12 @@ export function createTeamController(transport?: ProjectTransport) {
     return simulationControl("select", id)
   }
 
-  function advanceSimulation() { return simulationControl("advance") }
-  function resetSimulation() { return simulationControl("reset") }
+  function advanceSimulation() {
+    return simulationControl("advance")
+  }
+  function resetSimulation() {
+    return simulationControl("reset")
+  }
 
   function loadProject(id: string) {
     if (!api) return Promise.resolve()
@@ -301,7 +345,18 @@ export function createTeamController(transport?: ProjectTransport) {
     roster = undefined
     overviewRead?.controller.abort()
     overviewRead = undefined
-    set({ projectId: id, threads: [], overview: undefined, overviewError: "", overviewLastSuccess: 0, overviewLoading: false })
+    fixRead?.abort()
+    fixRead = undefined
+    fixStamp = ""
+    set({ fixProposal: undefined, fixLoading: false, fixError: "" })
+    set({
+      projectId: id,
+      threads: [],
+      overview: undefined,
+      overviewError: "",
+      overviewLastSuccess: 0,
+      overviewLoading: false,
+    })
     errors.roster = ""
     showError()
     return refreshRoster()
@@ -317,8 +372,11 @@ export function createTeamController(transport?: ProjectTransport) {
     overviewRead = read
     set("overviewLoading", true)
     const valid = () =>
-      overviewRead === read && current === api && ticket === connection &&
-      state.projectId === projectId && !read.controller.signal.aborted
+      overviewRead === read &&
+      current === api &&
+      ticket === connection &&
+      state.projectId === projectId &&
+      !read.controller.signal.aborted
     read.promise = (async () => {
       try {
         const [{ project, members }, threads, cards] = await Promise.all([
@@ -327,21 +385,32 @@ export function createTeamController(transport?: ProjectTransport) {
           current.workCards(projectId, read.controller.signal),
         ])
         if (!valid()) return
-        if (threads.some((thread) => thread.projectId !== projectId) ||
-          cards.some((card) => !threads.some((thread) => thread.id === card.threadId)))
+        if (
+          threads.some((thread) => thread.projectId !== projectId) ||
+          cards.some((card) => !threads.some((thread) => thread.id === card.threadId))
+        )
           throw new ProjectApiError("invalid")
         const snapshots = await Promise.all(threads.map((thread) => current.thread(thread.id, read.controller.signal)))
         if (!valid()) return
-        if (snapshots.some((snapshot, index) => {
-          const thread = threads[index]
-          return !thread || snapshot.thread.id !== thread.id || snapshot.thread.projectId !== projectId ||
-            snapshot.thread.sessionId !== thread.sessionId || snapshot.thread.workerId !== thread.workerId ||
-            snapshot.thread.activitySeq !== thread.activitySeq
-        })) throw new ProjectApiError("invalid")
+        if (
+          snapshots.some((snapshot, index) => {
+            const thread = threads[index]
+            return (
+              !thread ||
+              snapshot.thread.id !== thread.id ||
+              snapshot.thread.projectId !== projectId ||
+              snapshot.thread.sessionId !== thread.sessionId ||
+              snapshot.thread.workerId !== thread.workerId ||
+              snapshot.thread.activitySeq !== thread.activitySeq
+            )
+          })
+        )
+          throw new ProjectApiError("invalid")
         const next = { project, members, threads, cards, snapshots }
         // Keep citation controls and their focus stable across identical polling responses.
         if (JSON.stringify(state.overview) !== JSON.stringify(next)) set("overview", reconcile(next))
         set({ overviewError: "", overviewLastSuccess: Date.now() })
+        void refreshFix()
       } catch (error) {
         if (!valid()) return
         if (error instanceof ProjectApiError && [401, 403].includes(error.status)) {
@@ -449,6 +518,7 @@ export function createTeamController(transport?: ProjectTransport) {
         })
         errors.thread = errors.action = ""
         showError()
+        void refreshFix()
       } catch (error) {
         more = false
         if (valid()) {
@@ -471,6 +541,201 @@ export function createTeamController(transport?: ProjectTransport) {
 
   async function refresh() {
     await Promise.all([refreshRoster(), refreshThread()])
+  }
+
+  async function refreshFix() {
+    const current = api
+    const target = state.snapshot && structuredClone(unwrap(state.snapshot.thread))
+    const overview = state.overview
+    const failure = activeFailure(state.events, state.threadId)
+    if (
+      !current ||
+      !target ||
+      target.id !== state.threadId ||
+      !failure ||
+      !overview ||
+      overview.project.id !== target.projectId ||
+      state.projectId !== target.projectId ||
+      state.overviewError ||
+      Date.now() - state.overviewLastSuccess > 20_000 ||
+      state.error
+    ) {
+      fixRead?.abort()
+      fixRead = undefined
+      fixStamp = ""
+      set({ fixProposal: undefined, fixLoading: false })
+      return
+    }
+    const cards = overview.cards.filter(
+      (card) =>
+        card.threadId !== target.id &&
+        card.status === "done" &&
+        card.sourceActivitySeq === overview.threads.find((thread) => thread.id === card.threadId)?.activitySeq,
+    )
+    const stamp = JSON.stringify([
+      state.sourceScope,
+      target.id,
+      target.activitySeq,
+      failure.id,
+      failure.seq,
+      cards,
+      overview.members,
+    ])
+    if (stamp === fixStamp) return
+    fixRead?.abort()
+    const controller = new AbortController()
+    fixRead = controller
+    fixStamp = stamp
+    const ticket = connection
+    const generation = selection
+    const valid = () =>
+      !controller.signal.aborted &&
+      current === api &&
+      ticket === connection &&
+      generation === selection &&
+      state.threadId === target.id &&
+      state.snapshot?.thread.activitySeq === target.activitySeq &&
+      fixRead === controller &&
+      fixStamp === stamp
+    set({ fixProposal: undefined, fixLoading: true, fixError: "" })
+    try {
+      const choices = await Promise.all(
+        cards.slice(0, 20).map(async (card) => {
+          const thread = overview.threads.find((thread) => thread.id === card.threadId)!
+          const sources = await Promise.all(
+            card.evidenceRefs.slice(0, 10).map((ref) => current.source(target.projectId, ref, controller.signal)),
+          )
+          return sources
+            .map((source) =>
+              verifiedFix({
+                failure,
+                thread,
+                card,
+                source,
+                memberIds: overview.members.map((member) => member.userId),
+              }),
+            )
+            .find((fix) => !!fix)
+        }),
+      )
+      if (!valid()) return
+      const fix = choices
+        .filter((fix): fix is VerifiedFix => !!fix)
+        .toSorted((a, b) => b.source.occurredAt.localeCompare(a.source.occurredAt))[0]
+      set("fixProposal", fix && !state.dismissedFixes[`${fix.failure.id}:${fix.source.id}`] ? fix : undefined)
+    } catch (error) {
+      if (!valid()) return
+      fixStamp = ""
+      if (error instanceof ProjectApiError && [401, 403].includes(error.status)) clearConnection("unauthorized")
+      else set("fixError", error instanceof ProjectApiError ? error.code : "connection")
+    } finally {
+      if (fixRead === controller) {
+        fixRead = undefined
+        set("fixLoading", false)
+      }
+    }
+  }
+
+  function dismissFix() {
+    const fix = state.fixProposal
+    if (!fix || state.action) return
+    set("dismissedFixes", `${fix.failure.id}:${fix.source.id}`, true)
+    set("fixProposal", undefined)
+  }
+
+  function canApplyFix() {
+    return (
+      state.connected &&
+      !!state.snapshot &&
+      !state.loading &&
+      !state.error &&
+      !!state.lastSuccess &&
+      Date.now() - state.lastSuccess < 8_000 &&
+      !state.action &&
+      (!state.simulation || !!state.simulation.capabilities?.fixReuse) &&
+      !state.pending[state.threadId] &&
+      !state.fixAttempts[state.threadId]?.runId
+    )
+  }
+
+  async function applyFix() {
+    const previous = state.fixAttempts[state.threadId]
+    const fix = previous?.uncertain ? previous.fix : state.fixProposal
+    const current = api
+    const target = state.snapshot?.thread
+    if (!current || !target || !fix || !canApplyFix()) return
+    const ticket = connection
+    const generation = selection
+    const id = target.id
+    const valid = () => current === api && ticket === connection && generation === selection && state.threadId === id
+    set({ action: `fix:${id}`, fixError: "" })
+    try {
+      // Exact retries reconcile an ambiguous admission even if the target has since completed.
+      if (!previous?.uncertain) {
+        const [source, sourceThread, targetThread, cards, project] = await Promise.all([
+          current.source(target.projectId, {
+            threadId: fix.source.threadId!,
+            eventId: fix.source.id,
+            seq: fix.source.seq,
+          }),
+          current.thread(fix.source.threadId!),
+          current.thread(id),
+          current.workCards(target.projectId),
+          current.project(target.projectId),
+        ])
+        if (!valid()) return
+        const card = cards.find((item) => item.threadId === fix.source.threadId)
+        const checked =
+          card &&
+          verifiedFix({
+            failure: fix.failure,
+            thread: sourceThread.thread,
+            card,
+            source,
+            memberIds: project.members.map((member) => member.userId),
+          })
+        if (
+          !checked ||
+          JSON.stringify(checked) !== JSON.stringify(fix) ||
+          targetThread.thread.activitySeq !== target.activitySeq ||
+          activeFailure(state.events, id)?.id !== fix.failure.id
+        )
+          throw new ProjectApiError("conflict", 409)
+      }
+      const attempt = previous?.uncertain ? previous : { fix, requestId: crypto.randomUUID(), uncertain: true }
+      if (!valid()) return
+      set("fixAttempts", id, attempt)
+      const response = await current.submit(id, fixInstruction(attempt.fix), attempt.requestId)
+      if (!valid()) return
+      if (
+        response.instruction.threadId !== id ||
+        response.instruction.requestId !== attempt.requestId ||
+        response.instruction.text !== fixInstruction(attempt.fix) ||
+        response.run.threadId !== id ||
+        response.run.id !== response.instruction.runId
+      )
+        throw new ProjectApiError("invalid")
+      set("fixAttempts", id, { ...attempt, uncertain: false, runId: response.run.id })
+      invalidateThread()
+      overviewRead?.controller.abort()
+      overviewRead = undefined
+    } catch (error) {
+      if (!valid()) return
+      if (
+        error instanceof ProjectApiError &&
+        [400, 401, 403, 404, 409, 422].includes(error.status) &&
+        !previous?.uncertain
+      )
+        set("fixAttempts", id, undefined)
+      set("fixError", error instanceof ProjectApiError ? error.code : "connection")
+      if (error instanceof ProjectApiError && [401, 403].includes(error.status)) clearConnection("unauthorized")
+    } finally {
+      if (ticket === connection) {
+        set("action", "")
+        if (state.fixAttempts[id]?.runId) await Promise.all([refresh(), refreshOverview()])
+        else void refresh()
+      }
+    }
   }
 
   async function resolveSource(ref: SourceRef, signal: AbortSignal): Promise<Coordination.Event> {
@@ -524,20 +789,39 @@ export function createTeamController(transport?: ProjectTransport) {
     const ticket = connection
     const generation = sourceSelection
     const expected = { threadId: ref.threadId, eventId: ref.eventId, seq: ref.seq }
-    const cited = (overview: OverviewRead | undefined) => !!overview && overview.project.id === projectId &&
-      (overview.cards.some((card) => card.threadId === expected.threadId &&
-        card.evidenceRefs.some((item) => item.threadId === expected.threadId && item.eventId === expected.eventId && item.seq === expected.seq)) ||
-        (state.simulation && scenarioForProject(state.simulation, projectId)?.id === "wf02" &&
+    const cited = (overview: OverviewRead | undefined) =>
+      !!overview &&
+      overview.project.id === projectId &&
+      (overview.cards.some(
+        (card) =>
+          card.threadId === expected.threadId &&
+          card.evidenceRefs.some(
+            (item) =>
+              item.threadId === expected.threadId && item.eventId === expected.eventId && item.seq === expected.seq,
+          ),
+      ) ||
+        (state.simulation &&
+          scenarioForProject(state.simulation, projectId)?.id === "wf02" &&
           state.simulation.wf02?.sourceRef.threadId === expected.threadId &&
           state.simulation.wf02.sourceRef.eventId === expected.eventId &&
           state.simulation.wf02.sourceRef.seq === expected.seq))
     if (!current || !state.connected || !identity || !scope || !projectId || !cited(read) || signal.aborted)
       throw new ProjectApiError("invalid")
     const event = await current.source(projectId, expected, signal)
-    if (signal.aborted || current !== api || ticket !== connection || identity !== account ||
-      scope !== state.sourceScope || generation !== sourceSelection || state.projectId !== projectId ||
-      !cited(state.overview) || event.projectId !== projectId || event.threadId !== expected.threadId ||
-      event.id !== expected.eventId || event.seq !== expected.seq)
+    if (
+      signal.aborted ||
+      current !== api ||
+      ticket !== connection ||
+      identity !== account ||
+      scope !== state.sourceScope ||
+      generation !== sourceSelection ||
+      state.projectId !== projectId ||
+      !cited(state.overview) ||
+      event.projectId !== projectId ||
+      event.threadId !== expected.threadId ||
+      event.id !== expected.eventId ||
+      event.seq !== expected.seq
+    )
       throw new ProjectApiError("invalid")
     return event
   }
@@ -649,6 +933,10 @@ export function createTeamController(transport?: ProjectTransport) {
     selectThread,
     refresh,
     refreshOverview,
+    refreshFix,
+    dismissFix,
+    applyFix,
+    canApplyFix,
     resolveSource,
     resolveOverviewSource,
     send,
