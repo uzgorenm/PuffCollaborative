@@ -1,6 +1,6 @@
 # Coordination backend process test, September 29, 2026
 
-Tested commit: `f3007ee350aaf39bff0f7d8bac65ff0ae8ce20b2`. Bun 1.3.14 on macOS arm64. The test ran the registered HTTP route layer in a coordinator process against disposable SQLite files. A separate fake execution process stayed alive through coordinator `SIGKILL` and restart. HTTP clients used eight distinct roster credentials, including four project members, an outsider, a stale worker instance, and an analysis service. No OpenCode model or tool execution, frontend, Flower job, or paid service was used.
+Tested checkout: `2f4fca555eddc25d2e8e404c1d120c6cb880e5d5`. Bun 1.3.14 on macOS arm64. The test ran the registered HTTP route layer in a coordinator process against disposable SQLite files. A separate fake execution process stayed alive through coordinator `SIGKILL` and restart. HTTP clients used eight distinct roster credentials, including four project members, an outsider, a stale worker instance, and an analysis service. No OpenCode model or tool execution, frontend, Flower job, or paid service was used. The subsequent receipt edit changed documentation only.
 
 The harness and run instructions are in [coordination-e2e.md](../../coordination-e2e.md). The test entry point uses `createRoutes` with a fake `RunnerPort` and a Session binding adapter that reads real seeded `session` rows. The roster validator, project admission allowlist, route handlers, queue, runner gateway, EventV2 journal, cards, activity service, SQLite engine, and migrations are the backend implementations under test.
 
@@ -15,7 +15,7 @@ Run from `packages/server` with Bun 1.3.14 on `PATH`:
 | `bun test test/coordination-e2e/suite.test.ts`   |    1 | 8 pass, 1 fail, 1,083 assertions. The failing case is the retained runner-output citation regression. |
 | `bun test test/coordination.integration.test.ts` |    0 | Existing in-process mock test: 1 pass, 0 fail, 51 assertions.                                         |
 
-The suite log contains `COORDINATION_STRESS_SEED 12648430` and `COORDINATION_STRESS_RESULT {"seed":12648430,"threads":20,"accepted":100,"starts":95,"events":414}`. Five accepted instructions were cancelled while queued. The remaining 95 started and drained after a simulated worker disconnect was removed. The fake recorded one execution start for each accepted start, and event replay converged with terminal Run snapshots. The suite took 49.07 seconds in this run.
+The suite log contains `COORDINATION_STRESS_SEED 12648430` and `COORDINATION_STRESS_RESULT {"seed":12648430,"threads":20,"accepted":100,"starts":95,"events":414}`. Five accepted instructions were cancelled while queued. The remaining 95 started and drained after a simulated worker disconnect was removed. The fake recorded one execution start for each accepted start, and event replay converged with terminal Run snapshots. The suite took 50.72 seconds in this run.
 
 ## Scenario results
 
@@ -38,15 +38,15 @@ The contract uses numeric project sequences and retains historical events. It de
 
 ## Smoke event trace
 
-The trace below is from the passing smoke run at the tested commit. Shared thread `thr_5c65c139-9240-4e72-bffb-aa745b6cd749` had Alice's first Run `run_f544b533-58d2-43bd-8227-aed35095e938` and Bob's queued Run `run_64f8a524-b4d0-46ba-a185-8234d054cd45`. Dan used independent thread `thr_245b76ce-d629-4752-a01c-7d7827a38f20`.
+The trace below is from the passing smoke run at the tested checkout. Shared thread `thr_5448774b-253f-402e-a8ed-cfad26d12e6e` had Alice's first Run `run_b82903de-873d-47b1-825a-dd241bdf167d` and Bob's queued Run `run_f3344560-57dc-402f-9623-5a9add4874aa`. Dan used independent thread `thr_fdd2cff5-60ec-49cf-ab19-30f195716752`.
 
 | Project seq | Observed event                                                                           |
 | ----------: | ---------------------------------------------------------------------------------------- |
-|        6, 7 | Bob and Alice each commented in the shared thread. No Run existed yet.                   |
+|        6, 7 | Alice and Bob each commented in the shared thread. No Run existed yet.                   |
 |    8, 9, 10 | Alice, Bob, and Carol submitted instructions to that thread in durable acceptance order. |
 |          11 | Dan submitted in the independent thread.                                                 |
-|      12, 13 | Alice's Run was reserved and started while Bob and Carol remained queued.                |
-|      14, 15 | Dan's Run was reserved and started in the independent thread.                            |
+|      12, 13 | Alice's and Dan's Runs were reserved in separate threads.                                |
+|      14, 15 | Both Runs started while Bob and Carol remained queued.                                   |
 |      16, 17 | Alice emitted fixture output; Dan emitted an inert fixture tool event.                   |
 |          18 | Alice's Run completed. Dan's thread was still active.                                    |
 |      19, 20 | Bob's accepted Run was reserved and started in the shared thread.                        |
@@ -57,4 +57,4 @@ The trace includes stable event IDs in the replay API. The table omits UUID suff
 
 The retained test `I regression: runner output must advance the citable activity revision` observed `run.output` at project sequence 8 while `Thread.activitySeq` remained 4. `WorkCard.update` requires a cited event sequence no newer than `sourceActivitySeq`, which must match the thread's current `activitySeq`. The resulting card update is rejected. Agent 3's queue runner-activity projection is the responsible module. The smallest likely repair is to update the thread activity revision for summary-relevant runner output in the same `Events.append` transaction, then rerun the regression and card checks. No production behavior was changed in this test task.
 
-Talha's real OpenCode port still needs stable start deduplication, Session-history assembly after a prior turn commits, reconciliation, cancellation confirmation, ownership enforcement, and approval delivery. Serdar's frontend still needs a live authenticated snapshot, SSE/replay cursor, queue, cancellation, and approval integration. Ferit's Jev/Flower service still needs to submit source-cited analysis with its service credential and prove real multi-agent results. This receipt is backend process evidence with external simulators. It does not close G0 through G7 or WF01 through WF10 in the hackathon progress checklist.
+An end-to-end run with Talha's real OpenCode port still needs to prove stable start deduplication, Session-history assembly after a prior turn commits, reconciliation, cancellation confirmation, ownership enforcement, and approval delivery. Serdar's frontend needs a live authenticated run covering snapshots, SSE replay, queue state, cancellation, and approvals. Ferit's Jev/Flower service needs to submit source-cited analysis with its service credential and prove real multi-agent results. This receipt is backend process evidence with external simulators. It does not close G0 through G7 or WF01 through WF10 in the hackathon progress checklist.
