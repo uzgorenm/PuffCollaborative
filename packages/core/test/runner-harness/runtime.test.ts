@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Coordination } from "@opencode-ai/schema/coordination"
 import { Session } from "@opencode-ai/schema/session"
-import { Deferred, Effect, Schema } from "effect"
+import { Deferred, Effect, Fiber, Schema } from "effect"
 import type { SessionExecution } from "../../src/session/execution"
 import type { RunnerHarnessContracts } from "../../src/runner-harness/contracts"
 import { RunnerHarnessRuntime } from "../../src/runner-harness/runtime"
@@ -38,6 +38,7 @@ const workspace: RunnerHarnessContracts.WorkspaceIdentity = {
   projectId: run.projectId,
   directory: session.location.directory,
 }
+const observe = (onReady: Effect.Effect<void>) => onReady.pipe(Effect.andThen(Effect.never))
 
 function fixture(options?: {
   readonly get?: () => Effect.Effect<Session.Info>
@@ -232,6 +233,111 @@ describe("embedded runtime lifecycle with service doubles", () => {
     )
   })
 
+  test("waits for observer registration before allowing a wake", async () => {
+    const system = fixture()
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
+          const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
+          const current = { run, phase: "admitted" as const, workspace, runtime }
+          const entered = yield* Deferred.make<void>()
+          const registered = yield* Deferred.make<void>()
+          const waiting = yield* runtimes
+            .watch({
+              execution: current,
+              session,
+              readinessTimeoutMs: 100,
+              observe: (onReady) =>
+                Deferred.succeed(entered, undefined).pipe(
+                  Effect.andThen(Deferred.await(registered)),
+                  Effect.andThen(onReady),
+                  Effect.andThen(Effect.never),
+                ),
+            })
+            .pipe(Effect.forkScoped)
+          yield* Deferred.await(entered)
+          const premature = yield* runtimes
+            .wake(current)
+            .pipe(Effect.match({ onFailure: (error) => error.code, onSuccess: () => "started" as const }))
+          expect(premature).toBe("conflict")
+          expect(system.calls.wake).toBe(0)
+          yield* Deferred.succeed(registered, undefined)
+          yield* Fiber.join(waiting)
+          yield* runtimes.wake(current)
+          expect(system.calls.wake).toBe(1)
+        }),
+      ),
+    )
+  })
+
+  test("times out an observer that never registers", async () => {
+    const system = fixture()
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
+          const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
+          const current = { run, phase: "admitted" as const, workspace, runtime }
+          const result = yield* runtimes
+            .watch({ execution: current, session, observe: () => Effect.never, readinessTimeoutMs: 5 })
+            .pipe(Effect.match({ onFailure: (error) => error.code, onSuccess: () => "ready" as const }))
+          expect(result).toBe("unavailable")
+          expect(system.failures).toContain("Observer readiness timed out")
+          const wake = yield* runtimes
+            .wake(current)
+            .pipe(Effect.match({ onFailure: (error) => error.code, onSuccess: () => "started" as const }))
+          expect(wake).toBe("conflict")
+        }),
+      ),
+    )
+  })
+
+  test("reports an observer startup failure without waking the Session", async () => {
+    const system = fixture()
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
+          const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
+          const current = { run, phase: "admitted" as const, workspace, runtime }
+          const result = yield* runtimes
+            .watch({
+              execution: current,
+              session,
+              readinessTimeoutMs: 100,
+              observe: () => Effect.fail({ code: "unavailable" as const, message: "secret listener failure" }),
+            })
+            .pipe(Effect.match({ onFailure: (error) => error.code, onSuccess: () => "ready" as const }))
+          expect(result).toBe("unavailable")
+          expect(system.calls.wake).toBe(0)
+          expect(system.failures.join(" ")).toContain("[redacted]")
+          expect(system.failures.join(" ")).not.toContain("secret")
+        }),
+      ),
+    )
+  })
+
+  test("waits for the owned drain to settle after its final event", async () => {
+    const system = fixture()
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
+          const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
+          const current = { run, phase: "running" as const, workspace, runtime }
+          yield* runtimes.watch({ execution: current, session, observe, readinessTimeoutMs: 100 })
+          yield* runtimes.wake(current)
+          expect((yield* runtimes.awaitIdle(current, 5)).state).toBe("unknown")
+          const waiting = yield* runtimes.awaitIdle(current, 100).pipe(Effect.forkScoped)
+          yield* Effect.sleep("10 millis")
+          system.active.delete(session.id)
+          expect(yield* Fiber.join(waiting)).toMatchObject({ state: "idle", activeTools: 0 })
+        }),
+      ),
+    )
+  })
+
   test("observes before wake, interrupts its own drain, and shuts down", async () => {
     const system = fixture()
     await Effect.runPromise(
@@ -240,7 +346,7 @@ describe("embedded runtime lifecycle with service doubles", () => {
           const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
           const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
           const current = { run, phase: "admitted" as const, workspace, runtime }
-          yield* runtimes.watch({ execution: current, session, observe: Effect.never })
+          yield* runtimes.watch({ execution: current, session, observe, readinessTimeoutMs: 100 })
           yield* runtimes.wake(current)
           yield* runtimes.wake(current)
           expect(system.calls.wake).toBe(1)
@@ -249,9 +355,59 @@ describe("embedded runtime lifecycle with service doubles", () => {
           const stopped = yield* runtimes.interrupt(current)
           expect(stopped.state).toBe("stopped")
           expect(stopped.abort).toBe("acknowledged")
-          expect((yield* runtimes.inspect(current)).activeTools).toBe(0)
+          expect((yield* runtimes.inspect(current)).activeTools).toBe("unknown")
+          expect(
+            (yield* runtimes.inspect({
+              ...current,
+              run: {
+                ...run,
+                command: {
+                  ...run.command,
+                  runId: Coordination.RunID.make("run_runtime_followup"),
+                  runnerMessageId: "msg_runtime_followup",
+                },
+              },
+            })).activeTools,
+          ).toBe("unknown")
           yield* runtimes.shutdown(runtime)
           expect((yield* runtimes.health(runtime)).state).toBe("stopped")
+        }),
+      ),
+    )
+  })
+
+  test("shutdown still interrupts a woken Session after its observer fails", async () => {
+    const system = fixture()
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runtimes = yield* RunnerHarnessRuntime.make(system.deps)
+          const runtime = yield* runtimes.ensure({ run, workspace, readinessTimeoutMs: 100 })
+          const current = { run, phase: "running" as const, workspace, runtime }
+          const failObserver = yield* Deferred.make<void>()
+          yield* runtimes.watch({
+            execution: current,
+            session,
+            readinessTimeoutMs: 100,
+            observe: (onReady) =>
+              onReady.pipe(
+                Effect.andThen(Deferred.await(failObserver)),
+                Effect.andThen(Effect.fail({ code: "unavailable" as const, message: "Observer lost" })),
+              ),
+          })
+          yield* runtimes.wake(current)
+          yield* Deferred.succeed(failObserver, undefined)
+          yield* Effect.gen(function* () {
+            while (true) {
+              const result = yield* runtimes
+                .wake(current)
+                .pipe(Effect.match({ onFailure: (error) => error.code, onSuccess: () => "started" as const }))
+              if (result === "conflict") return
+              yield* Effect.sleep("1 millis")
+            }
+          }).pipe(Effect.timeout("1 second"))
+          yield* runtimes.shutdown(runtime)
+          expect(system.calls.interrupt).toBe(1)
         }),
       ),
     )
@@ -267,13 +423,13 @@ describe("embedded runtime lifecycle with service doubles", () => {
           const current = { run, phase: "admitted" as const, workspace, runtime }
           const idle = yield* runtimes.interrupt(current)
           expect(idle).toMatchObject({ abort: "not_delivered", state: "already_idle" })
-          expect((yield* runtimes.inspect(current)).activeTools).toBe("unknown")
+          expect((yield* runtimes.inspect(current)).activeTools).toBe(0)
           system.active.add(session.id)
           expect((yield* runtimes.inspect(current)).state).toBe("unknown")
           expect(yield* runtimes.interrupt(current)).toMatchObject({ abort: "not_delivered", state: "uncertain" })
           expect(system.calls.interrupt).toBe(0)
           system.active.delete(session.id)
-          yield* runtimes.watch({ execution: current, session, observe: Effect.never })
+          yield* runtimes.watch({ execution: current, session, observe, readinessTimeoutMs: 100 })
           yield* runtimes.wake(current)
           const uncertain = yield* runtimes.interrupt(current)
           expect(uncertain).toMatchObject({ abort: "unknown", state: "uncertain" })

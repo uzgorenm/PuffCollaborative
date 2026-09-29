@@ -1,6 +1,6 @@
 export * as RunnerHarnessRuntime from "./runtime"
 
-import { Cause, Duration, Effect, Exit, Option, Schedule, Scope } from "effect"
+import { Cause, Deferred, Duration, Effect, Exit, Fiber, Option, Schedule, Scope } from "effect"
 import type { SessionV2 } from "../session"
 import type { SessionExecution } from "../session/execution"
 import type { RunnerHarnessContracts } from "./contracts"
@@ -20,6 +20,8 @@ type Dependencies = {
 type Watch = {
   readonly sessionId: RunnerHarnessContracts.AuthorizedRun["command"]["sessionId"]
   readonly workspaceId: string
+  registered: boolean
+  readonly ready: Deferred.Deferred<void, RunnerHarnessContracts.Failure>
 }
 type RunID = RunnerHarnessContracts.AuthorizedRun["command"]["runId"]
 
@@ -31,8 +33,9 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
 
     const runtimeId = `runtime_${crypto.randomUUID()}`
     const watches = new Map<RunID, Watch>()
-    const woken = new Set<RunID>()
-    const stoppedRuns = new Set<RunID>()
+    const woken = new Map<RunID, RunnerHarnessContracts.AuthorizedRun["command"]["sessionId"]>()
+    const uncertainRuns = new Set<RunID>()
+    const uncertainSessions = new Set<RunnerHarnessContracts.AuthorizedRun["command"]["sessionId"]>()
     let runtime: RunnerHarnessContracts.RuntimeIdentity | undefined
     let state: RunnerHarnessContracts.RuntimeHealth["state"] = "starting"
     let reason: string | undefined
@@ -75,6 +78,44 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
 
     const reportFailure = (runId: RunID, message: string) =>
       runtime ? deps.runtimeFailed({ runId, runtime, reason: diagnostic(message) }).pipe(Effect.ignore) : Effect.void
+
+    const markUncertain = (execution: RunnerHarnessContracts.LocalExecution) => {
+      uncertainRuns.add(execution.run.command.runId)
+      uncertainSessions.add(execution.run.command.sessionId)
+    }
+
+    const inspectRun: RunnerHarnessContracts.Runtimes["inspect"] = (execution) =>
+      Effect.gen(function* () {
+        const owner = yield* requireExecution(execution)
+        yield* deps.policy.runtimeAccess({
+          principal: owner.principal,
+          sessionId: execution.run.command.sessionId,
+          action: "read",
+        })
+        const active = yield* Effect.exit(deps.execution.active)
+        const isActive = Exit.isSuccess(active) && active.value.has(execution.run.command.sessionId)
+        const isOwnedRun =
+          watches.get(execution.run.command.runId)?.registered && woken.has(execution.run.command.runId)
+        return {
+          runtime: owner.runtime,
+          sessionId: execution.run.command.sessionId,
+          state:
+            Exit.isFailure(active) || (isActive && !isOwnedRun)
+              ? ("unknown" as const)
+              : isActive
+                ? ("active" as const)
+                : ("idle" as const),
+          // The coordinator removes a drain after scoped tool fibers settle. Escaped OS descendants are not tracked.
+          activeTools:
+            !isActive &&
+            Exit.isSuccess(active) &&
+            !uncertainRuns.has(execution.run.command.runId) &&
+            !uncertainSessions.has(execution.run.command.sessionId)
+              ? 0
+              : ("unknown" as const),
+          checkedAt: Date.now(),
+        }
+      })
 
     return {
       ensure: (input) =>
@@ -183,6 +224,11 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
         }),
       watch: (input) =>
         Effect.gen(function* () {
+          if (!Number.isInteger(input.readinessTimeoutMs) || input.readinessTimeoutMs <= 0)
+            return yield* Effect.fail({
+              code: "invalid" as const,
+              message: "Observer readiness timeout must be positive",
+            })
           const owner = yield* requireExecution(input.execution)
           if (state !== "ready")
             return yield* Effect.fail({ code: "unavailable" as const, message: "Runtime is not ready" })
@@ -200,19 +246,68 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
           })
           const existing = watches.get(input.execution.run.command.runId)
           if (existing) {
-            if (existing.sessionId === input.session.id && existing.workspaceId === input.execution.workspace.id) return
-            return yield* Effect.fail({ code: "conflict" as const, message: "Run already observes another Session" })
+            if (existing.sessionId !== input.session.id || existing.workspaceId !== input.execution.workspace.id)
+              return yield* Effect.fail({ code: "conflict" as const, message: "Run already observes another Session" })
+            const registered = yield* Deferred.await(existing.ready).pipe(
+              Effect.timeoutOption(Duration.millis(Math.min(input.readinessTimeoutMs, 30_000))),
+            )
+            if (Option.isNone(registered))
+              return yield* Effect.fail({ code: "unavailable" as const, message: "Observer readiness timed out" })
+            return
           }
 
           const runId = input.execution.run.command.runId
-          watches.set(runId, { sessionId: input.session.id, workspaceId: input.execution.workspace.id })
-          yield* input.observe.pipe(
-            Effect.catchCause((cause) =>
-              Cause.hasInterruptsOnly(cause) ? Effect.void : reportFailure(runId, Cause.pretty(cause)),
+          const ready = yield* Deferred.make<void, RunnerHarnessContracts.Failure>()
+          const watch = {
+            sessionId: input.session.id,
+            workspaceId: input.execution.workspace.id,
+            registered: false,
+            ready,
+          }
+          watches.set(runId, watch)
+          const fiber = yield* input
+            .observe(
+              Effect.sync(() => {
+                watch.registered = true
+              }).pipe(Effect.andThen(Deferred.succeed(ready, undefined)), Effect.asVoid),
+            )
+            .pipe(
+              Effect.onExit((exit) =>
+                Effect.gen(function* () {
+                  const stopped = { code: "unavailable" as const, message: "Run observer stopped" }
+                  yield* Deferred.fail(ready, stopped)
+                  if (Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)) return
+                  if (woken.has(runId)) markUncertain(input.execution)
+                  else uncertainRuns.add(runId)
+                  yield* reportFailure(runId, Exit.isFailure(exit) ? Cause.pretty(exit.cause) : stopped.message)
+                }),
+              ),
+              Effect.ensuring(
+                Effect.sync(() => {
+                  if (watches.get(runId) === watch) watches.delete(runId)
+                }),
+              ),
+              Effect.forkIn(scope),
+            )
+          const registered = yield* Effect.exit(
+            Deferred.await(ready).pipe(
+              Effect.timeoutOption(Duration.millis(Math.min(input.readinessTimeoutMs, 30_000))),
             ),
-            Effect.ensuring(Effect.sync(() => watches.delete(runId))),
-            Effect.forkIn(scope),
           )
+          if (Exit.isFailure(registered) || Option.isNone(registered.value)) {
+            if (watches.get(runId) === watch) watches.delete(runId)
+            yield* Fiber.interrupt(fiber).pipe(Effect.timeoutOption(Duration.millis(5_000)))
+            if (Exit.isFailure(registered))
+              return yield* Effect.fail({
+                code: "unavailable" as const,
+                message: "Run observer failed before readiness",
+              })
+            yield* reportFailure(runId, "Observer readiness timed out")
+            return yield* Effect.fail({ code: "unavailable" as const, message: "Observer readiness timed out" })
+          }
+          yield* Effect.yieldNow
+          if (watches.get(runId) !== watch)
+            return yield* Effect.fail({ code: "unavailable" as const, message: "Run observer stopped after readiness" })
         }),
       wake: (execution) =>
         Effect.gen(function* () {
@@ -224,43 +319,43 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
             sessionId: execution.run.command.sessionId,
             action: "prompt",
           })
-          if (!watches.has(execution.run.command.runId))
+          if (!watches.get(execution.run.command.runId)?.registered)
             return yield* Effect.fail({ code: "conflict" as const, message: "Run observer is not installed" })
           if (woken.has(execution.run.command.runId)) return
-          woken.add(execution.run.command.runId)
-          stoppedRuns.delete(execution.run.command.runId)
+          woken.set(execution.run.command.runId, execution.run.command.sessionId)
+          // A new wake starts a fresh owned drain; earlier interruption evidence does not describe it.
+          uncertainRuns.delete(execution.run.command.runId)
           const started = yield* Effect.exit(deps.execution.wake(execution.run.command.sessionId))
           if (Exit.isSuccess(started)) return
+          woken.delete(execution.run.command.runId)
+          markUncertain(execution)
           state = "failed"
           reason = diagnostic(Cause.pretty(started.cause))
           yield* reportFailure(execution.run.command.runId, reason)
           return yield* Effect.fail({ code: "unavailable" as const, message: "Could not wake Session execution" })
         }),
-      inspect: (execution) =>
+      inspect: inspectRun,
+      awaitIdle: (execution, timeoutMs) =>
         Effect.gen(function* () {
+          if (!Number.isInteger(timeoutMs) || timeoutMs <= 0)
+            return yield* Effect.fail({ code: "invalid" as const, message: "Idle wait timeout must be positive" })
           const owner = yield* requireExecution(execution)
-          yield* deps.policy.runtimeAccess({
-            principal: owner.principal,
-            sessionId: execution.run.command.sessionId,
-            action: "read",
-          })
-          const active = yield* Effect.exit(deps.execution.active)
-          const isActive = Exit.isSuccess(active) && active.value.has(execution.run.command.sessionId)
-          const isOwnedRun = watches.has(execution.run.command.runId) && woken.has(execution.run.command.runId)
+          const runId = execution.run.command.runId
+          if (!woken.has(runId) || !watches.get(runId)?.registered)
+            return yield* Effect.fail({ code: "conflict" as const, message: "Run has no owned observed drain" })
+          const settled = yield* Effect.gen(function* () {
+            while (true) {
+              const inspection = yield* inspectRun(execution)
+              if (inspection.state !== "active" || inspection.activeTools === 0) return inspection
+              yield* Effect.sleep(Duration.millis(20))
+            }
+          }).pipe(Effect.timeoutOption(Duration.millis(Math.min(timeoutMs, 30_000))))
+          if (Option.isSome(settled)) return settled.value
           return {
             runtime: owner.runtime,
             sessionId: execution.run.command.sessionId,
-            state:
-              Exit.isFailure(active) || (isActive && !isOwnedRun)
-                ? ("unknown" as const)
-                : isActive
-                  ? ("active" as const)
-                  : ("idle" as const),
-            // SessionExecution only exposes drains. Tool cleanup is known only after its interrupt waits for the owner fiber.
-            activeTools:
-              !isActive && Exit.isSuccess(active) && stoppedRuns.has(execution.run.command.runId)
-                ? 0
-                : ("unknown" as const),
+            state: "unknown" as const,
+            activeTools: "unknown" as const,
             checkedAt: Date.now(),
           }
         }),
@@ -274,6 +369,7 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
           })
           const before = yield* Effect.exit(deps.execution.active)
           if (Exit.isFailure(before)) {
+            markUncertain(execution)
             yield* reportFailure(execution.run.command.runId, "Session interruption was uncertain")
             return {
               runtime: owner.runtime,
@@ -292,6 +388,7 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
               checkedAt: Date.now(),
             }
           if (!woken.has(execution.run.command.runId) || !watches.has(execution.run.command.runId)) {
+            markUncertain(execution)
             yield* reportFailure(execution.run.command.runId, "Active Session is not owned by this Run")
             return {
               runtime: owner.runtime,
@@ -308,6 +405,7 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
               .pipe(Effect.timeoutOption(Duration.millis(10_000))),
           )
           if (Exit.isFailure(stopped) || Option.isNone(stopped.value)) {
+            markUncertain(execution)
             yield* reportFailure(execution.run.command.runId, "Session interruption acknowledgment was lost")
             return {
               runtime: owner.runtime,
@@ -319,6 +417,7 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
           }
           const after = yield* Effect.exit(deps.execution.active)
           if (Exit.isFailure(after) || after.value.has(execution.run.command.sessionId)) {
+            markUncertain(execution)
             yield* reportFailure(execution.run.command.runId, "Session remained active after interruption")
             return {
               runtime: owner.runtime,
@@ -328,7 +427,8 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
               checkedAt: Date.now(),
             }
           }
-          stoppedRuns.add(execution.run.command.runId)
+          // The owner fiber has stopped, but a shell descendant may outlive an ignored group-kill failure.
+          markUncertain(execution)
           return {
             runtime: owner.runtime,
             sessionId: execution.run.command.sessionId,
@@ -385,11 +485,7 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
           if (!owned(input))
             return yield* Effect.fail({ code: "forbidden" as const, message: "Runtime is not owned by this runner" })
           if (state === "stopped") return
-          const sessions = [
-            ...new Set(
-              [...watches.entries()].filter(([runId]) => woken.has(runId)).map(([, watch]) => watch.sessionId),
-            ),
-          ]
+          const sessions = [...new Set(woken.values())]
           const stopped = yield* Effect.exit(
             Effect.forEach(sessions, (sessionId) => deps.execution.interrupt(sessionId), { discard: true }).pipe(
               Effect.timeoutOption(Duration.millis(10_000)),
@@ -411,7 +507,9 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
             return yield* Effect.fail({ code: "unavailable" as const, message: failure })
           }
           watches.clear()
-          stoppedRuns.clear()
+          woken.clear()
+          uncertainRuns.clear()
+          uncertainSessions.clear()
           state = "stopped"
           reason = undefined
         }),
