@@ -8,7 +8,7 @@ Serdar authorized the coordinator chat, **Set up Flower development**, to direct
 
 | Resource | Owner | Other agents can do |
 | --- | --- | --- |
-| Main integration checkout and pushes | Coordinator | Supply exact ready commits and evidence; do not concurrently push main |
+| Main integration Git, clean publication checkout and pushes | Coordinator | Supply exact ready commits and evidence; do not concurrently push main or edit the publication checkout |
 | Next UI composition | Review README for task workflow, with coordinator-only Git writes | Edit only the files assigned in next-development.md |
 | Context-panel files | Read the project README | Suggest changes through R2/R3 reports; do not edit the same files |
 | Shared desktop mouse, keyboard and focus | Native QA after the frontend lead's release | Inspect source and existing captures; no native interaction |
