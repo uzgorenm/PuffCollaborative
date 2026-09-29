@@ -33,7 +33,7 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
 
     const runtimeId = `runtime_${crypto.randomUUID()}`
     const watches = new Map<RunID, Watch>()
-    const woken = new Set<RunID>()
+    const woken = new Map<RunID, RunnerHarnessContracts.AuthorizedRun["command"]["sessionId"]>()
     const uncertainRuns = new Set<RunID>()
     const uncertainSessions = new Set<RunnerHarnessContracts.AuthorizedRun["command"]["sessionId"]>()
     let runtime: RunnerHarnessContracts.RuntimeIdentity | undefined
@@ -322,7 +322,7 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
           if (!watches.get(execution.run.command.runId)?.registered)
             return yield* Effect.fail({ code: "conflict" as const, message: "Run observer is not installed" })
           if (woken.has(execution.run.command.runId)) return
-          woken.add(execution.run.command.runId)
+          woken.set(execution.run.command.runId, execution.run.command.sessionId)
           // A new wake starts a fresh owned drain; earlier interruption evidence does not describe it.
           uncertainRuns.delete(execution.run.command.runId)
           const started = yield* Effect.exit(deps.execution.wake(execution.run.command.sessionId))
@@ -485,11 +485,7 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
           if (!owned(input))
             return yield* Effect.fail({ code: "forbidden" as const, message: "Runtime is not owned by this runner" })
           if (state === "stopped") return
-          const sessions = [
-            ...new Set(
-              [...watches.entries()].filter(([runId]) => woken.has(runId)).map(([, watch]) => watch.sessionId),
-            ),
-          ]
+          const sessions = [...new Set(woken.values())]
           const stopped = yield* Effect.exit(
             Effect.forEach(sessions, (sessionId) => deps.execution.interrupt(sessionId), { discard: true }).pipe(
               Effect.timeoutOption(Duration.millis(10_000)),
@@ -511,6 +507,7 @@ export const make = (deps: Dependencies): Effect.Effect<RunnerHarnessContracts.R
             return yield* Effect.fail({ code: "unavailable" as const, message: failure })
           }
           watches.clear()
+          woken.clear()
           uncertainRuns.clear()
           uncertainSessions.clear()
           state = "stopped"
