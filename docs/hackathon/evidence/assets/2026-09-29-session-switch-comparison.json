@@ -1,0 +1,348 @@
+{
+  "before": {
+    "schemaVersion": 2,
+    "runID": "2026-09-29T20-18-32-849Z-41837",
+    "name": "benchmarks v2 session tab switching with and without the review pane",
+    "status": "passed",
+    "expectedStatus": "passed",
+    "retry": 0,
+    "repeatEachIndex": 0,
+    "context": {
+      "project": "chromium",
+      "platform": "darwin",
+      "runs": 1,
+      "reviewDiffs": 72
+    },
+    "metrics": {
+      "results": {
+        "closed": {
+          "cold": [
+            {
+              "firstDestinationObservedMs": 39,
+              "firstCorrectObservedMs": 39,
+              "stableObservedMs": 53.70000001788139,
+              "wrongDestinationSamples": 0,
+              "blankSamples": 0,
+              "unknownSamples": 0,
+              "sourceSamples": 0,
+              "reviewFileHostMissingSamples": 0,
+              "reviewFileHostReplacedSamples": 0,
+              "reviewHeaders": [],
+              "reviewReplacedLevels": []
+            }
+          ],
+          "hot": [
+            {
+              "firstDestinationObservedMs": 3.800000011920929,
+              "firstCorrectObservedMs": 3.800000011920929,
+              "stableObservedMs": 17.700000017881393,
+              "wrongDestinationSamples": 0,
+              "blankSamples": 0,
+              "unknownSamples": 0,
+              "sourceSamples": 0,
+              "reviewFileHostMissingSamples": 0,
+              "reviewFileHostReplacedSamples": 0,
+              "reviewHeaders": [],
+              "reviewReplacedLevels": []
+            }
+          ]
+        },
+        "open": {
+          "cold": [
+            {
+              "firstDestinationObservedMs": 26.5,
+              "firstCorrectObservedMs": 26.5,
+              "stableObservedMs": 36.5,
+              "wrongDestinationSamples": 0,
+              "blankSamples": 0,
+              "unknownSamples": 0,
+              "sourceSamples": 0,
+              "reviewFileHostMissingSamples": 0,
+              "reviewFileHostReplacedSamples": 0,
+              "reviewHeaders": [
+                "Mgenerated-000.tssrc/review/+3-3"
+              ],
+              "reviewReplacedLevels": []
+            }
+          ],
+          "hot": [
+            {
+              "firstDestinationObservedMs": 6.600000023841858,
+              "firstCorrectObservedMs": 6.600000023841858,
+              "stableObservedMs": 18.700000017881393,
+              "wrongDestinationSamples": 0,
+              "blankSamples": 0,
+              "unknownSamples": 0,
+              "sourceSamples": 0,
+              "reviewFileHostMissingSamples": 0,
+              "reviewFileHostReplacedSamples": 0,
+              "reviewHeaders": [
+                "Mgenerated-000.tssrc/review/+3-3"
+              ],
+              "reviewReplacedLevels": []
+            }
+          ]
+        }
+      },
+      "summary": {
+        "closed": {
+          "cold": {
+            "firstDestinationObservedMs": {
+              "min": 39,
+              "median": 39,
+              "max": 39,
+              "missing": 0
+            },
+            "firstCorrectObservedMs": {
+              "min": 39,
+              "median": 39,
+              "max": 39,
+              "missing": 0
+            },
+            "stableObservedMs": {
+              "min": 53.70000001788139,
+              "median": 53.70000001788139,
+              "max": 53.70000001788139,
+              "missing": 0
+            }
+          },
+          "hot": {
+            "firstDestinationObservedMs": {
+              "min": 3.800000011920929,
+              "median": 3.800000011920929,
+              "max": 3.800000011920929,
+              "missing": 0
+            },
+            "firstCorrectObservedMs": {
+              "min": 3.800000011920929,
+              "median": 3.800000011920929,
+              "max": 3.800000011920929,
+              "missing": 0
+            },
+            "stableObservedMs": {
+              "min": 17.700000017881393,
+              "median": 17.700000017881393,
+              "max": 17.700000017881393,
+              "missing": 0
+            }
+          }
+        },
+        "open": {
+          "cold": {
+            "firstDestinationObservedMs": {
+              "min": 26.5,
+              "median": 26.5,
+              "max": 26.5,
+              "missing": 0
+            },
+            "firstCorrectObservedMs": {
+              "min": 26.5,
+              "median": 26.5,
+              "max": 26.5,
+              "missing": 0
+            },
+            "stableObservedMs": {
+              "min": 36.5,
+              "median": 36.5,
+              "max": 36.5,
+              "missing": 0
+            }
+          },
+          "hot": {
+            "firstDestinationObservedMs": {
+              "min": 6.600000023841858,
+              "median": 6.600000023841858,
+              "max": 6.600000023841858,
+              "missing": 0
+            },
+            "firstCorrectObservedMs": {
+              "min": 6.600000023841858,
+              "median": 6.600000023841858,
+              "max": 6.600000023841858,
+              "missing": 0
+            },
+            "stableObservedMs": {
+              "min": 18.700000017881393,
+              "median": 18.700000017881393,
+              "max": 18.700000017881393,
+              "missing": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  "after": {
+    "schemaVersion": 2,
+    "runID": "2026-09-29T20-27-31-579Z-47151",
+    "name": "benchmarks v2 session tab switching with and without the review pane",
+    "status": "passed",
+    "expectedStatus": "passed",
+    "retry": 0,
+    "repeatEachIndex": 0,
+    "context": {
+      "project": "chromium",
+      "platform": "darwin",
+      "runs": 1,
+      "reviewDiffs": 72
+    },
+    "metrics": {
+      "results": {
+        "closed": {
+          "cold": [
+            {
+              "firstDestinationObservedMs": 41.89999997615814,
+              "firstCorrectObservedMs": 41.89999997615814,
+              "stableObservedMs": 54.89999997615814,
+              "wrongDestinationSamples": 0,
+              "blankSamples": 0,
+              "unknownSamples": 0,
+              "sourceSamples": 0,
+              "reviewFileHostMissingSamples": 0,
+              "reviewFileHostReplacedSamples": 0,
+              "reviewHeaders": [],
+              "reviewReplacedLevels": []
+            }
+          ],
+          "hot": [
+            {
+              "firstDestinationObservedMs": 2.699999988079071,
+              "firstCorrectObservedMs": 2.699999988079071,
+              "stableObservedMs": 14.199999988079071,
+              "wrongDestinationSamples": 0,
+              "blankSamples": 0,
+              "unknownSamples": 0,
+              "sourceSamples": 0,
+              "reviewFileHostMissingSamples": 0,
+              "reviewFileHostReplacedSamples": 0,
+              "reviewHeaders": [],
+              "reviewReplacedLevels": []
+            }
+          ]
+        },
+        "open": {
+          "cold": [
+            {
+              "firstDestinationObservedMs": 18.100000023841858,
+              "firstCorrectObservedMs": 18.100000023841858,
+              "stableObservedMs": 35.70000001788139,
+              "wrongDestinationSamples": 0,
+              "blankSamples": 0,
+              "unknownSamples": 0,
+              "sourceSamples": 0,
+              "reviewFileHostMissingSamples": 0,
+              "reviewFileHostReplacedSamples": 0,
+              "reviewHeaders": [
+                "Mgenerated-000.tssrc/review/+3-3"
+              ],
+              "reviewReplacedLevels": []
+            }
+          ],
+          "hot": [
+            {
+              "firstDestinationObservedMs": 9.5,
+              "firstCorrectObservedMs": 9.5,
+              "stableObservedMs": 28.900000005960464,
+              "wrongDestinationSamples": 0,
+              "blankSamples": 0,
+              "unknownSamples": 0,
+              "sourceSamples": 0,
+              "reviewFileHostMissingSamples": 0,
+              "reviewFileHostReplacedSamples": 0,
+              "reviewHeaders": [
+                "Mgenerated-000.tssrc/review/+3-3"
+              ],
+              "reviewReplacedLevels": []
+            }
+          ]
+        }
+      },
+      "summary": {
+        "closed": {
+          "cold": {
+            "firstDestinationObservedMs": {
+              "min": 41.89999997615814,
+              "median": 41.89999997615814,
+              "max": 41.89999997615814,
+              "missing": 0
+            },
+            "firstCorrectObservedMs": {
+              "min": 41.89999997615814,
+              "median": 41.89999997615814,
+              "max": 41.89999997615814,
+              "missing": 0
+            },
+            "stableObservedMs": {
+              "min": 54.89999997615814,
+              "median": 54.89999997615814,
+              "max": 54.89999997615814,
+              "missing": 0
+            }
+          },
+          "hot": {
+            "firstDestinationObservedMs": {
+              "min": 2.699999988079071,
+              "median": 2.699999988079071,
+              "max": 2.699999988079071,
+              "missing": 0
+            },
+            "firstCorrectObservedMs": {
+              "min": 2.699999988079071,
+              "median": 2.699999988079071,
+              "max": 2.699999988079071,
+              "missing": 0
+            },
+            "stableObservedMs": {
+              "min": 14.199999988079071,
+              "median": 14.199999988079071,
+              "max": 14.199999988079071,
+              "missing": 0
+            }
+          }
+        },
+        "open": {
+          "cold": {
+            "firstDestinationObservedMs": {
+              "min": 18.100000023841858,
+              "median": 18.100000023841858,
+              "max": 18.100000023841858,
+              "missing": 0
+            },
+            "firstCorrectObservedMs": {
+              "min": 18.100000023841858,
+              "median": 18.100000023841858,
+              "max": 18.100000023841858,
+              "missing": 0
+            },
+            "stableObservedMs": {
+              "min": 35.70000001788139,
+              "median": 35.70000001788139,
+              "max": 35.70000001788139,
+              "missing": 0
+            }
+          },
+          "hot": {
+            "firstDestinationObservedMs": {
+              "min": 9.5,
+              "median": 9.5,
+              "max": 9.5,
+              "missing": 0
+            },
+            "firstCorrectObservedMs": {
+              "min": 9.5,
+              "median": 9.5,
+              "max": 9.5,
+              "missing": 0
+            },
+            "stableObservedMs": {
+              "min": 28.900000005960464,
+              "median": 28.900000005960464,
+              "max": 28.900000005960464,
+              "missing": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}
