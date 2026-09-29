@@ -48,7 +48,7 @@ Use per-member/per-worker authentication mapped server-side to the fixed roster;
 
 ## Shared contract v1
 
-Ferit owns the contract and publishes matching synthetic fixtures in the first 25 minutes. Everyone agrees on these names before implementation. Use JSON, schemaVersion=1, UTC timestamps, and opaque string IDs. Reject unknown project/session/worker mappings and invalid shapes.
+Serhat owns the contract and publishes matching synthetic fixtures in the first 25 minutes. Everyone agrees on these names before implementation. Use JSON, schemaVersion=1, UTC timestamps, and opaque string IDs. Reject unknown project/session/worker mappings and invalid shapes.
 
 | Record | Required fields |
 | --- | --- |
@@ -69,21 +69,21 @@ Local APIs to implement (Puff APIs, not existing OpenCode or Flower endpoints):
 
 | Method and route | Owner | Contract |
 | --- | --- | --- |
-| POST /puff/v1/events | Ferit | Worker-authenticated SharedEvent upsert; duplicate eventId is a no-op; old revisions never overwrite newer state. |
-| POST /puff/v1/workers/heartbeat | Ferit | Authenticate worker; update server-recorded lastSeenAt; 10-second heartbeat, stale after 30 seconds. |
-| GET /puff/v1/projects/:id | Ferit | Authenticated authorized snapshot of workers, shared sessions, summaries, proposals, decisions, and deliveries. UI polls every 2 seconds for MVP. |
-| POST /puff/v1/context-requests | Ferit | Validate ContextRequest, deduplicate requestId, enqueue one coordinator job; return requestId and status. |
-| GET /puff/v1/context-requests/:id | Ferit | Return pending/completed/failed and report. |
-| POST /puff/v1/proposals/:id/approval | Ferit | Compare expectedVersion and source revisions; authenticate target worker owner; create one delivery on approval. |
-| POST /puff/v1/workers/:id/claim | Ferit | Authenticated worker claims its next delivery; one outstanding action per session. |
-| POST /puff/v1/deliveries/:id/ack | Ferit | Only owning worker can acknowledge with stable OpenCode messageId or failure. |
-| POST /puff/v1/decisions | Ferit | An authenticated member explicitly accepts or supersedes a source-backed decision; approval attributed. |
+| POST /puff/v1/events | Serhat | Worker-authenticated SharedEvent upsert; duplicate eventId is a no-op; old revisions never overwrite newer state. |
+| POST /puff/v1/workers/heartbeat | Serhat | Authenticate worker; update server-recorded lastSeenAt; 10-second heartbeat, stale after 30 seconds. |
+| GET /puff/v1/projects/:id | Serhat | Authenticated authorized snapshot of workers, shared sessions, summaries, proposals, decisions, and deliveries. UI polls every 2 seconds for MVP. |
+| POST /puff/v1/context-requests | Serhat | Validate ContextRequest, deduplicate requestId, enqueue one coordinator job; return requestId and status. |
+| GET /puff/v1/context-requests/:id | Serhat | Return pending/completed/failed and report. |
+| POST /puff/v1/proposals/:id/approval | Serhat | Compare expectedVersion and source revisions; authenticate target worker owner; create one delivery on approval. |
+| POST /puff/v1/workers/:id/claim | Serhat | Authenticated worker claims its next delivery; one outstanding action per session. |
+| POST /puff/v1/deliveries/:id/ack | Serhat | Only owning worker can acknowledge with stable OpenCode messageId or failure. |
+| POST /puff/v1/decisions | Serhat | An authenticated member explicitly accepts or supersedes a source-backed decision; approval attributed. |
 
 `ProjectSnapshot` contains projectId, workers, shared sessions, permitted recent events, summaries, proposals, decisions, and deliveries using the records above. Each shared-session entry contains workerId, sessionId, ownerId, title, revision, and status. The hub supplies only the requesting identity's authorized project view. The coordinator input excludes credentials, approval tokens, and delivery machinery even though the full UI snapshot contains delivery status.
 
-Serdar's callable boundary: `coordinate(request: ContextRequest, snapshot: ProjectSnapshot) -> CoordinationReport`, invoked asynchronously by the hub job queue. The adapter must return or fail within 90 seconds and propagate run status and failure details. Deduplicate on requestId; do not launch a second paid run merely because the client polls or retries. A local timeout does not prove the remote run stopped: retain its run ID, request cancellation or mark its remote state unresolved, and require an observed terminal state before a replacement run. Start with an explicit context-check action; add one debounced idle-update trigger after explicit invocation works. An unchanged event revision never triggers another run.
+Ferit's callable boundary: `coordinate(request: ContextRequest, snapshot: ProjectSnapshot) -> CoordinationReport`, invoked asynchronously by the hub job queue. The adapter must return or fail within 90 seconds and propagate run status and failure details. Deduplicate on requestId; do not launch a second paid run merely because the client polls or retries. A local timeout does not prove the remote run stopped: retain its run ID, request cancellation or mark its remote state unresolved, and require an observed terminal state before a replacement run. Start with an explicit context-check action; add one debounced idle-update trigger after explicit invocation works. An unchanged event revision never triggers another run.
 
-Serhat's callable boundaries: `captureSession(sessionId) -> SharedEvent[]` and `deliverContext(delivery) -> {messageId, state, error}`. Match the actual running OpenCode API version, not a guessed combination of old docs and new types. Carry deliveryId into a stable OpenCode message identity; if retry reconciliation cannot be verified, leave an ambiguous delivery failed for human review instead of blindly replaying it. Deliver at a supported safe boundary through the existing prompt admission path.
+Talha's callable boundaries: `captureSession(sessionId) -> SharedEvent[]` and `deliverContext(delivery) -> {messageId, state, error}`. Match the actual running OpenCode API version, not a guessed combination of old docs and new types. Carry deliveryId into a stable OpenCode message identity; if retry reconciliation cannot be verified, leave an ambiguous delivery failed for human review instead of blindly replaying it. Deliver at a supported safe boundary through the existing prompt admission path.
 
 ## Approval and knowledge rules
 

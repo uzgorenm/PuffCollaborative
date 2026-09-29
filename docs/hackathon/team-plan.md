@@ -28,54 +28,30 @@
 
 | Owner | Workstream | Owns | First usable output |
 | --- | --- | --- | --- |
-| Serhat | OpenCode adapter | hackathon/worker/ | One real session exported and one approved input admitted to that same session. |
-| Ferit | Shared state and API | hackathon/hub/, hackathon/contracts/ | Contract fixtures and hub snapshot/event/approval endpoints. |
-| Serdar | Flower coordination | hackathon/flower/ | A real SuperGrid run returning a validated report over the common fixtures. |
-| Talha | Team overview | packages/app/src/pages/puff/, packages/app/src/components/puff/, packages/app/src/app.tsx route, app i18n keys | Two-session view and proposal review against the fixtures. |
+| Serhat | Shared state and API | hackathon/hub/, hackathon/contracts/ | Contract fixtures and hub snapshot/event/approval endpoints. |
+| Talha | OpenCode adapter | hackathon/worker/ | One real session exported and one approved input admitted to that same session. |
+| Serdar | Team overview | packages/app/src/pages/puff/, packages/app/src/components/puff/, packages/app/src/app.tsx route, app i18n keys | Two-session view and proposal review against the fixtures. |
+| Ferit | Flower coordination | hackathon/flower/ | A real SuperGrid run returning a validated report over the common fixtures. |
 
-This uses Serhat's OpenCode familiarity and Serdar's already-verified Flower setup. Ferit and Talha have equally important ownership; their assignments do not assume different skill levels.
+These assignments follow the team’s confirmed roles. The previously verified standalone Flower setup is available as a starting point for Ferit; the product integration still needs verification.
 
-Ferit is the integration owner for shared schemas and the root manifest/lockfile if changes become necessary. Other owners request narrowly scoped root changes rather than editing those files concurrently. Talha owns any shared UI entry-point edits. No one implements another owner's workstream in parallel without agreeing a handoff.
+Serhat is the integration owner for shared schemas and the root manifest/lockfile if changes become necessary. Other owners request narrowly scoped root changes rather than editing those files concurrently. Serdar owns any shared UI entry-point edits. No one implements another owner's workstream in parallel without agreeing a handoff.
 
 ## Review focus
 
-1. Duplicate/reordered events and repeated clicks must not create duplicate coding instructions. Ferit tests hub idempotency; Serhat tests OpenCode retry reconciliation.
-2. Private sessions, wrong-project identities, and client-spoofed authors must not cross the sharing boundary. Serhat tests export scope; Ferit tests server-side authorization.
-3. New evidence must invalidate old proposals/approvals. Ferit tests revision checks; Talha renders the stale state.
-4. Offline workers and failed Flower runs must not look successful. Serdar tests coordinator failures; Serhat tests failed delivery; Talha shows both states.
-5. A model must not turn an unsupported claim into accepted knowledge. Serdar tests source validation/no-overlap behavior; Ferit tests explicit decision approval and supersession.
+1. Duplicate/reordered events and repeated clicks must not create duplicate coding instructions. Serhat tests hub idempotency; Talha tests OpenCode retry reconciliation.
+2. Private sessions, wrong-project identities, and client-spoofed authors must not cross the sharing boundary. Talha tests export scope; Serhat tests server-side authorization.
+3. New evidence must invalidate old proposals/approvals. Serhat tests revision checks; Serdar renders the stale state.
+4. Offline workers and failed Flower runs must not look successful. Ferit tests coordinator failures; Talha tests failed delivery; Serdar shows both states.
+5. A model must not turn an unsupported claim into accepted knowledge. Ferit tests source validation/no-overlap behavior; Serhat tests explicit decision approval and supersession.
 
-## Task 1 — Serhat: connect real OpenCode sessions
-
-**Features:** F1 capture; F4 delivery; F5 delivery to new/existing sessions.
-
-**Create:** hackathon/worker/package.json, tsconfig.json, adapter.ts, sharing.ts, worker.ts, adapter.test.ts, sharing.test.ts, README.md.
-
-**Inspect first:** packages/plugin/src/index.ts; packages/protocol/src/groups/session.ts; packages/server/src/handlers/session.ts; existing plugin/API tests and relevant AGENTS.md. Do not assume the legacy plugin hooks drive the active V2 runtime.
-
-**Consumes:** Ferit's v1 contract, roster/worker credentials, hub routes, and the selected local OpenCode API.
-
-**Produces:** `captureSession(sessionId) -> SharedEvent[]`; `deliverContext(delivery) -> {messageId, state, error}`; heartbeats; delivery acknowledgments.
-
-- [ ] In the first 30 minutes, launch the chosen OpenCode runtime, create a synthetic session, fetch its messages/events, and submit one ordinary prompt through the actual supported API. Record the exact working path/version.
-- [ ] Write failing checks: `unshared_session_exports_nothing`; `selected_session_exports_only_allowed_fields`; `retry_delivery_reuses_message_id`; `delivery_cannot_target_other_worker`; `busy_session_uses_existing_queue`.
-- [ ] Run `bun test` from hackathon/worker and confirm the new assertions fail for the intended missing behavior.
-- [ ] Implement selected-session capture, sharing preview, durable event cursor, 10-second heartbeat, hub publishing, and polling/claiming deliveries. Use capped payloads and only the assigned project's sessions.
-- [ ] Implement context delivery through existing prompt admission. Preserve worker/session identity and author metadata. Never replay an ambiguous delivery automatically.
-- [ ] Run package tests and `bun typecheck`; prove with a real session that a repeated delivery produces one visible context input and the session subsequently uses it.
-- [ ] Document startup and shutdown without printing credentials; commit with `feat(worker): bridge shared OpenCode sessions`.
-
-**Done when:** a second person sees a permitted event and an approved proposal reaches exactly the intended local session. A private session stays absent; an offline worker reports failure rather than delivery.
-
-**If blocked at minute 45:** pair with Ferit on one verified HTTP path; use explicit capture/context buttons instead of automatic hooks. Do not spend the entire hackathon supporting both API generations.
-
-## Task 2 — Ferit: contracts, hub, durable decisions
+## Task 1 — Serhat: contracts, hub, durable decisions
 
 **Features:** F1 registry; F4 approval/routing; F5 memory; shared persistence for F2/F3/F6.
 
 **Create:** hackathon/contracts/v1.schema.json, fixtures.json, README.md; hackathon/hub/package.json, tsconfig.json, server.ts, store.ts, jobs.ts, approval.ts, server.test.ts, approval.test.ts, README.md.
 
-**Consumes:** worker events; Serdar's `coordinate` boundary; member/worker runtime credentials.
+**Consumes:** worker events; Ferit's `coordinate` boundary; member/worker runtime credentials.
 
 **Produces:** all `/puff/v1/...` routes from the spec, fixed-roster authorization, persistent snapshots, proposal/version validation, delivery queue, accepted decisions, and integration fixtures. Runtime storage lives outside tracked source and is ignored by Git.
 
@@ -92,7 +68,54 @@ Ferit is the integration owner for shared schemas and the root manifest/lockfile
 
 **If time is short:** fixed roster, JSON storage, and 2-second UI polling are sufficient. Do not build account onboarding, organizations, a generic job platform, or a vector index.
 
-## Task 3 — Serdar: Flower summaries and coordination
+## Task 2 — Talha: connect real OpenCode sessions
+
+**Features:** F1 capture; F4 delivery; F5 delivery to new/existing sessions.
+
+**Create:** hackathon/worker/package.json, tsconfig.json, adapter.ts, sharing.ts, worker.ts, adapter.test.ts, sharing.test.ts, README.md.
+
+**Inspect first:** packages/plugin/src/index.ts; packages/protocol/src/groups/session.ts; packages/server/src/handlers/session.ts; existing plugin/API tests and relevant AGENTS.md. Do not assume the legacy plugin hooks drive the active V2 runtime.
+
+**Consumes:** Serhat's v1 contract, roster/worker credentials, hub routes, and the selected local OpenCode API.
+
+**Produces:** `captureSession(sessionId) -> SharedEvent[]`; `deliverContext(delivery) -> {messageId, state, error}`; heartbeats; delivery acknowledgments.
+
+- [ ] In the first 30 minutes, launch the chosen OpenCode runtime, create a synthetic session, fetch its messages/events, and submit one ordinary prompt through the actual supported API. Record the exact working path/version.
+- [ ] Write failing checks: `unshared_session_exports_nothing`; `selected_session_exports_only_allowed_fields`; `retry_delivery_reuses_message_id`; `delivery_cannot_target_other_worker`; `busy_session_uses_existing_queue`.
+- [ ] Run `bun test` from hackathon/worker and confirm the new assertions fail for the intended missing behavior.
+- [ ] Implement selected-session capture, sharing preview, durable event cursor, 10-second heartbeat, hub publishing, and polling/claiming deliveries. Use capped payloads and only the assigned project's sessions.
+- [ ] Implement context delivery through existing prompt admission. Preserve worker/session identity and author metadata. Never replay an ambiguous delivery automatically.
+- [ ] Run package tests and `bun typecheck`; prove with a real session that a repeated delivery produces one visible context input and the session subsequently uses it.
+- [ ] Document startup and shutdown without printing credentials; commit with `feat(worker): bridge shared OpenCode sessions`.
+
+**Done when:** a second person sees a permitted event and an approved proposal reaches exactly the intended local session. A private session stays absent; an offline worker reports failure rather than delivery.
+
+**If blocked at minute 45:** pair with Serhat on one verified HTTP path; use explicit capture/context buttons instead of automatic hooks. Do not spend the entire hackathon supporting both API generations.
+
+## Task 3 — Serdar: shared overview and human review
+
+**Features:** F1 visibility; F4 approval controls; F5 decision view; F6 observable demo.
+
+**Create:** packages/app/src/pages/puff/index.tsx, project-api.ts, project-state.test.ts; packages/app/src/components/puff/session-card.tsx, proposal-card.tsx, decision-list.tsx. Modify only the necessary route in packages/app/src/app.tsx and app i18n resources.
+
+**Consumes:** Serhat's fixtures/snapshot API, proposal approval endpoint, context-request endpoint, and decision endpoint.
+
+**Produces:** one team overview with worker/session cards, source-linked summaries, context-check action, proposal review, delivery status, and accepted decisions.
+
+- [ ] Use the existing app development path and components. Render the common fixture by minute 45; no alternate React app or desktop packaging.
+- [ ] Write meaningful state checks: `offline_worker_is_not_displayed_as_current`; `approval_sends_expected_version_and_final_text`; `stale_conflict_requires_refresh`; `delivery_ack_required_for_success`; `proposal_text_is_rendered_as_untrusted_content`.
+- [ ] Run the specific tests from packages/app using its existing test setup and confirm intended failures; read its AGENTS.md before changes.
+- [ ] Build one route with two worker lanes and a central proposal area. Show owner, worker, session, last update, evidence references, and Flower run ID. Clearly label fixtures until real data replaces them.
+- [ ] Add Approve/Edit/Reject for the authorized target owner, an explicit Check team context action, and a separate Accept as project decision action. The server remains the authorization authority.
+- [ ] Integrate hub polling; show pending/failed/stale/delivered distinctly. Existing conversation links must target the intended server/session, not assume the viewer's localhost is the worker.
+- [ ] Run relevant app tests, `bun typecheck`, and a browser walkthrough at two viewport sizes. Verify the complete review/delivery flow with Serhat and Talha.
+- [ ] Commit with `feat(app): show team context and handoffs`.
+
+**Done when:** a viewer can explain who owns each resource, what crossed the boundary, why Flower proposed the action, who approved it, and whether the destination received it.
+
+**If time is short:** cards and a compact event list are enough. Cut animated graphs and full transcript mirroring before cutting the approval and delivery states.
+
+## Task 4 — Ferit: Flower summaries and coordination
 
 **Features:** F2 summaries; F3 evidence-based detection; F5 context retrieval; F6 Flower trace.
 
@@ -115,35 +138,12 @@ Ferit is the integration owner for shared schemas and the root manifest/lockfile
 
 **If time is short:** use the existing runtime model and an explicit check button. Defer native Grid routing, automatic provider selection, a separate verifier agent, and local inference.
 
-## Task 4 — Talha: shared overview and human review
-
-**Features:** F1 visibility; F4 approval controls; F5 decision view; F6 observable demo.
-
-**Create:** packages/app/src/pages/puff/index.tsx, project-api.ts, project-state.test.ts; packages/app/src/components/puff/session-card.tsx, proposal-card.tsx, decision-list.tsx. Modify only the necessary route in packages/app/src/app.tsx and app i18n resources.
-
-**Consumes:** Ferit's fixtures/snapshot API, proposal approval endpoint, context-request endpoint, and decision endpoint.
-
-**Produces:** one team overview with worker/session cards, source-linked summaries, context-check action, proposal review, delivery status, and accepted decisions.
-
-- [ ] Use the existing app development path and components. Render the common fixture by minute 45; no alternate React app or desktop packaging.
-- [ ] Write meaningful state checks: `offline_worker_is_not_displayed_as_current`; `approval_sends_expected_version_and_final_text`; `stale_conflict_requires_refresh`; `delivery_ack_required_for_success`; `proposal_text_is_rendered_as_untrusted_content`.
-- [ ] Run the specific tests from packages/app using its existing test setup and confirm intended failures; read its AGENTS.md before changes.
-- [ ] Build one route with two worker lanes and a central proposal area. Show owner, worker, session, last update, evidence references, and Flower run ID. Clearly label fixtures until real data replaces them.
-- [ ] Add Approve/Edit/Reject for the authorized target owner, an explicit Check team context action, and a separate Accept as project decision action. The server remains the authorization authority.
-- [ ] Integrate hub polling; show pending/failed/stale/delivered distinctly. Existing conversation links must target the intended server/session, not assume the viewer's localhost is the worker.
-- [ ] Run relevant app tests, `bun typecheck`, and a browser walkthrough at two viewport sizes. Verify the complete review/delivery flow with Ferit and Serhat.
-- [ ] Commit with `feat(app): show team context and handoffs`.
-
-**Done when:** a viewer can explain who owns each resource, what crossed the boundary, why Flower proposed the action, who approved it, and whether the destination received it.
-
-**If time is short:** cards and a compact event list are enough. Cut animated graphs and full transcript mirroring before cutting the approval and delivery states.
-
 ## Integration schedule
 
 | Elapsed | All-team checkpoint |
 | --- | --- |
 | 0:00–0:25 | Agree scope/contracts, verify toolchains, fixed demo roster and connectivity. Each owner uses a separate checkout based on current remote main; it includes Serhat's reviewed README. |
-| 0:25–0:45 | Serhat proves OpenCode capture/input; Ferit supplies fixtures/API; Serdar proves Flower structured round trip; Talha renders fixtures. Pair immediately on a blocked execution dependency. |
+| 0:25–0:45 | Talha proves OpenCode capture/input; Serhat supplies fixtures/API; Ferit proves Flower structured round trip; Serdar renders fixtures. Pair immediately on a blocked execution dependency. |
 | 0:45–2:00 | Implement owned slices against frozen contract. Verify and integrate small working commits into main early; do not wait for polish to share interfaces. |
 | 2:00–3:00 | First live vertical slice: both workers -> hub -> Flower -> proposal -> owner approval -> actual target session response. |
 | 3:00–4:00 | Add accepted decisions and new-session reuse; test stale source, duplicate approval, private session, and worker offline. |
@@ -152,11 +152,11 @@ Ferit is the integration owner for shared schemas and the root manifest/lockfile
 
 ## Working agreement
 
-- Read the spec and your task card before coding. Contract changes go through Ferit with all four owners informed; schema version changes require fixture updates.
+- Read the spec and your task card before coding. Contract changes go through Serhat with all four owners informed; schema version changes require fixture updates.
 - Each owner shares the working command, exact pushed commit, evidence of their checks, and known limitations. This document does not itself notify anyone or assign GitHub issues.
-- Ferit coordinates integration order: contracts and fixtures first; hub, worker, Flower, and UI slices follow as their interfaces work. Check each slice before committing and pushing it to main; authors preserve another person's in-progress changes.
+- Serhat coordinates integration order: contracts and fixtures first; hub, worker, Flower, and UI slices follow as their interfaces work. Check each slice before committing and pushing it to main; authors preserve another person's in-progress changes.
 - Use separate local clones, all on main. Fetch before every integration. If a push is rejected because main advanced, merge the incoming commits, rerun affected checks, and push normally. Do not create a PR or feature branch.
-- Each owner reserves the final hour for integration and testing. Serdar narrates the Flower run; Serhat and Ferit operate the two demo workers; Talha operates the overview and shows the approval flow.
+- Each owner reserves the final hour for integration and testing. Ferit narrates the Flower run; Talha and Serhat operate the two demo workers; Serdar operates the overview and shows the approval flow.
 - Checkpoints measure observed outcomes. A build, fixture response, live Flower run, and successful context delivery prove different things.
 
 ## Final acceptance rehearsal
