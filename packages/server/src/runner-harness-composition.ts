@@ -235,6 +235,7 @@ export function makeRunnerFactory(config: Config) {
           ),
         credentials,
         policy,
+        localExecution: lifecycle,
         runtimeFailed: lifecycle.runtimeFailed,
       })
       const ingestion = make({ sessions, events, permissions: permission })
