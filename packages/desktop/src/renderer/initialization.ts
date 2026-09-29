@@ -1,5 +1,19 @@
-export function initializationData<A>(state: (() => A | undefined) & { error: unknown }) {
-  if (state.error !== undefined) throw markLocalServerStartup(state.error)
+export function externalServerUrl(value: string | null | undefined) {
+  const input = value?.trim()
+  if (!input || !/^https?:\/\/[^/\\\s]+/i.test(input) || /[\\\s]/.test(input) || !URL.canParse(input)) return
+  const url = new URL(input)
+  if (url.username || url.password || url.search || url.hash) return
+  return input.replace(/\/+$/, "")
+}
+
+export function initializationData<A>(
+  state: (() => A | undefined) & { error: unknown },
+  defaultServer?: string | null,
+) {
+  if (state.error !== undefined) {
+    if (externalServerUrl(defaultServer)) return
+    throw markLocalServerStartup(state.error)
+  }
   return state()
 }
 
@@ -15,8 +29,11 @@ function markLocalServerStartup(error: unknown) {
   return failure
 }
 
-export function initializationReady<A>(state: (() => A | undefined) & { error: unknown; loading: boolean }) {
+export function initializationReady<A>(
+  state: (() => A | undefined) & { error: unknown; loading: boolean },
+  defaultServer?: string | null,
+) {
   if (state.loading) return false
-  initializationData(state)
+  initializationData(state, defaultServer)
   return true
 }
