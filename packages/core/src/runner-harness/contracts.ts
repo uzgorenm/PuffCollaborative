@@ -6,6 +6,7 @@ import type { Session } from "@opencode-ai/schema/session"
 import type { Effect } from "effect"
 import type { CoordinationContracts } from "../coordination/contracts"
 import type { Database } from "../database/database"
+import type { RunnerArtifacts } from "./artifacts"
 
 export type Failure = CoordinationContracts.Failure
 export type StartCommand = CoordinationContracts.RunnerCommand
@@ -78,6 +79,7 @@ export interface LocalExecution {
   readonly workspace?: WorkspaceIdentity
   readonly runtime?: RuntimeIdentity
   readonly admittedMessageId?: string
+  readonly artifactBaseline?: RunnerArtifacts.Baseline
 }
 
 export interface CallbackDraft {
@@ -165,10 +167,14 @@ export interface Runtimes {
   readonly watch: (input: {
     readonly execution: LocalExecution
     readonly session: Session.Info
-    readonly observe: Effect.Effect<void, Failure>
+    readonly readinessTimeoutMs: number
+    /** R6 signals readiness after listener registration and durable replay. */
+    readonly observe: (onReady: Effect.Effect<void>) => Effect.Effect<void, Failure>
   }) => Effect.Effect<void, Failure>
   readonly wake: (execution: LocalExecution) => Effect.Effect<void, Failure>
   readonly inspect: (execution: LocalExecution) => Effect.Effect<RuntimeInspection, Failure>
+  /** Wait for this Run's drain and scoped tools to settle before terminal reporting. */
+  readonly awaitIdle: (execution: LocalExecution, timeoutMs: number) => Effect.Effect<RuntimeInspection, Failure>
   readonly interrupt: (execution: LocalExecution) => Effect.Effect<InterruptionResult, Failure>
   /** Start the scoped callback-delivery tick only after R10 recovery has completed. */
   readonly startDelivery: (input: {
@@ -188,6 +194,7 @@ export interface Lifecycle {
     readonly workspace: WorkspaceIdentity
     readonly runtime: RuntimeIdentity
     readonly sessionId: Session.ID
+    readonly artifactBaseline: RunnerArtifacts.Baseline
   }) => Effect.Effect<LocalExecution, Failure>
   readonly admitted: (input: {
     readonly runId: Coordination.RunID
@@ -221,6 +228,7 @@ export interface EventIngestion {
     readonly execution: LocalExecution
     readonly session: Session.Info
     readonly onObservation: (observation: Observation) => Effect.Effect<void, Failure>
+    readonly onReady?: Effect.Effect<void>
   }) => Effect.Effect<void, Failure>
 }
 
@@ -261,21 +269,7 @@ export interface Recovery {
   readonly recover: Effect.Effect<void, Failure>
 }
 
-export interface Artifacts {
-  readonly baseline: (execution: LocalExecution) => Effect.Effect<{ readonly revision?: string; readonly dirtyPaths: ReadonlyArray<string> }, Failure>
-  readonly collect: (input: {
-    readonly execution: LocalExecution
-    readonly baseline: { readonly revision?: string; readonly dirtyPaths: ReadonlyArray<string> }
-  }) => Effect.Effect<{
-    readonly state: "complete" | "truncated" | "unavailable"
-    readonly changed: ReadonlyArray<{
-      readonly path: string
-      readonly status: "added" | "modified" | "deleted" | "renamed" | "untracked" | "binary" | "oversized"
-      readonly ref?: string
-    }>
-    readonly activity: ReadonlyArray<Coordination.RunnerActivity>
-  }, Failure>
-}
+export type Artifacts = RunnerArtifacts.Interface
 
 export interface Credentials {
   readonly verify: (owner: Coordination.ExecutionOwner) => Effect.Effect<void, Failure>
