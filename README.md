@@ -93,7 +93,7 @@ Build:
 - Stop and approval controls that bypass the instruction queue.
 Boundary: Decides what runs next, but does not implement agent execution or summaries.
 Demo test: Two teammates submit to the same thread. Both see the same queue, the second turn waits, and another thread continues independently.
-### — OpenCode execution and workspaces
+### Talha Aydn — OpenCode execution and workspaces
 Owns turning an authorized run into actual coding work.
 Build:
 - The adapter connecting each shared thread to its OpenCode session.
