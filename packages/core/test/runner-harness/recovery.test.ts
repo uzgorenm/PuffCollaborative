@@ -106,6 +106,7 @@ const fixture = (phase: LocalExecution["phase"]) =>
         attempt: 1,
         runnerMessageId: command.runnerMessageId,
         executionOwner: command.executionOwner,
+        leaseUntil: new Date(Date.now() + 60_000).toISOString(),
         createdAt: "2026-09-29T00:00:00.000Z",
       } as Coordination.Run,
       coordinatorAvailable: true,
@@ -336,6 +337,21 @@ describe("runner recovery with persisted SQLite records and dependency doubles",
       const setup = yield* fixture("admitted")
       yield* setup.admit()
       setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "completed" }
+      yield* setup.make().recover
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.starts).toHaveLength(0)
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("holds an unpromoted input after its reserved lease expires", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("admitted")
+      yield* setup.admit()
+      setup.state.coordinatorRun = {
+        ...setup.state.coordinatorRun,
+        leaseUntil: new Date(Date.now() - 1_000).toISOString(),
+      }
       yield* setup.make().recover
       expect(setup.state.execution.phase).toBe("recovery_required")
       expect(setup.state.starts).toHaveLength(0)
