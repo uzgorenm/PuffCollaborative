@@ -8,6 +8,7 @@ import type { Database } from "../../database/database"
 import { ProjectTable } from "../../project/sql"
 import { SessionTable } from "../../session/sql"
 import type { CoordinationContracts } from "../contracts"
+import type { SessionSelection } from "../access/selection"
 import { CommentTable } from "../comments/sql"
 import { ThreadTable } from "../threads/sql"
 import { threadFromRow } from "../threads/row"
@@ -28,6 +29,7 @@ export type Dependencies = {
   readonly queue: Pick<CoordinationContracts.Queue, "instructions">
   readonly projectAdmission: CoordinationContracts.ProjectAdmission
   readonly sessionBinding: CoordinationContracts.SessionBinding
+  readonly sessionSelection?: SessionSelection
   readonly members: { readonly hasMember: (userId: Coordination.UserID) => boolean }
 }
 
@@ -205,6 +207,12 @@ export function make(input: Dependencies): CoordinationContracts.Projects {
       if (!session || session.project_id !== request.projectId) return yield* Effect.fail(notFound)
       const binding = yield* input.sessionBinding.resolve(request.sessionId)
       if (binding.projectId !== request.projectId) return yield* Effect.fail(notFound)
+      const selected = input.sessionSelection
+        ? yield* input.sessionSelection
+            .canShareSession(request.auth.userId, request.projectId, request.sessionId, binding.workerId)
+            .pipe(Effect.mapError((error) => (error.code === "unavailable" ? error : forbidden)))
+        : false
+      if (!selected) return yield* Effect.fail(forbidden)
       const shared = yield* db
         .select({ id: ThreadTable.id })
         .from(ThreadTable)

@@ -1,5 +1,7 @@
 import { CoordinationAccess } from "@opencode-ai/core/coordination/access/index"
 import { load } from "@opencode-ai/core/coordination/access/identity"
+import { loadDevSessionSelection } from "@opencode-ai/core/coordination/access/selection"
+import type { SessionSelection } from "@opencode-ai/core/coordination/access/selection"
 import { CoordinationActivity } from "@opencode-ai/core/coordination/activity/activity"
 import { CoordinationApproval } from "@opencode-ai/core/coordination/approval/store"
 import { CoordinationComments } from "@opencode-ai/core/coordination/comments/index"
@@ -39,6 +41,7 @@ export interface CoordinationRunnerFactoryResult {
 export interface CoordinationPorts<R = never> {
   readonly projectAdmission?: CoordinationContracts.ProjectAdmission
   readonly sessionBinding?: CoordinationContracts.SessionBinding
+  readonly sessionSelection?: SessionSelection
   readonly runnerPort?: CoordinationContracts.RunnerPort
   readonly runnerFactory?: (
     input: CoordinationRunnerFactoryInput,
@@ -91,6 +94,14 @@ export const coordinationLayer = <R = never>(ports: CoordinationPorts<R> = {}) =
         assembled?.sessionBinding ??
         (workerId ? mockSessionBinding(database.db, workerId) : undefined)
       const port = ports.runnerPort ?? assembled?.runnerPort
+      const selectionPath = workerId ? process.env.OPENCODE_COORDINATION_DEV_SESSION_SELECTIONS_PATH : undefined
+      const selection =
+        ports.sessionSelection ??
+        (selectionPath
+          ? yield* loadDevSessionSelection(selectionPath).pipe(
+              Effect.match({ onFailure: () => undefined, onSuccess: (value) => value }),
+            )
+          : undefined)
       const missing = [
         ...(!binding ? ["Session binding"] : []),
         ...(!port && !workerId ? [ports.runnerFactory ? "runner factory" : "runner port"] : []),
@@ -104,6 +115,7 @@ export const coordinationLayer = <R = never>(ports: CoordinationPorts<R> = {}) =
         queue,
         projectAdmission: admission,
         sessionBinding: binding,
+        sessionSelection: selection,
         members: identity,
       })
       const comments = CoordinationComments.make({ db: database.db, access, events })

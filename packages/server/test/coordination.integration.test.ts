@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { Context } from "effect"
 
 type TestData = {
+  ready?: boolean
   id: string
   userId: string
   instruction: { id: string; queueSeq: number }
@@ -27,6 +28,7 @@ test("two members share queued turns, replay, approval, activity, and stale-card
   const dbPath = join(directory, "opencode.sqlite")
   const identitiesPath = join(directory, "identities.json")
   const admissionsPath = join(directory, "admissions.json")
+  const selectionsPath = join(directory, "selections.json")
   const projectId = "prj_coordination_http"
   const workerId = "wrk_coordination_http"
   const instanceId = "local-mock"
@@ -50,9 +52,23 @@ test("two members share queued turns, replay, approval, activity, and stale-card
     }),
   )
   await Bun.write(admissionsPath, JSON.stringify({ allowed: [{ userId: "usr_alice", projectId }] }))
+  await Bun.write(
+    selectionsPath,
+    JSON.stringify({
+      allowed: ["ses_coordination_one", "ses_coordination_two"]
+        .map((sessionId) => ({
+          userId: "usr_alice",
+          projectId,
+          sessionId,
+          workerId,
+        }))
+        .concat({ userId: "usr_alice", projectId, sessionId: "ses_coordination_three", workerId: "wrong-worker" }),
+    }),
+  )
   process.env.OPENCODE_DB = dbPath
   process.env.OPENCODE_COORDINATION_IDENTITIES_PATH = identitiesPath
   process.env.OPENCODE_COORDINATION_ADMISSIONS_PATH = admissionsPath
+  process.env.OPENCODE_COORDINATION_DEV_SESSION_SELECTIONS_PATH = selectionsPath
   process.env.OPENCODE_COORDINATION_MOCK_RUNNER = "1"
   process.env.OPENCODE_COORDINATION_MOCK_WORKER_ID = workerId
   process.env.OPENCODE_COORDINATION_MOCK_INSTANCE_ID = instanceId
@@ -85,7 +101,7 @@ test("two members share queued turns, replay, approval, activity, and stale-card
     sqlite
       .query("INSERT INTO project (id, worktree, sandboxes, time_created, time_updated) VALUES (?, ?, ?, ?, ?)")
       .run(projectId, directory, "[]", now, now)
-    for (const id of ["ses_coordination_one", "ses_coordination_two"])
+    for (const id of ["ses_coordination_one", "ses_coordination_two", "ses_coordination_three"])
       sqlite
         .query(
           "INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -124,6 +140,20 @@ test("two members share queued turns, replay, approval, activity, and stale-card
     })
     expect(member.response.status).toBe(200)
     expect(member.data?.userId).toBe("usr_bob")
+    const unselected = await request(`/api/coordination/v1/projects/${projectId}/threads`, "bob", "POST", {
+      sessionId: "ses_coordination_one",
+      title: "Forged selection",
+      requestId: "bob-share-unselected",
+      selectedBy: "usr_alice",
+      workerId,
+    })
+    expect(unselected.response.status).toBe(403)
+    const wrongWorker = await request(`/api/coordination/v1/projects/${projectId}/threads`, "alice", "POST", {
+      sessionId: "ses_coordination_three",
+      title: "Wrong worker grant",
+      requestId: "share-wrong-worker",
+    })
+    expect(wrongWorker.response.status).toBe(403)
     const threads = [] as string[]
     for (const [index, sessionId] of ["ses_coordination_one", "ses_coordination_two"].entries()) {
       const result = await request(`/api/coordination/v1/projects/${projectId}/threads`, "alice", "POST", {
@@ -296,13 +326,27 @@ test("two members share queued turns, replay, approval, activity, and stale-card
     expect(secondDecision.response.status).toBe(200)
     await waitFor(threads[0], "completed", second.data!.run.id)
     await app.dispose()
+    delete process.env.OPENCODE_COORDINATION_DEV_SESSION_SELECTIONS_PATH
     app = webHandler()
+    const statusWithoutSelection = await request("/api/coordination/v1/status")
+    expect(statusWithoutSelection.response.status).toBe(200)
+    expect(statusWithoutSelection.data?.ready).toBe(true)
     const restored = await snapshot(threads[0])
     expect(restored.runs.filter((run: { state: string }) => run.state === "completed").length).toBe(2)
     expect(restored.workCard?.version).toBe(1)
     const restoredReplay = await request(`/api/coordination/v1/threads/${threads[0]}/events?after=${cursor}`, "bob")
     expect(restoredReplay.response.status).toBe(200)
     expect(restoredReplay.data?.events.some((event) => event.kind === "comment.created")).toBe(true)
+    expect((await request(`/api/coordination/v1/threads/${threads[0]}`, "bob")).response.status).toBe(200)
+    expect(
+      (
+        await request(`/api/coordination/v1/projects/${projectId}/threads`, "alice", "POST", {
+          sessionId: "ses_coordination_three",
+          title: "No selection source",
+          requestId: "share-after-grant-removed",
+        })
+      ).response.status,
+    ).toBe(403)
   } finally {
     await app.dispose()
     await rm(directory, { recursive: true, force: true })

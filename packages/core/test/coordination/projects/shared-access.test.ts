@@ -20,6 +20,8 @@ const mallory = { kind: "member", userId: Coordination.UserID.make("usr_mallory"
 const projectId = Coordination.ProjectID.make("prj_shared_fixture")
 const unsharedProjectId = Coordination.ProjectID.make("prj_unshared_fixture")
 const sessionId = Coordination.Thread.fields.sessionId.make("ses_shared_fixture")
+const unselectedSessionId = Coordination.Thread.fields.sessionId.make("ses_unselected_fixture")
+const otherProjectSessionId = Coordination.Thread.fields.sessionId.make("ses_other_project_fixture")
 const workerId = Coordination.WorkerID.make("worker_fixture")
 const makeDb = EffectDrizzleSqlite.makeWithDefaults()
 
@@ -69,16 +71,38 @@ describe("shared project access with mocked event, queue, project admission and 
           .run()
         yield* db
           .insert(SessionTable)
-          .values({
-            id: sessionId,
-            project_id: projectId,
-            slug: "shared-fixture",
-            directory: "/tmp/coordination-shared-fixture",
-            title: "Shared fixture",
-            version: "test",
-            time_created: now,
-            time_updated: now,
-          })
+          .values([
+            {
+              id: sessionId,
+              project_id: projectId,
+              slug: "shared-fixture",
+              directory: "/tmp/coordination-shared-fixture",
+              title: "Shared fixture",
+              version: "test",
+              time_created: now,
+              time_updated: now,
+            },
+            {
+              id: unselectedSessionId,
+              project_id: projectId,
+              slug: "unselected-fixture",
+              directory: "/tmp/coordination-shared-fixture",
+              title: "Unselected fixture",
+              version: "test",
+              time_created: now,
+              time_updated: now,
+            },
+            {
+              id: otherProjectSessionId,
+              project_id: unsharedProjectId,
+              slug: "other-project-fixture",
+              directory: "/tmp/coordination-unshared-fixture",
+              title: "Other project fixture",
+              version: "test",
+              time_created: now,
+              time_updated: now,
+            },
+          ])
           .run()
 
         const events: Coordination.Event[] = []
@@ -103,6 +127,20 @@ describe("shared project access with mocked event, queue, project admission and 
             Effect.succeed(userId === alice.userId || (userId === mallory.userId && requestedProjectId === projectId)),
         }
         const sessionBinding = { resolve: () => Effect.succeed({ projectId, workerId }) }
+        const sessionSelection = {
+          canShareSession: (
+            userId: Coordination.UserID,
+            selectedProjectId: Coordination.ProjectID,
+            selectedSessionId: Coordination.Thread["sessionId"],
+            selectedWorkerId: Coordination.WorkerID,
+          ) =>
+            Effect.succeed(
+              userId === alice.userId &&
+                selectedProjectId === projectId &&
+                selectedSessionId === sessionId &&
+                selectedWorkerId === workerId,
+            ),
+        }
         const members = {
           hasMember: (userId: Coordination.UserID) => [alice.userId, bob.userId, eve.userId].includes(userId),
         }
@@ -113,6 +151,7 @@ describe("shared project access with mocked event, queue, project admission and 
           queue,
           projectAdmission,
           sessionBinding,
+          sessionSelection,
           members,
         })
         const comments = CoordinationComments.make({ db, access, events: { append } })
@@ -184,6 +223,54 @@ describe("shared project access with mocked event, queue, project admission and 
           }),
           "not_found",
         )
+        const projectsWithoutSelection = CoordinationProjects.make({
+          db,
+          access,
+          events: { append },
+          queue,
+          projectAdmission,
+          sessionBinding,
+          members,
+        })
+        yield* assertForbidden(
+          projectsWithoutSelection.createThread({
+            auth: alice,
+            projectId,
+            sessionId,
+            title: "No trusted selection source",
+            requestId: "alice-share-without-selection",
+          }),
+        )
+        yield* assertForbidden(
+          projects.createThread({
+            auth: bob,
+            projectId,
+            sessionId,
+            title: "Unselected session",
+            requestId: "bob-share-unselected",
+          }),
+        )
+        yield* assertForbidden(
+          projects.createThread({
+            auth: alice,
+            projectId,
+            sessionId: unselectedSessionId,
+            title: "Wrong Session grant",
+            requestId: "alice-share-wrong-session",
+          }),
+        )
+        yield* assertFailure(
+          projects.createThread({
+            auth: alice,
+            projectId,
+            sessionId: otherProjectSessionId,
+            title: "Other project Session",
+            requestId: "alice-share-other-project-session",
+          }),
+          "not_found",
+        )
+        expect(yield* projects.listThreads(alice, projectId)).toEqual([])
+        expect(events.map((event) => event.kind)).toEqual(["project.created", "membership.changed"])
         const shareRequest = {
           auth: alice,
           projectId,

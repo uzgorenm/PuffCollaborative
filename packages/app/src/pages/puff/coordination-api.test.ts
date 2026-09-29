@@ -37,3 +37,14 @@ test("the_real_status_503_does_not_fall_back_to_live_fixture_data", async () => 
     }),
   ).rejects.toMatchObject({ code: "unavailable", status: 503 })
 })
+
+test("ready_false_blocks_the_connection_even_when_status_is_200", async () => {
+  await expect(
+    checkCoordination({
+      baseUrl: "https://hub.example",
+      username: "serdar",
+      password: "test-only",
+      transport: async () => Response.json({ ready: false }),
+    }),
+  ).rejects.toMatchObject({ code: "unavailable" })
+})
