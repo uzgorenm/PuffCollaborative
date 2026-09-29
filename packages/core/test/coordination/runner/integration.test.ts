@@ -8,6 +8,7 @@ import { CoordinationApproval } from "@opencode-ai/core/coordination/approval/st
 import { RunnerAdapter } from "@opencode-ai/core/coordination/runner/adapter"
 import { MockRunner } from "@opencode-ai/core/coordination/runner/mock"
 import { Database } from "@opencode-ai/core/database/database"
+import { DatabaseMigration } from "@opencode-ai/core/database/migration"
 import { EventV2 } from "@opencode-ai/core/event"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -50,14 +51,7 @@ const access: CoordinationContracts.Access = {
 const services = Effect.gen(function* () {
   const db = (yield* Database.Service).db
   const events = yield* CoordinationEvents.Service
-  yield* db
-    .transaction((tx) =>
-      Effect.gen(function* () {
-        yield* queueMigration.up(tx)
-        yield* approvalMigration.up(tx)
-      }),
-    )
-    .pipe(Effect.orDie)
+  yield* DatabaseMigration.applyOnly(db, [approvalMigration, queueMigration]).pipe(Effect.orDie)
   const queue = CoordinationQueue.make({ db, access, events, now: () => Date.parse(date) })
   const approvals = CoordinationApproval.make({ db, events, access, queue, now: () => Date.parse(date) })
   return { queue, approvals, events }
