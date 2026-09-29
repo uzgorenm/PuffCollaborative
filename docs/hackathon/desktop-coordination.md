@@ -8,7 +8,7 @@ Serdar authorized the coordinator chat, **Set up Flower development**, to direct
 
 | Resource | Owner | Other agents can do |
 | --- | --- | --- |
-| Main integration checkout and pushes | Coordinator | Supply exact ready commits and evidence; do not concurrently push main |
+| Main integration Git, clean publication checkout and pushes | Coordinator | Supply exact ready commits and evidence; do not concurrently push main or edit the publication checkout |
 | Next UI composition | Review README for task workflow, with coordinator-only Git writes | Edit only the files assigned in next-development.md |
 | Context-panel files | Read the project README | Suggest changes through R2/R3 reports; do not edit the same files |
 | Shared desktop mouse, keyboard and focus | Native QA after the frontend lead's release | Inspect source and existing captures; no native interaction |
@@ -20,8 +20,8 @@ This is a coordination protocol, not an operating-system lock. The coordinator i
 
 ## Active access record
 
-- **Interactive desktop owner:** native QA, `Summarize current team work`. The frontend lead explicitly released the final instance after committing `f4c8ad9ee4`; coordinator confirmed the transfer.
-- **Next owner:** unassigned. The frontend lead and all reviewers stay source-only until QA explicitly releases control and the coordinator assigns the next owner.
+- **Interactive desktop owner:** unassigned. Native QA explicitly released CDP9223; the frontend lead then completed polling-focus fix `65767b5f31` on `serdar/ui` and explicitly released native input. Its next assignment is source-only in the integration checkout.
+- **Next owner:** unassigned. All chats remain source-only until the coordinator assigns the next native pass.
 - **Current UI checkout:** `PuffCollaborative-serdar-ui`; integration uses a separate `PuffCollaborative-main-integration` checkout. The original checkout remains untouched.
 - **Known development backend:** `127.0.0.1:4466`, explicitly synthetic/mock fixture. Treat the source/runtime identity from the latest lead handoff as authoritative; never publish credentials here.
 - **Final QA target:** profile `/tmp/puff-serdar-ui-desktop`, renderer port 5175, debugging port 9223, source checkpoint `f4c8ad9ee4` on `serdar/ui`. Verify instance identity before any action. This already-running window is not a freshly launched main-integration build.
