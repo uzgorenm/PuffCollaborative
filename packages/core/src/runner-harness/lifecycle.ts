@@ -2,13 +2,16 @@ export * as RunnerLifecycle from "./lifecycle"
 
 import { and, eq } from "drizzle-orm"
 import { Cause, Effect, Exit, Option } from "effect"
+import { isDeepStrictEqual } from "node:util"
 import type { Coordination } from "@opencode-ai/schema/coordination"
 import { SessionMessage } from "../session/message"
 import { SessionV2 } from "../session"
 import type { Database } from "../database/database"
 import { KeyedMutex } from "../effect/keyed-mutex"
+import { Hash } from "../util/hash"
 import { ExecutionTable } from "./sql"
 import type {
+  Artifacts,
   AuthorizedRun,
   CallbackDraft,
   Credentials,
@@ -36,10 +39,12 @@ export interface Dependencies {
   readonly runtimes: Runtimes
   readonly ingestion: EventIngestion
   readonly delivery: ReportDelivery
+  readonly artifacts: Artifacts
   readonly approvals: Pick<import("./contracts").Approvals, "requested" | "invalidate">
   readonly recovery: Recovery
   readonly now?: () => number
   readonly readinessTimeoutMs?: number
+  readonly settlementTimeoutMs?: number
 }
 
 const terminal = new Set<LocalPhase>(["completed", "failed", "cancelled"])
@@ -96,6 +101,8 @@ export function make(input: Dependencies): Lifecycle {
           ? { runtime: { id: row.runtime_id, workerId: row.worker_id, instanceId: row.instance_id } }
           : {}),
         ...(row.admitted_message_id ? { admittedMessageId: row.admitted_message_id } : {}),
+        ...(row.artifact_baseline ? { artifactBaseline: row.artifact_baseline } : {}),
+        ...(row.artifact_report ? { artifactReport: row.artifact_report } : {}),
       } satisfies LocalExecution
     })
 
@@ -183,8 +190,16 @@ export function make(input: Dependencies): Lifecycle {
       return yield* load(row)
     })
 
-  const prepared: Lifecycle["prepared"] = ({ runId, workspace, runtime, sessionId }) =>
+  const prepared: Lifecycle["prepared"] = ({ runId, workspace, runtime, sessionId, artifactBaseline }) =>
     Effect.gen(function* () {
+      if (
+        artifactBaseline.runId !== runId ||
+        artifactBaseline.threadId !== workspace.threadId ||
+        artifactBaseline.projectId !== workspace.projectId ||
+        artifactBaseline.workspaceId !== workspace.id ||
+        artifactBaseline.directoryHash !== Hash.sha256(workspace.directory)
+      )
+        return yield* Effect.fail(failure("conflict", "Artifact baseline belongs to another Run or workspace"))
       const row = yield* input.db
         .transaction((tx) =>
           Effect.gen(function* () {
@@ -207,7 +222,8 @@ export function make(input: Dependencies): Lifecycle {
               if (
                 current.workspace_id !== workspace.id ||
                 current.workspace_directory !== workspace.directory ||
-                current.runtime_id !== runtime.id
+                current.runtime_id !== runtime.id ||
+                !isDeepStrictEqual(current.artifact_baseline, artifactBaseline)
               )
                 return yield* Effect.fail(failure("conflict", "Prepared Run identity changed"))
               return current
@@ -221,6 +237,7 @@ export function make(input: Dependencies): Lifecycle {
                 workspace_id: workspace.id,
                 workspace_directory: workspace.directory,
                 runtime_id: runtime.id,
+                artifact_baseline: artifactBaseline,
                 updated_at: now(),
               })
               .where(and(eq(ExecutionTable.run_id, runId), eq(ExecutionTable.phase, "accepted")))
@@ -277,10 +294,12 @@ export function make(input: Dependencies): Lifecycle {
       return yield* load(row)
     })
 
-  const transition: Lifecycle["transition"] = ({ runId, expected, next, callbacks }) =>
+  const transition: Lifecycle["transition"] = ({ runId, expected, next, callbacks, artifactReport }) =>
     Effect.gen(function* () {
       if (terminal.has(expected) || (expected !== next && !allowed[expected].has(next)))
         return yield* Effect.fail(failure("conflict", `Invalid local transition: ${expected} to ${next}`))
+      if (artifactReport && !terminal.has(next))
+        return yield* Effect.fail(failure("invalid", "Artifact report requires a terminal transition"))
       if (callbacks.some((draft) => draft.runId !== runId))
         return yield* Effect.fail(failure("conflict", "Callback belongs to another Run"))
       if (
@@ -310,6 +329,16 @@ export function make(input: Dependencies): Lifecycle {
             if (current.phase !== expected)
               return yield* Effect.fail(failure("conflict", "Stale local Run observation"))
             if (
+              artifactReport &&
+              (artifactReport.runId !== runId ||
+                artifactReport.threadId !== current.thread_id ||
+                artifactReport.projectId !== current.project_id ||
+                artifactReport.sessionId !== current.session_id ||
+                artifactReport.workspaceId !== current.workspace_id ||
+                artifactReport.baseline !== current.artifact_baseline?.revision)
+            )
+              return yield* Effect.fail(failure("conflict", "Artifact report belongs to another execution"))
+            if (
               callbacks.some(
                 (draft) =>
                   draft.sourceSessionSeq !== undefined &&
@@ -329,6 +358,7 @@ export function make(input: Dependencies): Lifecycle {
                 updated_at: now(),
                 ...(sourceSeq >= 0 ? { last_session_seq: sourceSeq } : {}),
                 ...(terminal.has(next) ? { terminal_at: now() } : {}),
+                ...(artifactReport ? { artifact_report: artifactReport } : {}),
               })
               .where(and(eq(ExecutionTable.run_id, runId), eq(ExecutionTable.phase, expected)))
               .returning()
@@ -532,6 +562,14 @@ export function make(input: Dependencies): Lifecycle {
       })
     })
 
+  const holdObservation = (execution: LocalExecution, sourceKey: string) =>
+    transition({
+      runId: execution.run.command.runId,
+      expected: execution.phase,
+      next: "recovery_required",
+      callbacks: [recoveryDraft(execution, sourceKey)],
+    }).pipe(Effect.andThen(input.delivery.flush(execution.run.command.runId)))
+
   const onObservation = (observed: Observation) =>
     observations.withLock(observed.runId)(
       Effect.gen(function* () {
@@ -604,14 +642,63 @@ export function make(input: Dependencies): Lifecycle {
         }
         if (current.phase !== "running" && !(observed.kind === "failed" && current.phase === "admitted")) return
         if (!current.runtime) return
-        const inspection = yield* input.runtimes.inspect(current)
-        if (inspection.sessionId !== current.run.session.id || inspection.runtime.id !== current.runtime.id) return
-        if (inspection.state !== "idle" || inspection.activeTools !== 0) return
+        const inspected = yield* input.runtimes
+          .awaitIdle(current, input.settlementTimeoutMs ?? 30_000)
+          .pipe(Effect.exit)
+        const settled = yield* get(observed.runId)
+        if (!settled || settled.phase !== current.phase) return
+        if (!settled.runtime) {
+          yield* holdObservation(settled, `observation:${observed.sourceKey}:missing-runtime`)
+          return
+        }
+        if (
+          Exit.isFailure(inspected) ||
+          inspected.value.sessionId !== settled.run.session.id ||
+          inspected.value.runtime.id !== settled.runtime.id ||
+          inspected.value.runtime.workerId !== settled.runtime.workerId ||
+          inspected.value.runtime.instanceId !== settled.runtime.instanceId ||
+          inspected.value.state !== "idle" ||
+          inspected.value.activeTools !== 0
+        ) {
+          yield* holdObservation(settled, `observation:${observed.sourceKey}:unsettled`)
+          return
+        }
+        if (!settled.artifactBaseline) {
+          yield* holdObservation(settled, `observation:${observed.sourceKey}:missing-baseline`)
+          return
+        }
+        const collected = yield* input.artifacts
+          .collect({ execution: settled, baseline: settled.artifactBaseline })
+          .pipe(Effect.exit)
+        const verified = yield* get(observed.runId)
+        if (!verified || verified.phase !== settled.phase) return
+        if (Exit.isFailure(collected)) {
+          yield* holdObservation(verified, `observation:${observed.sourceKey}:artifact-error`)
+          return
+        }
+        const activities =
+          verified.phase === "running"
+            ? collected.value.activity.map(
+                (activity, index): CallbackDraft => ({
+                  runId: observed.runId,
+                  producerKey: `artifact:${observed.sourceKey}:${index}`,
+                  callback: { kind: "activity", state: "running", activity },
+                }),
+              )
+            : []
+        for (let offset = 0; offset < activities.length; offset += 64)
+          yield* transition({
+            runId: observed.runId,
+            expected: verified.phase,
+            next: verified.phase,
+            callbacks: activities.slice(offset, offset + 64),
+          })
         const next = observed.kind === "settled" ? "completed" : "failed"
         yield* transition({
           runId: observed.runId,
-          expected: current.phase,
+          expected: verified.phase,
           next,
+          artifactReport: collected.value,
           callbacks: [
             {
               runId: observed.runId,
@@ -619,7 +706,7 @@ export function make(input: Dependencies): Lifecycle {
               sourceSessionSeq: observed.sourceSessionSeq,
               callback: {
                 kind: "state",
-                expectedState: current.phase === "admitted" ? "reserved" : "running",
+                expectedState: verified.phase === "admitted" ? "reserved" : "running",
                 nextState: next,
               },
             },
@@ -684,8 +771,12 @@ export function make(input: Dependencies): Lifecycle {
             )
               return yield* Effect.fail(failure("unavailable", "OpenCode Session is already active or uncertain"))
           }
+          const artifactBaseline =
+            accepted.phase === "accepted" ? yield* input.artifacts.baseline(ready) : accepted.artifactBaseline
+          if (!artifactBaseline)
+            return yield* Effect.fail(failure("unavailable", "Prepared Run has no durable artifact baseline"))
           yield* watch(ready)
-          return { workspace, runtime, session, ready }
+          return { workspace, runtime, session, ready, artifactBaseline }
         }).pipe(Effect.exit)
         if (Exit.isFailure(setup)) {
           const error = Cause.findErrorOption(setup.cause)
@@ -730,6 +821,7 @@ export function make(input: Dependencies): Lifecycle {
           workspace: setup.value.workspace,
           runtime: setup.value.runtime,
           sessionId: setup.value.session.id,
+          artifactBaseline: setup.value.artifactBaseline,
         })
         const admission = yield* input.sessions
           .prompt({
@@ -783,7 +875,9 @@ export function make(input: Dependencies): Lifecycle {
       return yield* input.runtimes.watch({
         execution,
         session: execution.run.session,
-        observe: input.ingestion.observe({ execution, session: execution.run.session, onObservation }),
+        readinessTimeoutMs: input.readinessTimeoutMs ?? 30_000,
+        observe: (onReady) =>
+          input.ingestion.observe({ execution, session: execution.run.session, onObservation, onReady }),
       })
     })
 

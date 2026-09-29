@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "4ec74f26-06eb-45e7-9ca2-6e1f12bd1dc9",
+  "id": "67fdca1e-afc3-4662-bffa-c34025f9f78b",
   "prevIds": [
-    "7387f176-f1e9-4c01-a3e3-628f827f1264"
+    "4ec74f26-06eb-45e7-9ca2-6e1f12bd1dc9"
   ],
   "ddl": [
     {
@@ -2021,6 +2021,16 @@
       "default": null,
       "generated": null,
       "name": "artifact_baseline",
+      "entityType": "columns",
+      "table": "runner_harness_execution"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "artifact_report",
       "entityType": "columns",
       "table": "runner_harness_execution"
     },
