@@ -74,6 +74,8 @@ export function ConnectedWorkspace() {
     ?? workspace?.threads.find(item => item.ownerId === workspace.viewer.id)?.id
   const runnerLabel = workspace?.runnerAvailability === "model_configuration_missing"
     ? "Connect a coding model to run this session. Your messages and source context are saved in your session."
+    : workspace?.runnerAvailability === "provider_auth_failed"
+      ? "Your coding model rejected its credential. Update the provider key to run this session."
     : workspace?.runnerAvailability && ["configured", "model_configured"].includes(workspace.runnerAvailability)
       ? "Coding model configured. Run status shows whether it can execute."
       : workspace?.runnerAvailability && ["ready", "available"].includes(workspace.runnerAvailability)

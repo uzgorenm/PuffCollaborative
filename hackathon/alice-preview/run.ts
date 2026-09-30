@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, realpath } from "node:fs/promises"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
+import { provisionNativeConfig } from "./native-config"
 
 const repository = resolve(import.meta.dir, "../..")
 const checkOnly = process.argv.includes("--check-only")
@@ -134,6 +135,9 @@ const configPath = process.env.PUFF_MODEL_CONFIG_PATH
 const config = configPath ? await Bun.file(configPath).json() : undefined
 if (configPath && (!config?.model || typeof config.model !== "string" || !config.model.includes("/")))
   throw new Error("PUFF_MODEL_CONFIG_PATH must name an OpenCode JSON config with an explicit provider/model")
+// The native Session runner reads Config.Service from files, while the legacy
+// CLI reads OPENCODE_CONFIG_CONTENT. Provision both through their existing loaders.
+const nativeConfig = await provisionNativeConfig(directory, config, configPath)
 const model = config?.model
   ? {
       providerID: config.model.slice(0, config.model.indexOf("/")),
@@ -154,6 +158,7 @@ const env = {
   OPENCODE_DISABLE_MODELS_FETCH: "1",
   OPENCODE_DISABLE_PROJECT_CONFIG: "1",
   OPENCODE_DISABLE_AUTOUPDATE: "1",
+  OPENCODE_CONFIG_DIR: nativeConfig.directory,
   OPENCODE_CONFIG_CONTENT: JSON.stringify(config ?? { formatter: false, lsp: false }),
   OPENCODE_COORDINATION_IDENTITIES_PATH: identityPath,
   OPENCODE_COORDINATION_ADMISSIONS_PATH: admissionPath,
@@ -446,10 +451,27 @@ try {
       callback: { kind: "state", expectedState: "reserved", nextState: "running" },
     },
   )
-  const afterReserve = requireOK(
+  let afterReserve = requireOK(
     await request<Snapshot>(`/api/coordination/v1/threads/${targetThread.id}`, "serdar"),
     "Read actual runner state",
   )
+  // Capture a settled native result when it arrives promptly. A configured
+  // provider alone is never evidence of a successful model response.
+  if (config && actualReserve.status === 200) {
+    const settleDeadline = Date.now() + 20_000
+    while (
+      Date.now() < settleDeadline &&
+      !["completed", "failed", "cancelled", "waiting_approval", "recovery_required"].includes(
+        afterReserve.runs.find((run) => run.id === first.run.id)?.state ?? "",
+      )
+    ) {
+      await Bun.sleep(200)
+      afterReserve = requireOK(
+        await request<Snapshot>(`/api/coordination/v1/threads/${targetThread.id}`, "serdar"),
+        "Read receiving Run result",
+      )
+    }
+  }
   const persisted = new Database(env.OPENCODE_DB, { readonly: true })
   const actualExecution = persisted
     .query<
@@ -461,18 +483,48 @@ try {
     .count
   const sessionMessages = persisted.query<{ count: number }, []>("SELECT count(*) AS count FROM session_message").get()!
     .count
+  const assistant = persisted
+    .query<
+      { id: string; seq: number; data: string },
+      []
+    >("SELECT id, seq, data FROM session_message WHERE session_id = 'ses_serdar_preview' AND type = 'assistant' ORDER BY seq DESC LIMIT 1")
+    .get()
   persisted.close()
+  const assistantData = assistant ? JSON.parse(assistant.data) : undefined
+  const providerHttpStatus =
+    typeof assistantData?.error?.message === "string"
+      ? Number(/HTTP (\d{3})\b/.exec(assistantData.error.message)?.[1]) || undefined
+      : undefined
+  const runState = afterReserve.runs.find((run) => run.id === first.run.id)?.state
+  const modelOutcome = !assistant
+    ? "not_observed"
+    : assistantData.error
+      ? "failed"
+      : runState === "completed"
+        ? "completed"
+        : "pending"
   const runnerAvailability = {
     configured: Boolean(config),
     mock: false,
+    runId: first.run.id,
     reserveHttpStatus: actualReserve.status,
     reserveResponse: actualReserve.data,
-    runState: afterReserve.runs.find((run) => run.id === first.run.id)?.state,
+    runState,
     localPhase: actualExecution?.phase,
     admittedInputs,
     sessionMessages,
+    modelOutcome,
+    providerHttpStatus,
+    assistantMessageId: assistant?.id,
+    assistantSeq: assistant?.seq,
     message: config
-      ? "Real OpenCode adapter uses the explicitly supplied provider/model configuration."
+      ? actualReserve.status !== 200
+        ? "The model is configured, but the actual OpenCode adapter could not prepare execution. No model input was admitted."
+        : modelOutcome === "failed"
+          ? `Real OpenCode admitted the task, but the provider request failed${providerHttpStatus ? ` with HTTP ${providerHttpStatus}` : ""}. The failed native assistant receipt is preserved; no successful model output was observed.`
+          : modelOutcome === "completed"
+            ? "The real OpenCode receiving task completed with a native model response."
+            : "Real OpenCode admitted the task using the configured model. Its successful completion has not been observed."
       : "No real model configuration was supplied. The actual OpenCode adapter rejected preparation; no model executed. Supply PUFF_MODEL_CONFIG_PATH and restart the isolated preview.",
   }
   const member = people.find((person) => person.username === "serdar")!
@@ -490,7 +542,11 @@ try {
         targetThreadId: targetThread.id,
         credentialsPath,
         capturePath: join(directory, "capture.json"),
-        runnerAvailability: config ? "configured" : "model_configuration_missing",
+        runnerAvailability: config
+          ? [401, 403].includes(providerHttpStatus ?? 0)
+            ? "provider_auth_failed"
+            : "configured"
+          : "model_configuration_missing",
         runnerDiagnostics: runnerAvailability,
       },
       null,

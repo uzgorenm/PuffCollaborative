@@ -22,7 +22,11 @@ To enable real OpenCode execution, supply an existing OpenCode JSON config with 
 PUFF_MODEL_CONFIG_PATH=/absolute/path/to/opencode.json bun hackathon/alice-preview/run.ts
 ```
 
-The configuration is loaded through the backend's existing `OPENCODE_CONFIG_CONTENT` path. Provider credentials may be supplied by the config or its supported environment variables. The launcher selects that explicit model for both Sessions, attempts the initial task, and polls the real reserve route for subsequent user instructions. The current runner is a trusted local worker, as documented by the existing runner contract. No Flower analysis is invoked by this preview. WorkCard projection is labeled as the recorded human fixture service.
+The launcher provisions a private `0600` `opencode.json` in the isolated global config directory read by the native `Config.Service`, and sets `OPENCODE_CONFIG_DIR` to that directory. It also supplies `OPENCODE_CONFIG_CONTENT` for the legacy CLI loader. The native file loader does not expand CLI variables, so the launcher resolves `{env:NAME}` and `{file:path}` references into the private config before starting the backend. The parent directories are private; resolved credentials and server logs are never printed or returned through the product proxy.
+
+The launcher selects the explicit model for both Sessions, attempts the initial task, and waits briefly for a native result before writing `runnerDiagnostics`. That receipt distinguishes configuration, admitted inputs, native assistant messages, terminal Run state and any provider HTTP error. It polls the real reserve route for later user instructions. The runner is a trusted local worker under the existing runner contract. WorkCard projection is labeled as the recorded human fixture service.
+
+The approved Flower receiving-session test used the official `flower-labs/flwrlabs/endeavor-1.0` model with `@ai-sdk/openai` and the Responses API at `https://api.flower.ai/v1`. The actual reservation succeeded and the task was promoted into the native Session. Its persisted assistant receipt then failed with provider HTTP 401; no successful model output was observed. The configured state alone does not establish usable provider access. Provider setup follows the [official Flower OpenCode guide](https://flower.ai/docs/model/endeavor-opencode.html).
 
 For Flower Endeavor, `opencode.flower.example.json` follows [Flower's official OpenCode setup](https://flower.ai/docs/model/endeavor-opencode.html): the OpenAI SDK uses Responses at `https://api.flower.ai/v1`. Set `FLOWER_API_KEY` in the launching environment, or use a private config with a `{file:/absolute/path/to/key}` reference. No user-wide OpenCode settings are changed. A private file-backed configuration was prepared during this implementation; both the SuperGrid Control preflight and the explicitly approved `/v1/models` check returned HTTP 401 with the supplied credential. Those failures establish that these endpoints rejected the key; they do not establish its expiration or other product scope.
 
@@ -32,11 +36,14 @@ Run the isolated API/process verification from its directory (the repository roo
 cd hackathon/alice-preview
 bun test integration.test.ts
 bun test web.integration.test.ts
+bun test native-config.test.ts
 ```
 
 This uses backend port 4479 and verifies the measured collision/recovery, exact evidence, invalid evidence rejection, stale WorkCard rejection, exact retries, conflicting retries, outsider access denial, member reserve denial, stale worker callback denial, and exclusion of an unshared Session. Harness mode deliberately closes runtime HTTP routes, including `/api/session/:id/history`; the React source view reads authenticated coordination comments and event replay instead. The product's source reuse action is an explicit queued instruction requested by the owner, not automatic cross-session awareness or an already consumed model input.
 
 The web integration check starts a separate backend on port 4480 and calls the same proxy used by the Next.js route. It checks owner-only writes, cross-origin rejection, source and target revisions, unrelated errors, preserved tasks, one context instruction after retries, and reconciliation after a later source correction.
+
+The native config regression loads the provisioned provider through the actual `Config.Service`, checks migration to the Responses provider, file-reference escaping, and private permissions. It uses a test-only credential and makes no network or inference request.
 
 ## Published Flower guardian
 
