@@ -1,0 +1,84 @@
+.connected-shell { min-height: 0; }
+.connected-shell button:disabled { opacity: .5; cursor: default; }
+.connected-shell button:focus-visible, .connected-shell a:focus-visible { outline: 2px solid #adbf9f; outline-offset: 3px; }
+.connected-sidebar-list { min-height: 0; flex: 1; overflow-y: auto; margin-top: 22px; }
+.connected-status { display: inline-flex; align-items: center; gap: 7px; color: #b2bdab; font-size: 10px; white-space: nowrap; }
+.connected-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #8eb18d; }
+.connected-status.offline { color: #b9aa98; }
+.connected-status.offline::before { background: #be9f76; }
+.connected-content { padding: 30px 38px; gap: 0; }
+.connected-overview { width: 100%; max-width: 1120px; margin: 0 auto; }
+.connected-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 30px; }
+.connected-heading h1 { margin: 7px 0 9px; color: #e4e5dd; font-size: 28px; letter-spacing: -.8px; font-weight: 500; line-height: 1.35; }
+.connected-heading p { max-width: 680px; margin: 0; color: #9a9e91; font-size: 12px; line-height: 1.8; }
+.connected-refresh { flex-shrink: 0; margin-top: 10px; padding: 8px 11px; border: 1px solid #43483b; border-radius: 6px; font-size: 11px; color: #b7c3aa; }
+.connected-section-label { margin: 0 0 12px; color: #939f87; font-size: 10px; font-weight: 500; letter-spacing: .8px; text-transform: uppercase; }
+.connected-people { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 17px; }
+.connected-person { min-width: 0; border: 1px solid #3a3f34; background: #242622; border-radius: 10px; padding: 19px 18px 14px; }
+.connected-person > header { display: flex; align-items: center; gap: 9px; margin-bottom: 15px; }
+.connected-person h2 { font-size: 13px; font-weight: 500; margin: 0; color: #d7dfcd; }
+.connected-person header > span:last-child { margin-left: auto; color: #929b87; font-size: 9px; }
+.connected-person-summary { margin: 0 0 12px; color: #a6ae9c; font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; }
+.connected-person-counts { display: flex; flex-wrap: wrap; gap: 11px; color: #89967e; font-size: 9px; padding-bottom: 16px; border-bottom: 1px solid #373e30; }
+.connected-person-threads { display: flex; flex-direction: column; gap: 3px; padding-top: 8px; }
+.connected-thread-card { display: block; width: 100%; text-align: left; padding: 10px 0; border-radius: 5px; }
+.connected-thread-card:hover { background: #2d3228; }
+.connected-thread-card > span { display: flex; align-items: center; gap: 7px; color: #d4ddca; font-size: 12px; line-height: 1.6; }
+.connected-thread-card p { margin: 5px 0 0; color: #8f9c84; font-size: 10px; line-height: 1.7; overflow-wrap: anywhere; }
+.connected-thread-card small { display: block; color: #7f8e74; font-size: 9px; margin-top: 5px; }
+.connected-empty { max-width: 550px; width: 100%; margin: auto; padding: 40px 20px; text-align: center; }
+.connected-empty img { width: 44px; height: 52px; object-fit: contain; margin-bottom: 13px; }
+.connected-empty h1 { margin: 8px 0 12px; font-size: 25px; font-weight: 500; color: #e2e7da; }
+.connected-empty p { margin: 0 0 19px; color: #98a18e; font-size: 12px; line-height: 1.8; }
+.connected-error { padding: 12px 14px; border: 1px solid #624d3d; background: #352c24; color: #d3b79b; border-radius: 7px; margin-bottom: 20px; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
+.connected-error button { margin-left: 10px; text-decoration: underline; }
+.connected-thread { width: 100%; max-width: 850px; margin: 0 auto; }
+.connected-thread .connected-heading { margin-bottom: 18px; }
+.connected-thread .connected-heading h1 { font-size: 24px; }
+.connected-original-task { border: 1px solid #3e4635; border-radius: 7px; background: #262d21; padding: 14px 16px; margin-bottom: 19px; }
+.connected-original-task strong { display: block; margin-bottom: 7px; color: #92a680; font-size: 9px; font-weight: 500; letter-spacing: .7px; text-transform: uppercase; }
+.connected-original-task p { margin: 0; color: #c4d0b9; font-size: 11px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.connected-instructions { margin-bottom: 23px; color: #a6b399; font-size: 11px; border-bottom: 1px solid #373e31; padding-bottom: 12px; }
+.connected-instructions summary { cursor: pointer; }
+.connected-instructions p { white-space: pre-wrap; line-height: 1.8; color: #9da98f; overflow-wrap: anywhere; }
+.connected-executions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+.connected-execution { display: flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid #3e4835; border-radius: 5px; color: #b1c09f; font-size: 10px; }
+.connected-execution small { color: #8a967e; }
+.connected-thread .message-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.connected-message-time { color: #748069; font-size: 9px; font-weight: 400; }
+.connected-events { margin: 20px 0 25px; border-top: 1px solid #373e30; padding-top: 16px; font-size: 11px; color: #9ba88e; }
+.connected-events summary { cursor: pointer; }
+.connected-event { margin-top: 14px; padding-left: 10px; border-left: 2px solid #414b38; }
+.connected-event strong { font-size: 10px; font-weight: 500; color: #b2c29f; }
+.connected-event p { font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; color: #9da991; line-height: 1.8; margin: 5px 0; }
+.connected-composer { margin: 26px 0 16px; }
+.connected-composer .composer { border-color: #4a5540; }
+.connected-composer .composer-options { color: #859675; font-size: 9px; }
+.connected-message-actions { display: flex; align-items: center; gap: 10px; }
+.connected-find-button { color: #b1c2a0; padding: 6px 0; font-size: 10px; }
+.connected-receipt { padding: 11px 13px; border: 1px solid #435339; border-radius: 6px; color: #b6c9a3; font-size: 11px; line-height: 1.8; background: #273020; margin: 13px 0; }
+.connected-receipt p { margin: 3px 0 0; color: #90a67b; font-size: 10px; }
+.connected-read-only .connected-find-button { display: block; margin-top: 7px; }
+.connected-dock-people { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.connected-findings { margin-top: 22px; }
+.connected-finding { padding: 15px 17px; margin-bottom: 10px; border: 1px solid #46523c; background: #293123; border-radius: 8px; }
+.connected-finding > span { color: #99ad89; font-size: 9px; }
+.connected-finding h3 { margin: 8px 0; color: #cbdcbb; font-size: 13px; font-weight: 500; }
+.connected-finding p { margin: 0 0 13px; color: #9fb48e; font-size: 11px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.connected-source-dialog { max-width: 760px; max-height: calc(100dvh - 40px); overflow-y: auto; border-color: #49563d; }
+.connected-source-dialog > p { color: #9cac8b; font-size: 11px; line-height: 1.8; }
+.connected-source-meta { padding: 10px 12px; background: #2a3323; border-radius: 5px; font-size: 10px; color: #a7bb95; line-height: 1.8; }
+.connected-source-body { margin: 20px 0; }
+.connected-source-body article { padding: 13px 0; border-bottom: 1px solid #3a4431; }
+.connected-source-body strong { color: #b6c5a6; font-size: 10px; font-weight: 500; }
+.connected-source-body p { margin: 6px 0 0; color: #a3b192; font-size: 11px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.connected-source-solution { border: 1px solid #455638; padding: 14px; margin: 15px 0; border-radius: 7px; background: #27311f; }
+.connected-source-solution h3 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: #c0d5ad; }
+.connected-source-solution p { margin: 0; color: #a1b88a; font-size: 11px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.connected-source-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 20px; }
+.connected-source-actions > button:last-child { font-size: 11px; color: #a6b793; }
+.connected-spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #465239; border-top-color: #b0c69d; display: inline-block; animation: connected-spin .8s linear infinite; }
+@keyframes connected-spin { to { transform: rotate(360deg); } }
+@media (max-width: 900px) { .connected-content { padding: 25px; } .connected-people { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .connected-content { padding: 20px 16px; } .connected-heading { gap: 12px; } .connected-heading h1 { font-size: 23px; } .connected-message-actions { gap: 8px; } .connected-composer .composer-toolbar { align-items: flex-start; flex-direction: column; } .connected-message-actions { width: 100%; justify-content: space-between; } .connected-source-dialog { padding: 19px; } .connected-source-actions { align-items: stretch; flex-direction: column; } .connected-status { font-size: 9px; } }
+@media (prefers-reduced-motion: reduce) { .connected-spinner { animation: none; } }

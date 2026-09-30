@@ -1,5 +1,13 @@
 # Puff web workspace
 
+## Connected Alice flow
+
+`/live` reads the registered coordination backend through server-side member authentication. It shows each person's work summary and sessions, actual conversations and Run states, and exact source inspection for a recorded `EADDRINUSE` finding. The owner can add that finding as one attributed instruction to the original receiving session. Private unshared sessions remain outside the shared backend view.
+
+Start the isolated backend with `bun hackathon/alice-preview/run.ts` from the repository root, then run the web command it prints. Open <http://127.0.0.1:3010/live>. See [the launcher instructions](../../hackathon/alice-preview/README.md) for model configuration and verification. Member credentials are read from `PUFF_BACKEND_MEMBER_PATH` on the web server and are never returned to the browser. This preview binds to loopback and uses one configured member identity; a hosted multi-user deployment needs individual web authentication.
+
+The source scenario records a real local port collision and health check as a human-authored finding. Without an OpenCode model configuration, receiving instructions persist in the backend queue and execution remains unavailable. Source reuse is an explicit owner action. The narrow error matcher covers `EADDRINUSE`; automatic Flower awareness and receiving-model use require separate live evidence.
+
 A browser demo built with React 19 and Next.js 16. The project overview groups work by person: **name → total work summary → individual sessions**. Opening a session shows its own conversation, task, status, and related context. One person can keep several sessions in parallel.
 
 The interactive demo uses local sample `WorkspaceState` data from `lib/workspace.ts`. You, Sam, and Alice illustrate a team scenario. Their conversations and work statuses are examples; the demo does not execute agents or represent real teammate presence.
