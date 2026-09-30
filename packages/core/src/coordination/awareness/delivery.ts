@@ -43,6 +43,7 @@ export interface Dependencies {
 }
 
 const contentKinds = new Set<Coordination.EventKind>([
+  "instruction.submitted",
   "comment.created",
   "run.tool",
   "run.output",

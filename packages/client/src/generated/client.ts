@@ -113,6 +113,22 @@ import type {
   ProjectCopiesRefreshInput,
   ProjectCopiesRefreshOutput,
   ServerCoordinationStatusOutput,
+  ServerCoordinationDataFlowerAwarenessReceiptInput,
+  ServerCoordinationDataFlowerAwarenessReceiptOutput,
+  ServerCoordinationDataFlowerResultRegisterInput,
+  ServerCoordinationDataFlowerResultRegisterOutput,
+  ServerCoordinationDataFlowerAwarenessDeliverInput,
+  ServerCoordinationDataFlowerAwarenessDeliverOutput,
+  ServerCoordinationDataCooperationGetInput,
+  ServerCoordinationDataCooperationGetOutput,
+  ServerCoordinationDataCooperationPutInput,
+  ServerCoordinationDataCooperationPutOutput,
+  ServerCoordinationDataFlowerExportInput,
+  ServerCoordinationDataFlowerExportOutput,
+  ServerCoordinationDataMeOutput,
+  ServerCoordinationDataProvisioningListOutput,
+  ServerCoordinationDataSessionProvisionInput,
+  ServerCoordinationDataSessionProvisionOutput,
   ServerCoordinationDataProjectListOutput,
   ServerCoordinationDataProjectCreateInput,
   ServerCoordinationDataProjectCreateOutput,
@@ -1057,6 +1073,137 @@ export function make(options: ClientOptions) {
         ),
     },
     "server.coordination.data": {
+      flowerAwarenessReceipt: (
+        input: ServerCoordinationDataFlowerAwarenessReceiptInput,
+        requestOptions?: RequestOptions,
+      ) =>
+        request<ServerCoordinationDataFlowerAwarenessReceiptOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/flower/awareness/${encodeURIComponent(input.reportId)}/${encodeURIComponent(input.noteId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      flowerResultRegister: (input: ServerCoordinationDataFlowerResultRegisterInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataFlowerResultRegisterOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/flower/results`,
+            body: {
+              requestId: input["requestId"],
+              reportId: input["reportId"],
+              sourceThreadId: input["sourceThreadId"],
+              targetThreadId: input["targetThreadId"],
+              sourceActivitySeq: input["sourceActivitySeq"],
+              targetActivitySeq: input["targetActivitySeq"],
+              cooperationVersions: input["cooperationVersions"],
+              awarenessNoteCandidates: input["awarenessNoteCandidates"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      flowerAwarenessDeliver: (
+        input: ServerCoordinationDataFlowerAwarenessDeliverInput,
+        requestOptions?: RequestOptions,
+      ) =>
+        request<ServerCoordinationDataFlowerAwarenessDeliverOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/flower/awareness`,
+            body: { reportId: input["reportId"], noteId: input["noteId"], messageId: input["messageId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      cooperationGet: (input: ServerCoordinationDataCooperationGetInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataCooperationGetOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/cooperation`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      cooperationPut: (input: ServerCoordinationDataCooperationPutInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataCooperationPutOutput>(
+          {
+            method: "PUT",
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/cooperation`,
+            body: {
+              requestId: input["requestId"],
+              expectedVersion: input["expectedVersion"],
+              featureTopic: input["featureTopic"],
+              relationship: input["relationship"],
+              analysisEnabled: input["analysisEnabled"],
+              analysisTextEnabled: input["analysisTextEnabled"],
+              awarenessMode: input["awarenessMode"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      flowerExport: (input: ServerCoordinationDataFlowerExportInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataFlowerExportOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/flower/export`,
+            body: {
+              requestId: input["requestId"],
+              sourceThreadId: input["sourceThreadId"],
+              targetThreadId: input["targetThreadId"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      me: (requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataMeOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/me`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      provisioningList: (requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataProvisioningListOutput>(
+          {
+            method: "GET",
+            path: `/api/coordination/v1/provisioning`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      sessionProvision: (input: ServerCoordinationDataSessionProvisionInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataSessionProvisionOutput>(
+          {
+            method: "POST",
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/sessions`,
+            body: { requestId: input["requestId"], title: input["title"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 403, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
       projectList: (requestOptions?: RequestOptions) =>
         request<ServerCoordinationDataProjectListOutput>(
           {

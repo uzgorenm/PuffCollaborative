@@ -4,7 +4,8 @@ import { SessionEvent } from "@opencode-ai/schema/session-event"
 import { EventV2 } from "../event"
 import { PermissionV2 } from "../permission"
 import { SessionV2 } from "../session"
-import type { EventIngestion, Failure, Observation } from "./contracts"
+import { SessionMessage } from "../session/message"
+import type { AuthorizedRun, EventIngestion, Failure, Observation } from "./contracts"
 
 export type RejectedEvent = {
   readonly sourceKey: string
@@ -13,9 +14,14 @@ export type RejectedEvent = {
 }
 
 export interface Dependencies {
-  readonly sessions: Pick<SessionV2.Interface, "history">
+  readonly sessions: Pick<SessionV2.Interface, "history"> & Partial<Pick<SessionV2.Interface, "active">>
   readonly events: Pick<EventV2.Interface, "listen">
   readonly permissions: Pick<PermissionV2.Interface, "forSession">
+  /** Verifies a previously admitted informational finding against its durable server-owned result and binding. */
+  readonly trustedSteer?: (input: {
+    readonly run: AuthorizedRun
+    readonly messageID: SessionMessage.ID
+  }) => Effect.Effect<boolean>
   /** Receives identifiers only, never raw event content. */
   readonly rejected?: (event: RejectedEvent) => Effect.Effect<void>
 }
@@ -49,7 +55,8 @@ export function make(input: Dependencies): EventIngestion {
               message: "Runner observation binding mismatch",
             } satisfies Failure)
 
-          const queue = yield* Queue.dropping<EventV2.Payload>(1_024)
+          const idleWake = Symbol("Session drain idle")
+          const queue = yield* Queue.dropping<EventV2.Payload | typeof idleWake>(1_024)
           let overflow = false
           const unsubscribe = yield* input.events.listen((event) => {
             // A child Session's parentID alone does not bind its events to this Run.
@@ -73,11 +80,38 @@ export function make(input: Dependencies): EventIngestion {
           let cursor = -1
           let anchored = false
           let closed = false
+          let terminal: Observation | undefined
+          let settlementScheduled = false
+          let idleObserved = false
 
           const reject = (sourceKey: string, type: string, reason: RejectedEvent["reason"]) =>
             input.rejected?.({ sourceKey, type, reason }) ?? Effect.void
 
           const emit = (observation: Observation) => onObservation(observation)
+
+          const settle = (observation: Observation) =>
+            Effect.gen(function* () {
+              const active = input.sessions.active
+              if (!active) return yield* emit(observation)
+              terminal = observation
+              if (settlementScheduled) return
+              settlementScheduled = true
+              // Keep consuming native events while the drain continues. Synchronous settlement would
+              // block this observer and let the first provider step hide later continuation output.
+              // Human permission waits remain active until resolved; the observer scope owns this waiter.
+              yield* Effect.gen(function* () {
+                while ((yield* active).has(session.id)) yield* Effect.sleep("20 millis")
+              }).pipe(
+                Effect.andThen(
+                  Effect.sync(() => {
+                    idleObserved = true
+                  }),
+                ),
+                Effect.andThen(Queue.offer(queue, idleWake)),
+                Effect.asVoid,
+                Effect.forkScoped,
+              )
+            })
 
           const permission = Effect.fn("RunnerEventIngest.permission")(function* (request: Permission.Request) {
             if (request.sessionID !== session.id) return
@@ -122,6 +156,13 @@ export function make(input: Dependencies): EventIngestion {
                 return
               }
               if (anchored && !closed) {
+                if (
+                  event.data.delivery === "steer" &&
+                  event.durable?.aggregateID === session.id &&
+                  input.trustedSteer &&
+                  (yield* input.trustedSteer({ run, messageID: event.data.messageID }))
+                )
+                  return
                 closed = true
                 yield* reject(event.id, event.type, "foreign_prompt")
               }
@@ -212,8 +253,8 @@ export function make(input: Dependencies): EventIngestion {
                 return
               }
               if (event.type === SessionEvent.Step.Ended.type && event.data.finish === "tool-calls") return
-              // A settled provider step is evidence; R3 must still confirm the Session drain ended.
-              yield* emit({
+              // Preserve the latest provider outcome; R3 still verifies runtime ownership and idle tools.
+              yield* settle({
                 kind: event.type === SessionEvent.Step.Ended.type ? "settled" : "failed",
                 runId: run.command.runId,
                 sourceKey: event.id,
@@ -254,7 +295,18 @@ export function make(input: Dependencies): EventIngestion {
           yield* onReady ?? Effect.void
 
           while (true) {
+            if (idleObserved) {
+              idleObserved = false
+              // SQLite replay includes every final output before any terminal callback is delivered.
+              yield* history()
+              yield* pending()
+              const final = terminal
+              terminal = undefined
+              settlementScheduled = false
+              if (!closed && final) yield* emit(final)
+            }
             const event = yield* Queue.take(queue)
+            if (event === idleWake) continue
             if (overflow) {
               overflow = false
               yield* history()

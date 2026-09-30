@@ -58,7 +58,7 @@ const events: Coordination.Event[] = [
 ]
 
 const granted = (selected: Coordination.Thread) => ({
-  ownerId,
+  ownerId: selected.createdBy,
   projectId,
   sessionId: selected.sessionId,
   workerId,
@@ -78,17 +78,24 @@ function fixture(
     wrongBinding?: boolean
     missingSource?: boolean
     sparseProjectSeq?: boolean
+    secondOwner?: boolean
+    textEnabled?: boolean
+    additionalEvents?: Coordination.Event[]
   } = {},
 ) {
   const threads = new Map(
-    [options.sparseProjectSeq ? { ...source, activitySeq: 2 } : source, target, privateThread].map((item) => [
-      item.id,
-      item,
-    ]),
+    [
+      options.sparseProjectSeq ? { ...source, activitySeq: 2 } : source,
+      options.secondOwner ? { ...target, createdBy: Coordination.UserID.make("usr_second") } : target,
+      privateThread,
+    ].map((item) => [item.id, item]),
   )
-  const journal = options.sparseProjectSeq
-    ? events.map((event) => (event.id === "evt_a" ? { ...event, seq: 17 } : event))
-    : events
+  const journal = [
+    ...(options.additionalEvents ?? []),
+    ...(options.sparseProjectSeq
+      ? events.map((event) => (event.id === "evt_a" ? { ...event, seq: 17 } : event))
+      : events),
+  ]
   let reads = 0
   let consentReads = 0
   return {
@@ -123,6 +130,7 @@ function fixture(
           return Effect.succeed({ ...granted(selected), featureTopic: "Backend navigation" })
         return Effect.succeed({
           ...granted(selected),
+          textEnabled: options.textEnabled ?? false,
           muted: options.muted ?? false,
           expiresAt: options.expired ? past : future,
         })
@@ -139,6 +147,71 @@ function fixture(
 }
 
 describe("trusted Flower selected-activity export", () => {
+  test("separate explicit text consent exports only bounded owner instructions and safe runner output", async () => {
+    const additionalEvents: Coordination.Event[] = [
+      {
+        ...events[0],
+        id: "evt_instruction",
+        kind: "instruction.submitted",
+        actorId: ownerId,
+        seq: 2,
+        payload: { text: "Fix navigation focus restoration" },
+      },
+      {
+        ...events[0],
+        id: "evt_foreign_instruction",
+        kind: "instruction.submitted",
+        actorId: Coordination.UserID.make("usr_other"),
+        seq: 3,
+        payload: { text: "Other owner private instruction" },
+      },
+      { ...events[1], id: "evt_secret_output", seq: 5, payload: { text: "Authorization: Bearer abcdef123456" } },
+      {
+        ...events[1],
+        id: "evt_comment",
+        kind: "comment.created",
+        seq: 6,
+        payload: { body: "Private comment transcript" },
+      },
+      {
+        ...events[1],
+        id: "evt_safe_output",
+        seq: 7,
+        payload: { text: "Solved missing focus by restoring it after navigation. " + "x".repeat(2200) },
+      },
+    ]
+    const capture = await Effect.runPromise(captureSelected(fixture({ textEnabled: true, additionalEvents })))
+    expect(capture.snapshot.events.find((event) => event.eventId === "evt_instruction")?.content).toEqual({
+      role: "user",
+      text: "Fix navigation focus restoration",
+    })
+    expect(capture.snapshot.events.find((event) => event.eventId === "evt_safe_output")?.content).toMatchObject({
+      role: "assistant",
+    })
+    expect(
+      (capture.snapshot.events.find((event) => event.eventId === "evt_safe_output")?.content as { text: string }).text
+        .length,
+    ).toBe(2000)
+    expect(JSON.stringify(capture)).not.toMatch(
+      /abcdef123456|Other owner private instruction|Private comment transcript/,
+    )
+    const metadataOnly = await Effect.runPromise(captureSelected(fixture({ additionalEvents })))
+    expect(JSON.stringify(metadataOnly)).not.toMatch(/Fix navigation focus restoration|Solved missing focus/)
+  })
+  test("a shared executor preserves each selected Session owner without inventing worker identity", async () => {
+    const capture = await Effect.runPromise(captureSelected(fixture({ secondOwner: true })))
+    expect(capture.snapshot.workers).toEqual([{ workerId, projectId }])
+    expect(capture.snapshot.sharedSessions.map((item) => item.ownerId)).toEqual([
+      ownerId,
+      Coordination.UserID.make("usr_second"),
+    ])
+  })
+
+  test("safe metadata uses strict Flower activity and status fields", async () => {
+    const capture = await Effect.runPromise(captureSelected(fixture()))
+    expect(capture.snapshot.events[0].content).toEqual({ toolName: "Read", toolStatus: "completed" })
+    expect(capture.snapshot.events[1].content).toEqual({ transition: "progress" })
+  })
   test("keeps exact Puff IDs and sequences while dropping transcript, summaries and private sessions", async () => {
     const capture = await Effect.runPromise(captureSelected(fixture()))
     expect(capture.snapshot.events.map((event) => [event.eventId, event.revision])).toEqual([

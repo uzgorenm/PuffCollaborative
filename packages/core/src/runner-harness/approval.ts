@@ -17,6 +17,7 @@ export interface Dependencies {
   readonly authority: RunnerHarnessContracts.ApprovalAuthority
   readonly permission: Pick<PermissionV2.Interface, "get" | "forSession" | "reply">
   readonly redact: RunnerHarnessContracts.SecurityPolicy["redact"]
+  readonly toolCall?: (input: { readonly sessionId: Row["session_id"]; readonly messageId: string; readonly callId: string }) => Effect.Effect<{ readonly name: string; readonly input: Readonly<Record<string, unknown>> } | undefined, RunnerHarnessContracts.Failure>
   readonly now?: () => number
 }
 
@@ -228,6 +229,40 @@ export function make(input: Dependencies): RunnerHarnessContracts.Approvals {
   const get: RunnerHarnessContracts.Approvals["get"] = (approvalId) =>
     Effect.map(find(approvalId), (row) => (row ? mapping(row) : undefined))
 
+  const review: RunnerHarnessContracts.Approvals["review"] = (approval, thread) =>
+    Effect.gen(function* () {
+      if (!["pending", "claimed"].includes(approval.state)) return undefined
+      const row = yield* find(approval.id)
+      if (!row || row.delivery !== "pending" || row.thread_id !== approval.threadId || row.thread_id !== thread.id || row.run_id !== approval.runId || row.session_id !== thread.sessionId || row.tool_call_id !== approval.toolCallId) return undefined
+      const current = yield* input.lifecycle.get(row.run_id)
+      if (!current || current.phase !== "waiting_approval" || current.run.command.threadId !== row.thread_id || current.run.command.sessionId !== row.session_id) return undefined
+      const native = yield* input.permission.get(row.permission_request_id)
+      if (!native || !sameRow(row, row.run_id, native)) return undefined
+      const tool = input.toolCall ? yield* input.toolCall({ sessionId: row.session_id, messageId: row.source_message_id, callId: row.tool_call_id }) : undefined
+      const toolName = tool ? input.redact(tool.name) : ""
+      const inputJson = tool ? reviewJson(tool.input, input.redact) : undefined
+      const permission = input.redact(native.action)
+      const patterns = native.resources.map(input.redact)
+      const savePatterns = (native.save ?? []).map(input.redact)
+      const metadataJson = native.metadata === undefined ? undefined : reviewJson(native.metadata, input.redact)
+      const complete = Boolean(tool) && toolName.length <= 512 && (inputJson?.length ?? 0) <= 8_000 && permission.length <= 512 && patterns.length <= 32 && savePatterns.length <= 32 && patterns.every((value) => value.length <= 512) && savePatterns.every((value) => value.length <= 512) && (metadataJson?.length ?? 0) <= 8_000
+      return {
+        permissionRequestId: row.permission_request_id,
+        sessionId: row.session_id,
+        toolCallId: row.tool_call_id,
+        sourceMessageId: row.source_message_id,
+        scopeHash: row.scope_hash,
+        toolName: toolName.slice(0, 512),
+        ...(inputJson === undefined ? {} : { inputJson: inputJson.slice(0, 8_000) }),
+        permission: permission.slice(0, 512),
+        patterns: patterns.slice(0, 32).map((value) => value.slice(0, 512)),
+        savePatterns: savePatterns.slice(0, 32).map((value) => value.slice(0, 512)),
+        ...(metadataJson === undefined ? {} : { metadataJson: metadataJson.slice(0, 8_000) }),
+        summary: row.summary.slice(0, 8_000),
+        complete,
+      }
+    })
+
   const invalidate: RunnerHarnessContracts.Approvals["invalidate"] = ({ runId, reason }) =>
     Effect.gen(function* () {
       const active = yield* input.db
@@ -251,7 +286,7 @@ export function make(input: Dependencies): RunnerHarnessContracts.Approvals {
         .pipe(Effect.orDie)
     })
 
-  return { requested, resolve, get, invalidate }
+  return { requested, resolve, get, review, invalidate }
 }
 
 function mapping(row: Row): RunnerHarnessContracts.ApprovalMapping {
@@ -319,6 +354,19 @@ function scopeHash(request: Permission.Request) {
       }),
     )
     .digest("hex")
+}
+
+function reviewJson(value: Readonly<Record<string, unknown>>, redact: (text: string) => string) {
+  const secret = /^(?:authorization|proxy-authorization|cookie|set-cookie|api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)$/i
+  const visit = (item: unknown): unknown => {
+    if (typeof item === "string") return redact(item)
+    if (Array.isArray(item)) return item.map(visit)
+    if (item && typeof item === "object") return Object.fromEntries(Object.entries(item).map(([key, entry]) => [redact(key), secret.test(key) ? "[REDACTED]" : visit(entry)]))
+    return item
+  }
+  // Redact values before encoding; text substitution on serialized JSON can
+  // remove quotes and make a complete tool request impossible to review.
+  return JSON.stringify(visit(value))
 }
 
 function invalid(message: string): RunnerHarnessContracts.Failure {

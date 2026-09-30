@@ -1,6 +1,7 @@
 export * as Coordination from "./coordination"
 
 import { Schema } from "effect"
+import { optional } from "./schema"
 import { Project } from "./project"
 import { Session } from "./session"
 
@@ -190,6 +191,23 @@ export const Run = Schema.Struct({
 }).annotate({ identifier: "Coordination.Run" })
 export type Run = typeof Run.Type
 
+export const ApprovalReview = Schema.Struct({
+  permissionRequestId: Schema.String,
+  sessionId: Schema.String,
+  toolCallId: Schema.String,
+  sourceMessageId: Schema.String,
+  scopeHash: Schema.String,
+  toolName: Schema.String,
+  inputJson: Schema.optional(Schema.String),
+  permission: Schema.String,
+  patterns: Schema.Array(Schema.String),
+  savePatterns: Schema.Array(Schema.String),
+  metadataJson: Schema.optional(Schema.String),
+  summary: Schema.String,
+  complete: Schema.Boolean,
+}).annotate({ identifier: "Coordination.ApprovalReview" })
+export type ApprovalReview = typeof ApprovalReview.Type
+
 export const Approval = Schema.Struct({
   id: Schema.String,
   threadId: ThreadID,
@@ -205,6 +223,7 @@ export const Approval = Schema.Struct({
   deliveryState: Schema.Literals(["none", "pending", "delivered", "failed"]),
   decidedBy: Schema.optional(UserID),
   decidedAt: Schema.optional(Schema.String),
+  review: Schema.optional(ApprovalReview),
 }).annotate({ identifier: "Coordination.Approval" })
 export type Approval = typeof Approval.Type
 
@@ -258,3 +277,70 @@ export const AuthContext = Schema.Union([
   }),
 ]).annotate({ identifier: "Coordination.AuthContext" })
 export type AuthContext = typeof AuthContext.Type
+
+export interface ProvisioningProject extends Schema.Schema.Type<typeof ProvisioningProject> {}
+export const ProvisioningProject = Schema.Struct({
+  projectId: ProjectID,
+  name: Schema.String,
+  modelReady: Schema.Boolean,
+}).annotate({ identifier: "Coordination.ProvisioningProject" })
+
+export interface ProvisioningView extends Schema.Schema.Type<typeof ProvisioningView> {}
+export const ProvisioningView = Schema.Struct({
+  projects: Schema.Array(ProvisioningProject),
+  privateSessions: Schema.Literal(false),
+}).annotate({ identifier: "Coordination.ProvisioningView" })
+
+export interface ProvisionedSession extends Schema.Schema.Type<typeof ProvisionedSession> {}
+
+export const CooperationContent = Schema.Struct({
+  featureTopic: Schema.String,
+  relationship: Schema.Literals(["open", "complementary", "alternative"]),
+  analysisEnabled: Schema.Boolean,
+  analysisTextEnabled: optional(Schema.Boolean),
+  awarenessMode: Schema.Literals(["off", "notify"]),
+}).annotate({ identifier: "Coordination.CooperationContent" })
+export interface CooperationContent extends Schema.Schema.Type<typeof CooperationContent> {}
+
+export const CooperationSettings = Schema.Struct({
+  ...CooperationContent.fields,
+  threadId: ThreadID,
+  ownerId: optional(UserID),
+  sourceActivitySeq: Schema.Int,
+  version: Schema.Int,
+  updatedAt: optional(Schema.String),
+}).annotate({ identifier: "Coordination.CooperationSettings" })
+export interface CooperationSettings extends Schema.Schema.Type<typeof CooperationSettings> {}
+
+export const FlowerAwarenessCandidate = Schema.Struct({
+  noteId: Schema.String,
+  sourceThreadId: ThreadID,
+  targetThreadId: ThreadID,
+  sourceActivitySeq: Schema.Int,
+  targetActivitySeq: Schema.Int,
+  featureTopic: Schema.String,
+  text: Schema.String,
+  evidenceRefs: Schema.Array(Schema.Struct({ threadId: ThreadID, eventId: Schema.String, seq: Schema.Int })),
+  candidateState: Schema.Literal("pending"),
+  deliveryState: Schema.Literal("not_attempted"),
+}).annotate({ identifier: "Coordination.FlowerAwarenessCandidate" })
+export interface FlowerAwarenessCandidate extends Schema.Schema.Type<typeof FlowerAwarenessCandidate> {}
+
+export const FlowerResultContent = Schema.Struct({
+  requestId: Schema.String,
+  reportId: Schema.String,
+  sourceThreadId: ThreadID,
+  targetThreadId: ThreadID,
+  sourceActivitySeq: Schema.Int,
+  targetActivitySeq: Schema.Int,
+  cooperationVersions: Schema.Record(Schema.String, Schema.Int),
+  awarenessNoteCandidates: Schema.Array(FlowerAwarenessCandidate),
+}).annotate({ identifier: "Coordination.FlowerResultContent" })
+export interface FlowerResultContent extends Schema.Schema.Type<typeof FlowerResultContent> {}
+export const ProvisionedSession = Schema.Struct({
+  thread: Thread,
+  sessionId: Thread.fields.sessionId,
+  workspaceId: Schema.String,
+  directory: Schema.String,
+  ownerUserId: UserID,
+}).annotate({ identifier: "Coordination.ProvisionedSession" })

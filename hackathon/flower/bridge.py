@@ -62,6 +62,7 @@ class Binding(Strict):
     featureTopic: Text
     relationship: Literal["alternative", "unspecified"]
     activitySeq: Revision
+    evidenceRevision: Revision | None = None
     expectedVersion: Revision
     shared: Literal[True]
     deterministicStatus: Literal["queued", "active", "blocked", "idle", "done"]
@@ -134,8 +135,11 @@ def build_job(request, activity_envelope, *, bindings, source_refs):
             for field in ("workerId", "ownerId", "title", "featureTopic", "relationship")
         ):
             raise ValueError("Activity session does not match trusted selection metadata")
-        if session["revision"] != binding["activitySeq"]:
-            raise ValueError("Activity evidence is not current at captured Thread.activitySeq")
+        evidence_revision = binding.get("evidenceRevision")
+        if evidence_revision is None:
+            evidence_revision = binding["activitySeq"]
+        if session["revision"] != evidence_revision or evidence_revision > binding["activitySeq"]:
+            raise ValueError("Activity evidence differs from the captured selected revision")
         sessions[session["sessionId"]] = session
     if len(sessions) != 2 or set(sessions) != set(by_session):
         raise ValueError("Activity and backend bindings select different sessions")
@@ -148,13 +152,15 @@ def build_job(request, activity_envelope, *, bindings, source_refs):
         if worker.get("projectId") != request.projectId or not isinstance(worker_id, str):
             raise ValueError("Activity worker belongs to another project")
         owners = {item["ownerId"] for item in bindings if item["workerId"] == worker_id}
-        if not owners or owners != {owner_id} or worker_id in workers:
+        if (
+            not owners
+            or ("ownerId" in worker and owners != {owner_id})
+            or worker_id in workers
+        ):
             raise ValueError("Activity worker owner does not match trusted bindings")
-        workers[worker_id] = {
-            "workerId": worker_id,
-            "projectId": request.projectId,
-            "ownerId": owner_id,
-        }
+        workers[worker_id] = {"workerId": worker_id, "projectId": request.projectId}
+        if "ownerId" in worker:
+            workers[worker_id]["ownerId"] = owner_id
     if set(workers) != {item["workerId"] for item in bindings}:
         raise ValueError("Activity worker roster does not match the selected sessions")
 

@@ -158,9 +158,23 @@ def prepare(request, snapshot):
     if len(selected_ids) != 2 or not selected_ids.issubset(by_id):
         raise ValueError("Supply evidence references for exactly two shared sessions")
     selected = [by_id[sid] for sid in sorted(selected_ids)]
-    workers = {(w["workerId"], w["projectId"], w["ownerId"]) for w in snapshot["workers"]}
-    if any((s["workerId"], request["projectId"], s["ownerId"]) not in workers for s in selected):
-        raise ValueError("Unknown project/worker/owner mapping")
+    workers = {}
+    for worker in snapshot["workers"]:
+        if (
+            not isinstance(worker, dict)
+            or set(worker) - {"workerId", "projectId", "ownerId"}
+            or not isinstance(worker.get("workerId"), str)
+            or not worker["workerId"]
+            or worker.get("projectId") != request["projectId"]
+            or worker["workerId"] in workers
+            or ("ownerId" in worker and not isinstance(worker["ownerId"], str))
+        ):
+            raise ValueError("Invalid trusted runner roster")
+        workers[worker["workerId"]] = worker
+    for session in selected:
+        worker = workers.get(session["workerId"])
+        if not worker or ("ownerId" in worker and worker["ownerId"] != session["ownerId"]):
+            raise ValueError("Unknown project/worker/owner mapping")
     inputs, warnings, seen = [], [], set()
     for session in selected:
         events = []
@@ -216,8 +230,8 @@ def prepare(request, snapshot):
             {
                 "schemaVersion": 1,
                 "projectId": request["projectId"],
-                # Owner identity was already checked against the trusted worker
-                # roster; Flower only needs session metadata for comparison.
+                # The trusted export binds Session ownership separately from
+                # its runner host. Flower only needs comparison metadata.
                 "session": {key: value for key, value in session.items() if key != "ownerId"},
                 "events": events[-20:],
             }

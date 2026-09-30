@@ -132,6 +132,7 @@ export interface Snapshot {
 }
 
 export interface ThreadSnapshot {
+  readonly ownerId?: Coordination.UserID
   readonly thread: Coordination.Thread
   readonly instructions: ReadonlyArray<Coordination.InstructionRequest>
   readonly runs: ReadonlyArray<Coordination.Run>

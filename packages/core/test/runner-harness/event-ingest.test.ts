@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { DateTime, Deferred, Effect, Fiber, Queue } from "effect"
+import { TestClock } from "effect/testing"
 import { Coordination } from "@opencode-ai/schema/coordination"
 import { Permission } from "@opencode-ai/schema/permission"
 import type { Data, Definition } from "@opencode-ai/schema/event"
@@ -151,6 +152,8 @@ const request = (id: string, sourceSessionID = sessionID) =>
 function fixture(
   initial: ReadonlyArray<SessionEvent.DurableEvent> = [],
   pending: ReadonlyArray<Permission.Request> = [],
+  trustedSteer?: Dependencies["trustedSteer"],
+  active?: NonNullable<Dependencies["sessions"]["active"]>,
 ) {
   return Effect.gen(function* () {
     const ready = yield* Deferred.make<void>()
@@ -161,6 +164,7 @@ function fixture(
     const listeners = new Set<(event: EventV2.Payload) => Effect.Effect<void>>()
     const deps: Dependencies = {
       sessions: {
+        ...(active ? { active } : {}),
         history: ({ after = -1, limit }) =>
           Deferred.succeed(ready, undefined).pipe(
             Effect.as({
@@ -179,6 +183,7 @@ function fixture(
           }),
       },
       permissions: { forSession: () => Effect.succeed(pending) },
+      ...(trustedSteer ? { trustedSteer } : {}),
       rejected: (item) =>
         Effect.sync(() => rejected.push(item)).pipe(
           Effect.andThen(Queue.offer(signal, received.length)),
@@ -202,6 +207,285 @@ function fixture(
     return { ready, received, rejected, publish, record, awaitCount, start, listenerCount: () => listeners.size }
   })
 }
+
+test("continues reporting a registered informational steer within the original Run", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const steerID = SessionMessage.ID.make("msg_registered_awareness")
+        const source = yield* fixture(
+          [
+            prompted(0),
+            step(1),
+            text(2, "original output"),
+            event(
+              SessionEvent.Prompted,
+              {
+                sessionID,
+                timestamp,
+                messageID: steerID,
+                prompt: { text: "An informational related finding" },
+                delivery: "steer",
+              },
+              3,
+            ),
+            event(
+              SessionEvent.Step.Started,
+              { sessionID, timestamp, assistantMessageID: secondAssistantID, agent: "build", model },
+              4,
+            ),
+            event(
+              SessionEvent.Text.Ended,
+              {
+                sessionID,
+                timestamp,
+                assistantMessageID: secondAssistantID,
+                textID: "text-2",
+                text: "continued output",
+              },
+              5,
+            ),
+          ],
+          [],
+          ({ run, messageID: id }) =>
+            Effect.succeed(run.command.runId === runID && run.command.sessionId === sessionID && id === steerID),
+        )
+        yield* source.start()
+        yield* Deferred.await(source.ready)
+        yield* source.publish({ id: EventV2.ID.create(), type: "session.next.unknown", data: { sessionID } })
+        while (!source.rejected.some((item) => item.type === "session.next.unknown")) yield* Effect.yieldNow
+        expect(source.received.filter((item) => item.kind === "activity").map((item) => item.activity)).toEqual([
+          { kind: "run.output", text: "original output" },
+          { kind: "run.output", text: "continued output" },
+        ])
+        expect(source.received.filter((item) => item.kind === "promoted")).toHaveLength(1)
+        expect(source.rejected.map((item) => item.reason)).toEqual(["invalid"])
+      }),
+    ),
+  )
+})
+
+test("closes attribution for an unregistered steer even when trusted steering is configured", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const source = yield* fixture(
+          [
+            prompted(0),
+            step(1),
+            text(2, "original output"),
+            event(
+              SessionEvent.Prompted,
+              {
+                sessionID,
+                timestamp,
+                messageID: SessionMessage.ID.make("msg_unregistered"),
+                prompt: { text: "An unregistered steer" },
+                delivery: "steer",
+              },
+              3,
+            ),
+            text(4, "original output that must not be attributed"),
+          ],
+          [],
+          () => Effect.succeed(false),
+        )
+        yield* source.start()
+        yield* Deferred.await(source.ready)
+        yield* source.publish({ id: EventV2.ID.create(), type: "session.next.unknown", data: { sessionID } })
+        while (!source.rejected.some((item) => item.type === "session.next.unknown")) yield* Effect.yieldNow
+        expect(source.received.filter((item) => item.kind === "activity").map((item) => item.activity)).toEqual([
+          { kind: "run.output", text: "original output" },
+        ])
+        expect(source.rejected.map((item) => item.reason)).toEqual(["foreign_prompt", "invalid"])
+      }),
+    ),
+  )
+})
+
+test("reports continuation output before settling the actual Session drain", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        let active = true
+        const source = yield* fixture(
+          [prompted(0), step(1), text(2, "first turn")],
+          [],
+          () => Effect.succeed(true),
+          Effect.sync(() => (active ? new Set([sessionID]) : new Set())),
+        )
+        yield* source.start()
+        yield* Deferred.await(source.ready)
+        yield* source.record(settled(3))
+        yield* source.publish({ id: EventV2.ID.create(), type: "session.next.unknown", data: { sessionID } })
+        while (source.rejected.length < 1) yield* Effect.yieldNow
+        expect(source.received.some((item) => item.kind === "settled")).toBe(false)
+
+        yield* source.record(
+          event(
+            SessionEvent.Prompted,
+            {
+              sessionID,
+              timestamp,
+              messageID: SessionMessage.ID.make("msg_trusted_continuation"),
+              prompt: { text: "Related informational finding" },
+              delivery: "steer",
+            },
+            4,
+          ),
+        )
+        yield* source.record(
+          event(
+            SessionEvent.Step.Started,
+            { sessionID, timestamp, assistantMessageID: secondAssistantID, agent: "build", model },
+            5,
+          ),
+        )
+        yield* source.record(
+          event(
+            SessionEvent.Text.Ended,
+            { sessionID, timestamp, assistantMessageID: secondAssistantID, textID: "text-2", text: "second turn" },
+            6,
+          ),
+        )
+        const finalStep = event(
+          SessionEvent.Step.Ended,
+          {
+            sessionID,
+            timestamp,
+            assistantMessageID: secondAssistantID,
+            finish: "stop",
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          },
+          7,
+        )
+        yield* source.record(finalStep)
+        yield* source.publish({ id: EventV2.ID.create(), type: "session.next.unknown", data: { sessionID } })
+        while (source.rejected.length < 2) yield* Effect.yieldNow
+        expect(source.received.some((item) => item.kind === "settled")).toBe(false)
+        yield* Effect.sync(() => {
+          active = false
+        })
+        yield* source.awaitCount(4)
+        expect(source.received.map((item) => item.kind)).toEqual(["promoted", "activity", "activity", "settled"])
+        expect(source.received.at(-1)?.sourceKey).toBe(finalStep.id)
+        expect(source.received.filter((item) => item.kind === "activity").map((item) => item.activity)).toEqual([
+          { kind: "run.output", text: "first turn" },
+          { kind: "run.output", text: "second turn" },
+        ])
+      }),
+    ),
+  )
+})
+
+test("keeps observing while an informational continuation waits for human tool approval", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        let active = true
+        const approval = Permission.Request.make({
+          id: Permission.ID.make("per_awareness_continuation"),
+          sessionID,
+          action: "bash",
+          resources: ["/tmp"],
+          source: { type: "tool", messageID: secondAssistantID, callID: "call-2" },
+        })
+        const source = yield* fixture(
+          [
+            prompted(0),
+            step(1),
+            text(2, "first turn"),
+            settled(3),
+            event(
+              SessionEvent.Prompted,
+              {
+                sessionID,
+                timestamp,
+                messageID: SessionMessage.ID.make("msg_approval_continuation"),
+                prompt: { text: "Related informational finding" },
+                delivery: "steer",
+              },
+              4,
+            ),
+            event(
+              SessionEvent.Step.Started,
+              { sessionID, timestamp, assistantMessageID: secondAssistantID, agent: "build", model },
+              5,
+            ),
+            event(
+              SessionEvent.Tool.Called,
+              {
+                sessionID,
+                timestamp,
+                assistantMessageID: secondAssistantID,
+                callID: "call-2",
+                tool: "bash",
+                input: {},
+                provider: { executed: false },
+              },
+              6,
+            ),
+          ],
+          [approval],
+          () => Effect.succeed(true),
+          Effect.sync(() => (active ? new Set([sessionID]) : new Set())),
+        )
+        yield* source.start()
+        yield* source.awaitCount(4)
+        yield* TestClock.adjust("35 seconds")
+        expect(source.listenerCount()).toBe(1)
+        expect(source.received.filter((item) => item.kind === "permission")).toHaveLength(1)
+        expect(source.received.some((item) => item.kind === "settled")).toBe(false)
+
+        yield* source.record(
+          event(
+            SessionEvent.Text.Ended,
+            {
+              sessionID,
+              timestamp,
+              assistantMessageID: secondAssistantID,
+              textID: "text-2",
+              text: "continued after approval",
+            },
+            7,
+          ),
+        )
+        yield* source.record(
+          event(
+            SessionEvent.Step.Ended,
+            {
+              sessionID,
+              timestamp,
+              assistantMessageID: secondAssistantID,
+              finish: "stop",
+              cost: 0,
+              tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            },
+            8,
+          ),
+        )
+        yield* Effect.sync(() => {
+          active = false
+        })
+        yield* TestClock.adjust("20 millis")
+        yield* source.awaitCount(6)
+        expect(source.received.map((item) => item.kind)).toEqual([
+          "promoted",
+          "activity",
+          "activity",
+          "permission",
+          "activity",
+          "settled",
+        ])
+        expect(source.received.filter((item) => item.kind === "activity").at(-1)?.activity).toEqual({
+          kind: "run.output",
+          text: "continued after approval",
+        })
+      }),
+    ).pipe(Effect.provide(TestClock.layer())),
+  )
+})
 
 test("deduplicates complete snapshots and never appends live-only token deltas", async () => {
   await Effect.runPromise(

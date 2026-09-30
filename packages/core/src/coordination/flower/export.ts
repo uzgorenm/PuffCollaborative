@@ -13,6 +13,8 @@ export interface Grant {
   readonly relationship: "alternative" | "unspecified"
   readonly expiresAt: string
   readonly muted: boolean
+  readonly version?: number
+  readonly textEnabled?: boolean
 }
 
 export interface Selection {
@@ -63,7 +65,7 @@ const safeTools = new Set([
 ])
 
 // Builds the exact request/snapshot accepted by hackathon/flower/coordinator.py.
-// Arbitrary journal payloads and Session transcript text never enter the result.
+// Only separately consented owner instructions and redacted runner output can add bounded text.
 export const captureSelected = (input: Input) =>
   Effect.gen(function* () {
     if (
@@ -100,21 +102,22 @@ export const captureSelected = (input: Input) =>
           if (page.cursor <= cursor) return yield* Effect.fail(unavailable)
           cursor = page.cursor
         }
-        const eligible = records.filter((event) => contentKinds.has(event.kind))
+        const grant = grants[index]
+        const eligible = records.filter((event) => evidenceEligible(event, grant))
         if (!eligible.length) return yield* Effect.fail(conflict)
         const recent = eligible.slice(-20)
         return {
           session: {
             workerId: thread.workerId,
             sessionId: thread.sessionId,
-            ownerId: thread.createdBy,
+            ownerId: grants[index].ownerId,
             title: index === 0 ? "Selected source session" : "Selected target session",
             featureTopic: grants[index].featureTopic,
             relationship: grants[index].relationship,
             revision: recent.at(-1)!.seq,
             status: "unknown",
           },
-          events: recent.map((event) => projectEvent(event, thread)),
+          events: recent.map((event) => projectEvent(event, thread, grant)),
           provenance: recent.map((event) => ({
             threadId: thread.id,
             eventId: event.id,
@@ -149,18 +152,21 @@ export const captureSelected = (input: Input) =>
           grant.featureTopic !== grants[index].featureTopic ||
           grant.relationship !== grants[index].relationship ||
           grant.expiresAt !== grants[index].expiresAt ||
-          grant.muted !== grants[index].muted,
+          grant.muted !== grants[index].muted ||
+          grant.version !== grants[index].version ||
+          grant.textEnabled !== grants[index].textEnabled,
       )
     )
       return yield* Effect.fail(conflict)
 
+    const sameOwner = selected[0].session.ownerId === selected[1].session.ownerId
     const workers = selected.map((item) => ({
       workerId: item.session.workerId,
       projectId: input.projectId,
-      ownerId: item.session.ownerId,
+      ...(sameOwner || selected[0].session.workerId !== selected[1].session.workerId
+        ? { ownerId: item.session.ownerId }
+        : {}),
     }))
-    if (workers[0].workerId === workers[1].workerId && workers[0].ownerId !== workers[1].ownerId)
-      return yield* Effect.fail(invalid)
     const request = {
       requestId: input.requestId,
       projectId: input.projectId,
@@ -197,7 +203,6 @@ function currentGrant(input: Input, thread: Coordination.Thread, at: Date) {
     if (
       !grant ||
       grant.muted ||
-      grant.ownerId !== thread.createdBy ||
       grant.projectId !== thread.projectId ||
       grant.sessionId !== thread.sessionId ||
       grant.workerId !== thread.workerId ||
@@ -212,23 +217,54 @@ function currentGrant(input: Input, thread: Coordination.Thread, at: Date) {
   })
 }
 
-function projectEvent(event: Coordination.Event, thread: Coordination.Thread) {
+const safeText = (value: unknown): string | undefined => {
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    /(bearer\s+\S+|sk-[a-z0-9_-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_-]?key|password|secret|(?:access[_-]?)?token|authorization)\s*[=:]|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|\b(?:gh[pousr]_|github_pat_|xox[baprs]-)[a-z0-9_-]{16,}|\bAIza[a-z0-9_-]{30,}|\beyJ[a-z0-9_-]{15,}\.[a-z0-9_-]{15,}\.[a-z0-9_-]{15,}|https?:\/\/[^\s/]+:[^\s/@]+@)/i.test(
+      value,
+    )
+  )
+    return undefined
+  return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").slice(0, 2000)
+}
+
+export const evidenceEligible = (event: Coordination.Event, grant: Pick<Grant, "ownerId" | "textEnabled">) =>
+  contentKinds.has(event.kind) ||
+  (grant.textEnabled === true &&
+    event.kind === "instruction.submitted" &&
+    event.actorId === grant.ownerId &&
+    safeText(event.payload.text) !== undefined)
+
+function projectEvent(event: Coordination.Event, thread: Coordination.Thread, grant: Grant) {
+  const text =
+    grant.textEnabled === true &&
+    (event.kind === "run.output" || (event.kind === "instruction.submitted" && event.actorId === grant.ownerId))
+      ? safeText(event.payload.text)
+      : undefined
   const content =
-    event.kind === "run.tool"
-      ? {
-          toolName: safeTools.has(event.payload.toolName as string) ? (event.payload.toolName as string) : "other",
-          status: ["started", "completed", "failed"].includes(event.payload.status as string)
-            ? (event.payload.status as string)
-            : "unknown",
-        }
-      : { status: event.kind }
+    text !== undefined
+      ? { role: event.kind === "instruction.submitted" ? "user" : "assistant", text }
+      : event.kind === "run.tool"
+        ? {
+            toolName: safeTools.has(event.payload.toolName as string) ? (event.payload.toolName as string) : "other",
+            toolStatus: ["started", "completed", "failed"].includes(event.payload.status as string)
+              ? (event.payload.status as string)
+              : "unknown",
+          }
+        : { transition: "progress" }
   return {
     eventId: event.id,
     projectId: event.projectId,
     workerId: thread.workerId,
     sessionId: thread.sessionId,
     revision: event.seq,
-    kind: event.kind === "run.tool" ? ("activity" as const) : ("status" as const),
+    kind:
+      text !== undefined
+        ? ("message" as const)
+        : event.kind === "run.tool"
+          ? ("activity" as const)
+          : ("status" as const),
     occurredAt: event.occurredAt,
     content,
   }
