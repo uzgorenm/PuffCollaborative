@@ -2,6 +2,8 @@
 
 Tested source: `7e431eb9a536d94e46f60d90047790c8173da72d`, integrating own `ff601ebaf5` and incoming `origin/serhat` `081f15b74b`. The isolated checkout is `/Users/mac/Desktop/Coding/Hackathon/Puff/PuffCollaborative-alice-product`. Incoming product, backend, consent and sharing work was retained. Publication is to `serhat`; main is unchanged by this task.
 
+Follow-up integration `74906dcdbf9bced95742944658868ac8af4085d5` preserves newer `origin/main` `2cd03715cf`, including the team's separate MiniMax M3 verification and locale fix. Conflict resolution retained consent/source-revision checks and permitted factual constraints; 32 targeted Flower Python tests and the relevant Ruff check pass without hosted calls. These incoming changes do not change this receipt's `/live` web code or preserved 4484 runtime. Their [two-user model evidence](2026-09-29-two-user-minimax-m3.md) remains distinct from this Endeavor example.
+
 The user supplied a replacement Flower model key. It is stored privately outside Git with owner-only permissions; the model catalog returned HTTP 200 and listed Endeavor. The old credential's HTTP 401 checkpoint remains historical evidence. No key or member password is in this receipt, browser data or staged source.
 
 ## Actual provider and native evidence
