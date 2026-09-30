@@ -202,7 +202,8 @@ export function detectDesktopNativeLocale(languages: readonly string[]): Desktop
     if (["no", "nb", "nn"].includes(source.language)) return "no"
     const match = DESKTOP_NATIVE_LOCALES.find((candidate) => {
       const target = locale(DESKTOP_NATIVE_LOCALE_TAGS[candidate])
-      return target?.language === source.language && target.script === source.script
+      if (!target || target.language !== source.language) return false
+      return script(target.script) === script(source.script)
     })
     if (match) return match
   }
@@ -219,6 +220,10 @@ function locale(value: string) {
   } catch {
     return undefined
   }
+}
+
+function script(value: string | undefined) {
+  return value === "Aran" ? "Arab" : value
 }
 
 export const DESKTOP_NATIVE_ENGLISH = {
