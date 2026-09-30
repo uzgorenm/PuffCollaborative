@@ -1,13 +1,29 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "67fdca1e-afc3-4662-bffa-c34025f9f78b",
+  "id": "ce08b25c-2b4b-457d-a54f-b838ef345e86",
   "prevIds": [
-    "4ec74f26-06eb-45e7-9ca2-6e1f12bd1dc9"
+    "3fb0e520-1a33-4f8e-a670-9a4b29edc2a4"
   ],
   "ddl": [
     {
       "name": "workspace",
+      "entityType": "tables"
+    },
+    {
+      "name": "coordination_flower_delivery",
+      "entityType": "tables"
+    },
+    {
+      "name": "coordination_flower_result",
+      "entityType": "tables"
+    },
+    {
+      "name": "coordination_person_focus_revision",
+      "entityType": "tables"
+    },
+    {
+      "name": "coordination_project_brief_revision",
       "entityType": "tables"
     },
     {
@@ -43,11 +59,19 @@
       "entityType": "tables"
     },
     {
+      "name": "coordination_cooperation_revision",
+      "entityType": "tables"
+    },
+    {
       "name": "coordination_membership",
       "entityType": "tables"
     },
     {
       "name": "coordination_project",
+      "entityType": "tables"
+    },
+    {
+      "name": "coordination_session_provisioning",
       "entityType": "tables"
     },
     {
@@ -213,6 +237,256 @@
       "name": "time_used",
       "entityType": "columns",
       "table": "workspace"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "report_id",
+      "entityType": "columns",
+      "table": "coordination_flower_delivery"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "note_id",
+      "entityType": "columns",
+      "table": "coordination_flower_delivery"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "message_id",
+      "entityType": "columns",
+      "table": "coordination_flower_delivery"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "owner_id",
+      "entityType": "columns",
+      "table": "coordination_flower_delivery"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "coordination_flower_delivery"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "report_id",
+      "entityType": "columns",
+      "table": "coordination_flower_result"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_id",
+      "entityType": "columns",
+      "table": "coordination_flower_result"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "request_id",
+      "entityType": "columns",
+      "table": "coordination_flower_result"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "service_id",
+      "entityType": "columns",
+      "table": "coordination_flower_result"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "content",
+      "entityType": "columns",
+      "table": "coordination_flower_result"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "coordination_flower_result"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_id",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "focus_text",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "request_id",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "event_seq",
+      "entityType": "columns",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_id",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "content",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_by",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "request_id",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "event_seq",
+      "entityType": "columns",
+      "table": "coordination_project_brief_revision"
     },
     {
       "type": "text",
@@ -970,6 +1244,66 @@
       "autoincrement": false,
       "default": null,
       "generated": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "table": "coordination_cooperation_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "coordination_cooperation_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "owner_id",
+      "entityType": "columns",
+      "table": "coordination_cooperation_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "request_id",
+      "entityType": "columns",
+      "table": "coordination_cooperation_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "content",
+      "entityType": "columns",
+      "table": "coordination_cooperation_revision"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "coordination_cooperation_revision"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
       "name": "project_id",
       "entityType": "columns",
       "table": "coordination_membership"
@@ -1073,6 +1407,156 @@
       "name": "request_id",
       "entityType": "columns",
       "table": "coordination_project"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_id",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "owner_id",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "request_id",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "title",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "worker_id",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "session_id",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "directory",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "config_signature",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "model",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "phase",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "thread",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "coordination_session_provisioning"
     },
     {
       "type": "text",
@@ -2911,6 +3395,36 @@
     },
     {
       "columns": [
+        "project_id"
+      ],
+      "tableTo": "coordination_project",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_coordination_person_focus_revision_project_id_coordination_project_id_fk",
+      "entityType": "fks",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "columns": [
+        "project_id"
+      ],
+      "tableTo": "coordination_project",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_coordination_project_brief_revision_project_id_coordination_project_id_fk",
+      "entityType": "fks",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "columns": [
         "run_id"
       ],
       "tableTo": "runner_harness_execution",
@@ -3211,6 +3725,37 @@
     },
     {
       "columns": [
+        "report_id",
+        "note_id"
+      ],
+      "nameExplicit": false,
+      "name": "coordination_flower_delivery_pk",
+      "entityType": "pks",
+      "table": "coordination_flower_delivery"
+    },
+    {
+      "columns": [
+        "project_id",
+        "user_id",
+        "version"
+      ],
+      "nameExplicit": false,
+      "name": "coordination_person_focus_revision_pk",
+      "entityType": "pks",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "columns": [
+        "project_id",
+        "version"
+      ],
+      "nameExplicit": false,
+      "name": "coordination_project_brief_revision_pk",
+      "entityType": "pks",
+      "table": "coordination_project_brief_revision"
+    },
+    {
+      "columns": [
         "email",
         "url"
       ],
@@ -3218,6 +3763,16 @@
       "name": "control_account_pk",
       "entityType": "pks",
       "table": "control_account"
+    },
+    {
+      "columns": [
+        "thread_id",
+        "version"
+      ],
+      "nameExplicit": false,
+      "name": "coordination_cooperation_revision_pk",
+      "entityType": "pks",
+      "table": "coordination_cooperation_revision"
     },
     {
       "columns": [
@@ -3256,6 +3811,15 @@
       "nameExplicit": false,
       "name": "workspace_pk",
       "table": "workspace",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "report_id"
+      ],
+      "nameExplicit": false,
+      "name": "coordination_flower_result_pk",
+      "table": "coordination_flower_result",
       "entityType": "pks"
     },
     {
@@ -3328,6 +3892,15 @@
       "nameExplicit": false,
       "name": "coordination_project_pk",
       "table": "coordination_project",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "coordination_session_provisioning_pk",
+      "table": "coordination_session_provisioning",
       "entityType": "pks"
     },
     {
@@ -3500,6 +4073,82 @@
       "name": "session_share_pk",
       "table": "session_share",
       "entityType": "pks"
+    },
+    {
+      "columns": [
+        {
+          "value": "message_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_flower_delivery_message_idx",
+      "entityType": "indexes",
+      "table": "coordination_flower_delivery"
+    },
+    {
+      "columns": [
+        {
+          "value": "project_id",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_flower_result_request_idx",
+      "entityType": "indexes",
+      "table": "coordination_flower_result"
+    },
+    {
+      "columns": [
+        {
+          "value": "project_id",
+          "isExpression": false
+        },
+        {
+          "value": "user_id",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_person_focus_request_idx",
+      "entityType": "indexes",
+      "table": "coordination_person_focus_revision"
+    },
+    {
+      "columns": [
+        {
+          "value": "project_id",
+          "isExpression": false
+        },
+        {
+          "value": "updated_by",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_project_brief_request_idx",
+      "entityType": "indexes",
+      "table": "coordination_project_brief_revision"
     },
     {
       "columns": [
@@ -3722,6 +4371,24 @@
     {
       "columns": [
         {
+          "value": "thread_id",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_cooperation_request_idx",
+      "entityType": "indexes",
+      "table": "coordination_cooperation_revision"
+    },
+    {
+      "columns": [
+        {
           "value": "user_id",
           "isExpression": false
         },
@@ -3776,6 +4443,70 @@
       "name": "coordination_project_actor_request_idx",
       "entityType": "indexes",
       "table": "coordination_project"
+    },
+    {
+      "columns": [
+        {
+          "value": "project_id",
+          "isExpression": false
+        },
+        {
+          "value": "owner_id",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_provisioning_request_idx",
+      "entityType": "indexes",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "columns": [
+        {
+          "value": "session_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_provisioning_session_idx",
+      "entityType": "indexes",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_provisioning_workspace_idx",
+      "entityType": "indexes",
+      "table": "coordination_session_provisioning"
+    },
+    {
+      "columns": [
+        {
+          "value": "directory",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "coordination_provisioning_directory_idx",
+      "entityType": "indexes",
+      "table": "coordination_session_provisioning"
     },
     {
       "columns": [

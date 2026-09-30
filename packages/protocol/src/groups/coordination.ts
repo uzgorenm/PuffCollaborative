@@ -10,6 +10,8 @@ import {
   UnauthorizedError,
 } from "../errors"
 import { CoordinationAuth } from "../middleware/coordination-auth"
+import { SessionMessage } from "@opencode-ai/schema/session-message"
+import { optional } from "@opencode-ai/schema/schema"
 
 const errors = [
   InvalidRequestError,
@@ -41,6 +43,7 @@ const callback = Schema.Union([
 ])
 
 const snapshot = Schema.Struct({
+  ownerId: Schema.optional(Coordination.UserID),
   thread: Coordination.Thread,
   instructions: Schema.Array(Coordination.InstructionRequest),
   runs: Schema.Array(Coordination.Run),
@@ -107,6 +110,92 @@ const activityView = Schema.Struct({
   ),
 })
 
+const flowerEvidence = Schema.Struct({
+  workerId: Coordination.WorkerID,
+  sessionId: Coordination.Thread.fields.sessionId,
+  eventId: Schema.String,
+  revision: Schema.Int,
+})
+const flowerExport = Schema.Struct({
+  request: Schema.Struct({
+    requestId: Schema.String,
+    projectId: Coordination.ProjectID,
+    targetWorkerId: Coordination.WorkerID,
+    targetSessionId: Coordination.Thread.fields.sessionId,
+    question: Schema.String,
+    evidenceRefs: Schema.Array(flowerEvidence),
+    createdAt: Schema.String,
+  }),
+  snapshot: Schema.Struct({
+    schemaVersion: Schema.Literal(1),
+    projectId: Coordination.ProjectID,
+    workers: Schema.Array(
+      Schema.Struct({
+        workerId: Coordination.WorkerID,
+        projectId: Coordination.ProjectID,
+        ownerId: Schema.optional(Coordination.UserID),
+      }),
+    ),
+    sharedSessions: Schema.Array(
+      Schema.Struct({
+        workerId: Coordination.WorkerID,
+        sessionId: Coordination.Thread.fields.sessionId,
+        ownerId: Coordination.UserID,
+        title: Schema.String,
+        featureTopic: Schema.String,
+        relationship: Schema.Literals(["alternative", "unspecified"]),
+        revision: Schema.Int,
+        status: Schema.String,
+      }),
+    ),
+    events: Schema.Array(
+      Schema.Struct({
+        eventId: Schema.String,
+        projectId: Coordination.ProjectID,
+        workerId: Coordination.WorkerID,
+        sessionId: Coordination.Thread.fields.sessionId,
+        revision: Schema.Int,
+        kind: Schema.Literals(["message", "activity", "status"]),
+        occurredAt: Schema.String,
+        content: Schema.Struct({
+          toolName: Schema.optional(Schema.String),
+          toolStatus: Schema.optional(Schema.String),
+          transition: Schema.optional(Schema.String),
+          role: Schema.optional(Schema.String),
+          text: Schema.optional(Schema.String),
+        }),
+      }),
+    ),
+  }),
+  provenance: Schema.Array(
+    Schema.Struct({
+      threadId: Coordination.ThreadID,
+      eventId: Schema.String,
+      eventSeq: Schema.Int,
+      threadActivitySeq: Schema.Int,
+    }),
+  ),
+  bindings: Schema.Array(
+    Schema.Struct({
+      projectId: Coordination.ProjectID,
+      threadId: Coordination.ThreadID,
+      workerId: Coordination.WorkerID,
+      sessionId: Coordination.Thread.fields.sessionId,
+      ownerId: Coordination.UserID,
+      title: Schema.String,
+      featureTopic: Schema.String,
+      relationship: Schema.Literals(["alternative", "unspecified"]),
+      activitySeq: Schema.Int,
+      evidenceRevision: Schema.Int,
+      expectedVersion: Schema.Int,
+      shared: Schema.Literal(true),
+      deterministicStatus: Schema.Literals(["queued", "active", "blocked", "idle", "done"]),
+      contributors: Schema.Array(Coordination.UserID),
+    }),
+  ),
+  cooperationVersions: Schema.Record(Schema.String, Schema.Int),
+})
+
 export const CoordinationGroup = HttpApiGroup.make("server.coordination").add(
   HttpApiEndpoint.get("coordination.status", "/api/coordination/v1/status", {
     success: Schema.Struct({ ready: Schema.Boolean }),
@@ -121,6 +210,104 @@ export const CoordinationGroup = HttpApiGroup.make("server.coordination").add(
 )
 
 export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data")
+  .add(
+    HttpApiEndpoint.get(
+      "coordination.flowerAwarenessReceipt",
+      "/api/coordination/v1/threads/:threadId/flower/awareness/:reportId/:noteId",
+      {
+        params: { threadId: Coordination.ThreadID, reportId: Schema.String, noteId: Schema.String },
+        success: Schema.Struct({
+          sessionID: Coordination.Thread.fields.sessionId,
+          messageID: SessionMessage.ID,
+          admittedSeq: Schema.Int,
+          promotedSeq: optional(Schema.Int),
+          activeObserved: Schema.Boolean,
+        }),
+        error: errors,
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "coordination.flowerResultRegister",
+      "/api/coordination/v1/projects/:projectId/flower/results",
+      {
+        params: { projectId: Coordination.ProjectID },
+        payload: Coordination.FlowerResultContent,
+        success: Schema.Struct({ reportId: Schema.String, requestId: Schema.String, registered: Schema.Literal(true) }),
+        error: errors,
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "coordination.flowerAwarenessDeliver",
+      "/api/coordination/v1/threads/:threadId/flower/awareness",
+      {
+        params: { threadId: Coordination.ThreadID },
+        payload: Schema.Struct({ reportId: Schema.String, noteId: Schema.String, messageId: SessionMessage.ID }),
+        success: Schema.Struct({
+          sessionID: Coordination.Thread.fields.sessionId,
+          messageID: SessionMessage.ID,
+          admittedSeq: Schema.Int,
+          promotedSeq: optional(Schema.Int),
+          activeObserved: Schema.Boolean,
+        }),
+        error: errors,
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("coordination.cooperationGet", "/api/coordination/v1/threads/:threadId/cooperation", {
+      params: { threadId: Coordination.ThreadID },
+      success: Coordination.CooperationSettings,
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.put("coordination.cooperationPut", "/api/coordination/v1/threads/:threadId/cooperation", {
+      params: { threadId: Coordination.ThreadID },
+      payload: Schema.Struct({
+        requestId: Schema.String,
+        expectedVersion: Schema.Int,
+        ...Coordination.CooperationContent.fields,
+      }),
+      success: Coordination.CooperationSettings,
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("coordination.flowerExport", "/api/coordination/v1/projects/:projectId/flower/export", {
+      params: { projectId: Coordination.ProjectID },
+      payload: Schema.Struct({
+        requestId: Schema.String,
+        sourceThreadId: Coordination.ThreadID,
+        targetThreadId: Coordination.ThreadID,
+      }),
+      success: flowerExport,
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("coordination.me", "/api/coordination/v1/me", {
+      success: Schema.Struct({ userId: Coordination.UserID }),
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("coordination.provisioningList", "/api/coordination/v1/provisioning", {
+      success: Coordination.ProvisioningView,
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("coordination.sessionProvision", "/api/coordination/v1/projects/:projectId/sessions", {
+      params: { projectId: Coordination.ProjectID },
+      payload: Schema.Struct({ requestId: Schema.String, title: Schema.String }),
+      success: Coordination.ProvisionedSession,
+      error: errors,
+    }),
+  )
   .add(
     HttpApiEndpoint.get("coordination.projectList", "/api/coordination/v1/projects", {
       success: Schema.Array(Coordination.SharedProject),
@@ -138,6 +325,44 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     HttpApiEndpoint.get("coordination.projectGet", "/api/coordination/v1/projects/:projectId", {
       params: { projectId: Coordination.ProjectID },
       success: Schema.Struct({ project: Coordination.SharedProject, members: Schema.Array(Coordination.Membership) }),
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("coordination.projectBriefGet", "/api/coordination/v1/projects/:projectId/brief", {
+      params: { projectId: Coordination.ProjectID },
+      success: Schema.Struct({ brief: Schema.optional(Coordination.ProjectBrief) }),
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.put("coordination.projectBriefPut", "/api/coordination/v1/projects/:projectId/brief", {
+      params: { projectId: Coordination.ProjectID },
+      payload: Schema.Struct({
+        requestId: Schema.String,
+        expectedVersion: Schema.Int,
+        content: Coordination.ProjectBriefContent,
+      }),
+      success: Coordination.ProjectBrief,
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("coordination.personFocusList", "/api/coordination/v1/projects/:projectId/focus", {
+      params: { projectId: Coordination.ProjectID },
+      success: Schema.Array(Coordination.PersonFocus),
+      error: errors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.put("coordination.personFocusPut", "/api/coordination/v1/projects/:projectId/focus/me", {
+      params: { projectId: Coordination.ProjectID },
+      payload: Schema.Struct({
+        requestId: Schema.String,
+        expectedVersion: Schema.Int,
+        text: Schema.NullOr(Schema.String),
+      }),
+      success: Coordination.PersonFocus,
       error: errors,
     }),
   )

@@ -15,7 +15,12 @@ export type ProjectOverviewProps = {
   onNewSession: () => void
   onSetup: () => void
   onStartScenario: (scenario: "overlap" | "solution" | "solo") => void
-  onReset: () => void
+  mode?: "demo" | "live"
+  actorName?: string
+  sessionLabels?: Record<string, string>
+  sessionDetails?: Record<string, string>
+  personWorkSummaries?: Record<string, string>
+  onReset?: () => void
   onUndoReset?: () => void
 }
 
@@ -35,23 +40,24 @@ export function ProjectOverview(props: ProjectOverviewProps) {
         <p className="overview-goal">{props.project.goal}</p>
       </div>
       <div className="overview-actions">
+        {props.mode === "live" && <span className="overview-demo-badge"><span aria-hidden="true" />Connected service data</span>}
         <div className="overview-action-buttons">
           <button type="button" className="overview-settings" onClick={props.onSetup}>Project settings</button>
           <button type="button" className="overview-new-session" onClick={props.onNewSession}><span aria-hidden="true">+</span> New session</button>
         </div>
-        <div className="overview-reset-actions">
+        {props.mode !== "live" && props.onReset && <div className="overview-reset-actions">
           {props.onUndoReset && <button type="button" onClick={props.onUndoReset}>Undo reset</button>}
           <button type="button" onClick={props.onReset}>Reset workspace</button>
-        </div>
+        </div>}
       </div>
     </header>
 
-    <nav className="overview-workflows" aria-label="Project workflows">
+    {props.mode !== "live" && <nav className="overview-workflows" aria-label="Project workflows">
       <span className="overview-workflows-label">Try a workflow</span>
       <button type="button" onClick={() => props.onStartScenario("overlap")}>Avoid duplicate work<span aria-hidden="true">↗</span></button>
       <button type="button" onClick={() => props.onStartScenario("solution")}>Reuse a solved problem<span aria-hidden="true">↗</span></button>
       <button type="button" onClick={() => props.onStartScenario("solo")}>Find my context<span aria-hidden="true">↗</span></button>
-    </nav>
+    </nav>}
 
     <section className="overview-team" aria-labelledby="overview-team-heading">
       <div className="overview-team-heading">
@@ -75,21 +81,22 @@ export function ProjectOverview(props: ProjectOverviewProps) {
           const working = owned.filter(session => session.status === "running")
           const ready = owned.filter(session => session.status === "waiting")
           const completed = owned.filter(session => session.status === "complete")
-          const added = owned.filter(session => !["demo-you-api", "demo-you-auth", "demo-sam-frontend", "demo-sam-mobile", "demo-alice-server", "demo-alice-tests"].includes(session.id)).map(session => session.task || session.title)
+          const added = props.mode === "live" ? [] : owned.filter(session => !["demo-you-api", "demo-you-auth", "demo-sam-frontend", "demo-sam-mobile", "demo-alice-server", "demo-alice-tests"].includes(session.id)).map(session => session.task || session.title)
 
           return <article className="overview-person-card" key={member.name} aria-label={`${member.name}'s work`}>
             <header className="overview-person-header">
               <span className={`overview-avatar ${member.color}`} aria-hidden="true">{member.initials}</span>
-              <h3>{member.name === "You" ? "Serdar (you)" : member.name}</h3>
+              <h3>{member.name === "You" ? `${props.actorName ?? "Serdar"} (you)` : member.name}</h3>
               <span className="overview-session-count">{owned.length} {owned.length === 1 ? "session" : "sessions"}</span>
             </header>
 
             <div className="overview-person-summary">
               <div className="overview-summary-label">Total work</div>
-              <p>{member.focus}{added.length > 0 && ` Also: ${added.join("; ")}.`}</p>
+              <p>{props.mode === "live" ? props.personWorkSummaries?.[member.name] || "No shared Session work is recorded." : <>{member.focus}{added.length > 0 && ` Also: ${added.join("; ")}.`}</>}</p>
+              {props.mode === "live" && <><div className="overview-summary-label">Member-stated focus</div><p>{member.focus}</p></>}
               <div className="overview-work-counts">
                 <span className={working.length ? "has-working" : ""}><span className="overview-status-dot running" aria-hidden="true" />{working.length} working</span>
-                {ready.length > 0 && <span>{ready.length} ready</span>}
+                {ready.length > 0 && <span>{ready.length} {props.mode === "live" ? "not running" : "ready"}</span>}
                 <span>{completed.length} completed</span>
               </div>
             </div>
@@ -98,11 +105,12 @@ export function ProjectOverview(props: ProjectOverviewProps) {
               <div className="overview-sessions-label">Sessions</div>
               {owned.map((session, index) => <button type="button" className="overview-session-row" key={session.id} aria-label={sessions.filter(item => item.title === session.title).length > 1 ? `Open ${session.title}, ${member.name}'s session ${index + 1}` : `Open ${session.title}`} onClick={() => props.onOpenSession(session.id)}>
                 <span className="overview-session-meta">
-                  <span className={`overview-session-status ${session.status}`}><span className={`overview-status-dot ${session.status}`} aria-hidden="true" />{statusLabels[session.status]}</span>
+                  <span className={`overview-session-status ${session.status}`}><span className={`overview-status-dot ${session.status}`} aria-hidden="true" />{props.sessionLabels?.[session.id] ?? statusLabels[session.status]}</span>
                   {session.scope === "private" && <span className="overview-private"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.4" /><path d="M5 7V4a3 3 0 0 1 6 0v3" /></svg>Private</span>}
                 </span>
                 <span className="overview-session-title">{session.title}<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8" /></svg></span>
                 <span className="overview-session-summary" title={session.summary}>{session.summary || session.task || "Open this session to review its context."}</span>
+                {props.sessionDetails?.[session.id] && <span className="overview-session-relation" title={props.sessionDetails[session.id]}>{props.sessionDetails[session.id]}</span>}
                 {session.relation && <span className="overview-session-relation">{session.relation.replace(/\s*\(demo-[^)]+\)/g, "")}</span>}
               </button>)}
               {!owned.length && <p className="overview-person-empty">{member.name === "You" ? "Start a session to bring your work into view." : `${member.name}'s shared sessions will appear here.`}</p>}

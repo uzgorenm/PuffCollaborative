@@ -9,11 +9,12 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-from coordinator import journal_events
+from journal import journal_events
+from private_state import secure_state_tree
 
 
 def reconcile(project_id, request_id, state_dir):
-    root = Path(state_dir)
+    root = secure_state_tree(state_dir)
     key = hashlib.sha256((project_id + "\0" + request_id).encode()).hexdigest()
     journal = root / key / "events.jsonl"
     with closing(sqlite3.connect(root / "requests.sqlite3", timeout=1)) as db:

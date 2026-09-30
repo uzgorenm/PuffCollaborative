@@ -37,11 +37,13 @@ async function workspace(repository: string, workspaces: string, name: string, r
   return directory
 }
 
-async function roster(home: string, projectId: string) {
+async function roster(home: string, projectId: string, sessionIds: ReadonlyArray<string>) {
   const identitiesPath = path.join(home, "identities.json")
   const admissionsPath = path.join(home, "admissions.json")
+  const selectionsPath = path.join(home, "selections.json")
   const people = [
     { username: "alice", password: "alice-fixture-secret", auth: { kind: "member", userId: "usr_r13_alice" } },
+    { username: "analysis", password: "analysis-fixture-secret", auth: { kind: "analysis", serviceId: "r13-flower" } },
     {
       username: "worker",
       password: "worker-fixture-secret",
@@ -66,7 +68,13 @@ async function roster(home: string, projectId: string) {
     }),
   )
   await Bun.write(admissionsPath, JSON.stringify({ allowed: [{ userId: "usr_r13_alice", projectId }] }))
-  return { identitiesPath, admissionsPath, people }
+  await Bun.write(
+    selectionsPath,
+    JSON.stringify({
+      allowed: sessionIds.map((sessionId) => ({ userId: "usr_r13_alice", projectId, sessionId, workerId: "wrk_r13" })),
+    }),
+  )
+  return { identitiesPath, admissionsPath, selectionsPath, people }
 }
 
 function request(base: string, username: string, password: string) {
@@ -126,6 +134,7 @@ async function faultHost(
       OPENCODE_SERVER_PASSWORD: "runtime-fixture-secret",
       OPENCODE_COORDINATION_IDENTITIES_PATH: identity.identitiesPath,
       OPENCODE_COORDINATION_ADMISSIONS_PATH: identity.admissionsPath,
+      OPENCODE_COORDINATION_DEV_SESSION_SELECTIONS_PATH: identity.selectionsPath,
       OPENCODE_COORDINATION_MOCK_RUNNER: "0",
       R13_RUNNER_FIXTURE: "1",
       R13_CALLBACK_OUTAGE_PATH: outagePath,
@@ -178,7 +187,9 @@ test("an authorized coordinator Run completes through the embedded OpenCode runn
               }),
             ),
           )
-          const identity = yield* Effect.promise(() => roster(root, prepared.projectId))
+          const identity = yield* Effect.promise(() =>
+            roster(root, prepared.projectId, ["ses_r13_first", "ses_r13_second", "ses_r13_approval"]),
+          )
           const dbPath = path.join(root, "runner.sqlite")
           const configPath = path.join(root, "runner.json")
           yield* Effect.promise(() =>
@@ -208,6 +219,7 @@ test("an authorized coordinator Run completes through the embedded OpenCode runn
             OPENCODE_SERVER_PASSWORD: "runtime-fixture-secret",
             OPENCODE_COORDINATION_IDENTITIES_PATH: identity.identitiesPath,
             OPENCODE_COORDINATION_ADMISSIONS_PATH: identity.admissionsPath,
+            OPENCODE_COORDINATION_DEV_SESSION_SELECTIONS_PATH: identity.selectionsPath,
             OPENCODE_COORDINATION_MOCK_RUNNER: "0",
           }
           const server = yield* opencode.serve({ env: processEnv, readyTimeoutMs: 30_000 })
@@ -576,7 +588,20 @@ test("an authorized coordinator Run completes through the embedded OpenCode runn
               () =>
                 alice<{
                   runs: Array<{ id: string; state: string }>
-                  approvals: Array<{ id: string; version: number }>
+                  approvals: Array<{
+                    id: string
+                    version: number
+                    review?: {
+                      permission: string
+                      toolName: string
+                      inputJson?: string
+                      patterns: string[]
+                      sessionId: string
+                      toolCallId: string
+                      scopeHash: string
+                      complete: boolean
+                    }
+                  }>
                 }>(`/api/coordination/v1/threads/${approvalThread.data.id}`),
               (value) =>
                 value.data.runs.some(
@@ -590,6 +615,15 @@ test("an authorized coordinator Run completes through the embedded OpenCode runn
             false,
           )
           const approval = awaitingApproval.data.approvals[0]
+          expect(approval.review).toMatchObject({
+            permission: "edit",
+            toolName: "write",
+            sessionId: "ses_r13_approval",
+            complete: true,
+          })
+          expect(JSON.parse(approval.review!.inputJson!)).toEqual({ path: "artifact.txt", content: "from runner\n" })
+          expect(approval.review?.patterns.some((pattern) => pattern.endsWith("artifact.txt"))).toBe(true)
+          expect(approval.review?.scopeHash).toMatch(/^[a-f0-9]{64}$/)
           const decisionRoute = `/api/coordination/v1/threads/${approvalThread.data.id}/approvals/${approval.id}/decision`
           const acceptedDecision = yield* Effect.promise(() =>
             alice(decisionRoute, "POST", {
@@ -843,7 +877,7 @@ test("a typed coordinator callback outage drains persisted output after a runner
           const modelConfig = testProviderConfig(llm.url)
           Reflect.deleteProperty(modelConfig.provider.test, "env")
           yield* Effect.promise(() => Bun.write(path.join(directory, "opencode.json"), JSON.stringify(modelConfig)))
-          const identity = yield* Effect.promise(() => roster(root, prepared.projectId))
+          const identity = yield* Effect.promise(() => roster(root, prepared.projectId, ["ses_r13_outage"]))
           const dbPath = path.join(root, "runner.sqlite")
           const configPath = path.join(root, "runner.json")
           const outagePath = path.join(root, "callbacks-offline")
@@ -1058,3 +1092,283 @@ test("a typed coordinator callback outage drains persisted output after a runner
     ),
   )
 }, 90_000)
+
+test("a registered informational Flower note is admitted while active and promoted at the next safe boundary", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      withCliFixture(({ home, llm, opencode }) =>
+        Effect.gen(function* () {
+          const root = yield* Effect.promise(() => fs.realpath(home))
+          const prepared = yield* Effect.promise(() => source(root))
+          const directories = yield* Effect.promise(() =>
+            Promise.all([
+              workspace(prepared.repository, prepared.workspaces, "awareness-source", prepared.revision),
+              workspace(prepared.repository, prepared.workspaces, "awareness-target", prepared.revision),
+            ]),
+          )
+          const sessionIds = ["ses_r13_awareness_source", "ses_r13_awareness_target"]
+          const modelConfig = testProviderConfig(llm.url)
+          Reflect.deleteProperty(modelConfig.provider.test, "env")
+          yield* Effect.promise(() =>
+            Promise.all(
+              directories.map((directory) =>
+                Bun.write(path.join(directory, "opencode.json"), JSON.stringify(modelConfig)),
+              ),
+            ),
+          )
+          const identity = yield* Effect.promise(() => roster(root, prepared.projectId, sessionIds))
+          const dbPath = path.join(root, "runner.sqlite")
+          const configPath = path.join(root, "runner.json")
+          yield* Effect.promise(() =>
+            Bun.write(
+              configPath,
+              JSON.stringify({
+                owner: { workerId: "wrk_r13", instanceId: "r13-instance" },
+                username: "worker",
+                workspaceRoot: prepared.workspaces,
+                projects: [
+                  {
+                    projectId: prepared.projectId,
+                    repositoryRoot: prepared.repository,
+                    baseRevision: prepared.revision,
+                  },
+                ],
+                toolPath: "/usr/bin:/bin",
+                deliveryIntervalMs: 25,
+              }),
+            ),
+          )
+          const server = yield* opencode.serve({
+            env: {
+              OPENCODE_DB: dbPath,
+              OPENCODE_RUNNER_CONFIG_PATH: configPath,
+              OPENCODE_RUNNER_PASSWORD: "worker-fixture-secret",
+              OPENCODE_SERVER_PASSWORD: "runtime-fixture-secret",
+              OPENCODE_COORDINATION_IDENTITIES_PATH: identity.identitiesPath,
+              OPENCODE_COORDINATION_ADMISSIONS_PATH: identity.admissionsPath,
+              OPENCODE_COORDINATION_DEV_SESSION_SELECTIONS_PATH: identity.selectionsPath,
+              OPENCODE_COORDINATION_MOCK_RUNNER: "0",
+            },
+            readyTimeoutMs: 30_000,
+          })
+          const alice = request(server.url, "alice", "alice-fixture-secret")
+          const worker = request(server.url, "worker", "worker-fixture-secret")
+          const analysis = request(server.url, "analysis", "analysis-fixture-secret")
+          expect((yield* Effect.promise(() => alice("/api/coordination/v1/status"))).status).toBe(200)
+          yield* Effect.sync(() => {
+            const sqlite = new Database(dbPath)
+            const now = Date.now()
+            sqlite
+              .query("INSERT INTO project (id, worktree, sandboxes, time_created, time_updated) VALUES (?, ?, ?, ?, ?)")
+              .run(prepared.projectId, prepared.repository, "[]", now, now)
+            for (const [index, id] of sessionIds.entries()) {
+              const workspaceId = `wrk_awareness_${index}`
+              sqlite
+                .query(
+                  "INSERT INTO session (id, project_id, workspace_id, slug, directory, title, version, model, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                )
+                .run(
+                  id,
+                  prepared.projectId,
+                  workspaceId,
+                  id,
+                  directories[index],
+                  id,
+                  "fixture",
+                  JSON.stringify({ id: "test-model", providerID: "test" }),
+                  now,
+                  now,
+                )
+              sqlite
+                .query(
+                  `INSERT INTO coordination_session_provisioning
+          (id, project_id, owner_id, request_id, title, worker_id, session_id, workspace_id, directory,
+           config_signature, model, phase, thread, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                )
+                .run(
+                  `awareness-owner-${index}`,
+                  prepared.projectId,
+                  "usr_r13_alice",
+                  `awareness-owner-${index}`,
+                  id,
+                  "wrk_r13",
+                  id,
+                  workspaceId,
+                  directories[index],
+                  "fixture",
+                  JSON.stringify({ id: "test-model", providerID: "test" }),
+                  "session",
+                  null,
+                  now,
+                  now,
+                )
+            }
+            sqlite.close()
+          })
+          expect(
+            (yield* Effect.promise(() =>
+              alice("/api/coordination/v1/projects", "POST", {
+                projectId: prepared.projectId,
+                name: "Awareness",
+                requestId: "awareness-project",
+              }),
+            )).status,
+          ).toBe(200)
+          const threads = yield* Effect.forEach(sessionIds, (sessionId, index) =>
+            Effect.promise(() =>
+              alice<{ id: string }>(`/api/coordination/v1/projects/${prepared.projectId}/threads`, "POST", {
+                sessionId,
+                title: "Selected awareness",
+                requestId: `awareness-thread-${index}`,
+              }),
+            ),
+          )
+          for (const [index, thread] of threads.entries()) {
+            expect(thread.status).toBe(200)
+            expect(
+              (yield* Effect.promise(() =>
+                alice(`/api/coordination/v1/threads/${thread.data.id}/comments`, "POST", {
+                  requestId: `awareness-evidence-${index}`,
+                  body: "Current selected navigation evidence",
+                }),
+              )).status,
+            ).toBe(200)
+            expect(
+              (yield* Effect.promise(() =>
+                alice(`/api/coordination/v1/threads/${thread.data.id}/cooperation`, "PUT", {
+                  requestId: `awareness-consent-${index}`,
+                  expectedVersion: 0,
+                  featureTopic: "Navigation",
+                  relationship: "complementary",
+                  analysisEnabled: true,
+                  awarenessMode: "notify",
+                }),
+              )).status,
+            ).toBe(200)
+          }
+          const sourceThreadId = threads[0].data.id
+          const targetThreadId = threads[1].data.id
+          const barrier = Promise.withResolvers<void>()
+          yield* Effect.addFinalizer(() => Effect.sync(() => barrier.resolve()))
+          yield* llm.hold("Held target response", barrier.promise)
+          const instruction = yield* Effect.promise(() =>
+            alice<{ run: { id: string } }>(`/api/coordination/v1/threads/${targetThreadId}/instructions`, "POST", {
+              requestId: "active-awareness-target",
+              text: "Continue the current navigation task",
+            }),
+          )
+          expect(instruction.status).toBe(200)
+          expect(
+            (yield* Effect.promise(() =>
+              worker(`/api/coordination/v1/runner/threads/${targetThreadId}/reserve`, "POST"),
+            )).status,
+          ).toBe(200)
+          yield* llm.wait(1)
+          const capture = yield* Effect.promise(() =>
+            alice<{
+              provenance: Array<{ threadId: string; eventId: string; eventSeq: number; threadActivitySeq: number }>
+              cooperationVersions: Record<string, number>
+            }>(`/api/coordination/v1/projects/${prepared.projectId}/flower/export`, "POST", {
+              requestId: "active-awareness-export",
+              sourceThreadId,
+              targetThreadId,
+            }),
+          )
+          expect(capture.status).toBe(200)
+          const sourceRef = capture.data.provenance.filter((ref) => ref.threadId === sourceThreadId).at(-1)!
+          const targetRef = capture.data.provenance.filter((ref) => ref.threadId === targetThreadId).at(-1)!
+          const finding = "Related Navigation work has a current source citation."
+          const reportId = "report-active-awareness"
+          const noteId = "active-awareness-export:awareness"
+          const registered = yield* Effect.promise(() =>
+            analysis(`/api/coordination/v1/projects/${prepared.projectId}/flower/results`, "POST", {
+              requestId: "active-awareness-export",
+              reportId,
+              sourceThreadId,
+              targetThreadId,
+              sourceActivitySeq: sourceRef.threadActivitySeq,
+              targetActivitySeq: targetRef.threadActivitySeq,
+              cooperationVersions: capture.data.cooperationVersions,
+              awarenessNoteCandidates: [
+                {
+                  noteId,
+                  sourceThreadId,
+                  targetThreadId,
+                  sourceActivitySeq: sourceRef.threadActivitySeq,
+                  targetActivitySeq: targetRef.threadActivitySeq,
+                  featureTopic: "Navigation",
+                  text: finding,
+                  evidenceRefs: [sourceRef, targetRef].map((ref) => ({
+                    threadId: ref.threadId,
+                    eventId: ref.eventId,
+                    seq: ref.eventSeq,
+                  })),
+                  candidateState: "pending",
+                  deliveryState: "not_attempted",
+                },
+              ],
+            }),
+          )
+          expect(registered.status).toBe(200)
+          const delivery = { reportId, noteId, messageId: "msg_active_awareness" }
+          const admitted = yield* Effect.promise(() =>
+            alice<{ admittedSeq: number; promotedSeq?: number; activeObserved: boolean }>(
+              `/api/coordination/v1/threads/${targetThreadId}/flower/awareness`,
+              "POST",
+              delivery,
+            ),
+          )
+          expect(admitted.status).toBe(200)
+          expect(admitted.data.activeObserved).toBe(true)
+          expect(admitted.data.admittedSeq).toBeNumber()
+          expect(admitted.data.promotedSeq).toBeUndefined()
+          expect(
+            (yield* Effect.promise(() =>
+              alice(`/api/coordination/v1/threads/${targetThreadId}/flower/awareness`, "POST", delivery),
+            )).status,
+          ).toBe(200)
+          yield* llm.text("Awareness acknowledged; the current task continues")
+          yield* Effect.sync(() => barrier.resolve())
+          yield* Effect.promise(() =>
+            until(
+              () =>
+                alice<{ runs: Array<{ id: string; state: string }> }>(`/api/coordination/v1/threads/${targetThreadId}`),
+              (value) => value.data.runs.some((run) => run.id === instruction.data.run.id && run.state === "completed"),
+              "awareness safe-boundary completion",
+            ),
+          )
+          const promoted = yield* Effect.promise(() =>
+            alice<{ admittedSeq: number; promotedSeq?: number }>(
+              `/api/coordination/v1/threads/${targetThreadId}/flower/awareness/${encodeURIComponent(reportId)}/${encodeURIComponent(noteId)}`,
+            ),
+          )
+          expect(promoted.status).toBe(200)
+          expect(promoted.data.admittedSeq).toBe(admitted.data.admittedSeq)
+          expect(promoted.data.promotedSeq).toBeNumber()
+          expect(yield* llm.calls).toBe(2)
+          expect(JSON.stringify((yield* llm.inputs)[1])).toContain(finding)
+          expect(JSON.stringify((yield* llm.inputs)[1])).toContain(
+            "keep the current assignment unless its owner approves a change",
+          )
+          const replay = yield* Effect.promise(() =>
+            alice<{ events: Array<{ kind: string; payload: { text?: string } }> }>(
+              `/api/coordination/v1/threads/${targetThreadId}/events?after=-1&limit=256`,
+            ),
+          )
+          expect(replay.status).toBe(200)
+          expect(
+            replay.data.events.filter((event) => event.kind === "run.output").map((event) => event.payload.text),
+          ).toContain("Awareness acknowledged; the current task continues")
+          console.log(
+            "FLOWER_AWARENESS_PROMOTION_TRACE",
+            JSON.stringify({
+              admittedSeq: admitted.data.admittedSeq,
+              promotedSeq: promoted.data.promotedSeq,
+              modelCalls: yield* llm.calls,
+            }),
+          )
+        }),
+      ),
+    ),
+  )
+}, 60_000)

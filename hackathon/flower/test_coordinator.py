@@ -1,13 +1,22 @@
 import copy
+import hashlib
 import json
+import os
+import sqlite3
+import stat
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from contracts import make_report, prepare, validate_analysis
 from coordinator import CoordinationFailure, coordinate, execute, journal_events
+from product_export import build_product_job
+from reconcile import reconcile
 from smoke import example
+from transport import cancel_runs, record
 
 
 def analysis_for(item, run_id):
@@ -31,6 +40,67 @@ def analysis_for(item, run_id):
 
 
 class ContractsTest(unittest.TestCase):
+    def test_consented_instruction_revision_can_advance_beyond_content_activity(self):
+        request, snapshot = example()
+        bindings = []
+        provenance = []
+        for index, session in enumerate(snapshot["sharedSessions"]):
+            event = next(
+                item for item in snapshot["events"] if item["sessionId"] == session["sessionId"]
+            )
+            event["revision"] = 17 + index
+            session["revision"] = event["revision"]
+            next(
+                ref for ref in request["evidenceRefs"] if ref["sessionId"] == session["sessionId"]
+            )["revision"] = event["revision"]
+            binding = {
+                "projectId": request["projectId"],
+                "threadId": f"thread-{index}",
+                **{
+                    key: session[key]
+                    for key in (
+                        "workerId",
+                        "sessionId",
+                        "ownerId",
+                        "title",
+                        "featureTopic",
+                        "relationship",
+                    )
+                },
+                "activitySeq": event["revision"] - 1,
+                "evidenceRevision": event["revision"],
+                "expectedVersion": 0,
+                "shared": True,
+                "deterministicStatus": "active",
+                "contributors": [],
+            }
+            bindings.append(binding)
+            provenance.append(
+                {
+                    "threadId": binding["threadId"],
+                    "eventId": event["eventId"],
+                    "eventSeq": event["revision"],
+                    "threadActivitySeq": binding["activitySeq"],
+                }
+            )
+        envelope = {
+            "request": request,
+            "snapshot": snapshot,
+            "provenance": provenance,
+            "bindings": bindings,
+            "cooperationVersions": {binding["threadId"]: 1 for binding in bindings},
+        }
+        job = build_product_job(envelope)
+        source = bindings[0]
+        self.assertEqual(job.session_revisions[source["sessionId"]], source["evidenceRevision"])
+        self.assertEqual(
+            job.bindings_by_session[source["sessionId"]]["activitySeq"], source["activitySeq"]
+        )
+        changed = copy.deepcopy(envelope)
+        changed["bindings"][0]["evidenceRevision"] += 1
+        with self.assertRaises(ValueError):
+            build_product_job(changed)
+
     def setUp(self):
         self.request, self.snapshot = example()
         self.prepared = prepare(self.request, self.snapshot)
@@ -74,6 +144,70 @@ class ContractsTest(unittest.TestCase):
         self.finding["awareness"]["evidenceRefs"][0]["eventId"] = "invented"
         with self.assertRaises(ValueError):
             make_report(self.prepared, self.analyses, self.finding, "test")
+
+    def test_correction_after_finding_rejects_retained_old_note_citation(self):
+        self.snapshot["sharedSessions"][0]["revision"] = 2
+        self.snapshot["events"].append(
+            {
+                **self.snapshot["events"][0],
+                "eventId": "event-A-correction",
+                "revision": 2,
+                "content": {
+                    "role": "assistant",
+                    "text": "Correction: the earlier keyboard focus constraint was withdrawn.",
+                },
+            }
+        )
+        prepared = prepare(self.request, self.snapshot)
+        self.assertEqual(len(prepared["inputs"][0]["events"]), 2)
+        # The old event remains valid history and the model may cite it in analysis.
+        validate_analysis(self.analyses[0]["result"], prepared["inputs"][0])
+        with self.assertRaisesRegex(ValueError, "non-current evidence"):
+            make_report(prepared, self.analyses, self.finding, "test")
+        self.finding["awareness"] = None
+        self.finding["proposal"] = {
+            "kind": "context",
+            "text": "Review the earlier finding.",
+            "rationale": "Human review required",
+            "evidenceRefs": self.request["evidenceRefs"],
+        }
+        with self.assertRaisesRegex(ValueError, "non-current evidence"):
+            make_report(prepared, self.analyses, self.finding, "test")
+        current_ref = {
+            "workerId": "worker-A",
+            "sessionId": "A",
+            "eventId": "event-A-correction",
+            "revision": 2,
+        }
+        self.analyses[0]["result"]["evidenceRefs"] = [current_ref]
+        self.finding["proposal"] = None
+        self.finding["awareness"] = {
+            "sourceSessionId": "A",
+            "text": "A withdrew its earlier keyboard focus finding; both designs remain ongoing.",
+            "evidenceRefs": [current_ref, self.request["evidenceRefs"][1]],
+        }
+        report = make_report(prepared, self.analyses, self.finding, "test")
+        self.assertEqual(report["awarenessNotes"][0]["sourceRevision"], 2)
+
+    def test_retained_target_context_does_not_claim_target_freshness(self):
+        self.snapshot["sharedSessions"][1]["revision"] = 2
+        self.snapshot["events"].append(
+            {
+                **self.snapshot["events"][1],
+                "eventId": "event-B-later",
+                "revision": 2,
+                "content": {"role": "assistant", "text": "Still exploring full navigation."},
+            }
+        )
+        prepared = prepare(self.request, self.snapshot)
+        self.analyses[1]["result"]["evidenceRefs"].append(
+            {"workerId": "worker-B", "sessionId": "B", "eventId": "event-B-later", "revision": 2}
+        )
+        report = make_report(prepared, self.analyses, self.finding, "test")
+        note = report["awarenessNotes"][0]
+        self.assertEqual(note["sourceRevision"], 1)
+        self.assertEqual(note["evidenceRefs"][1]["eventId"], "event-B")
+        self.assertNotIn("targetRevision", note)
 
     def test_alternatives_not_duplicates(self):
         self.finding["relationship"] = "overlap"
@@ -171,6 +305,51 @@ class ContractsTest(unittest.TestCase):
 
 
 class LifecycleTest(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "POSIX permission modes required")
+    def test_state_tree_and_sqlite_sidecar_are_owner_only(self):
+        def mode(path):
+            return stat.S_IMODE(Path(path).stat().st_mode)
+
+        def runner(prepared, directory, timeout):
+            record(directory / "events.jsonl", {"stage": "test", "state": "synthetic"})
+            return {"state": "completed", "report": {"requestId": prepared["request"]["requestId"]}}
+
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            root = Path(directory)
+            prior = root / "prior"
+            prior.mkdir(mode=0o755)
+            old_input = prior / "input.json"
+            old_input.write_text("synthetic", encoding="utf-8")
+            os.chmod(old_input, 0o644)
+            os.chmod(root, 0o755)
+            coordinate(*example("private-state"), state_dir=root, runner=runner)
+            request_dir = next(path for path in root.iterdir() if path.is_dir() and path != prior)
+            for path in (root, prior, request_dir):
+                self.assertEqual(mode(path), 0o700, str(path))
+            for path in (
+                old_input,
+                root / "requests.sqlite3",
+                request_dir / "events.jsonl",
+            ):
+                self.assertEqual(mode(path), 0o600, str(path))
+            with sqlite3.connect(root / "requests.sqlite3") as db:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute("INSERT INTO requests VALUES (?, ?, ?)", ("sidecar", "x", "{}"))
+                self.assertEqual(mode(root / "requests.sqlite3-journal"), 0o600)
+
+    def test_total_budget_covers_sequential_agent_stages(self):
+        observed = []
+
+        def runner(prepared, directory, timeout):
+            observed.append(timeout)
+            return {"state": "completed", "report": {"requestId": prepared["request"]["requestId"]}}
+
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            coordinate(*example("two-stage-budget"), state_dir=directory, runner=runner)
+        # Session agents overlap, but coordination begins only after both finish.
+        # Each stage has a 120-second SDK timeout plus remote startup overhead.
+        self.assertGreater(observed[0], 240)
+
     def test_new_id_cannot_replace_unresolved_remote_run(self):
         calls = []
 
@@ -257,6 +436,65 @@ class LifecycleTest(unittest.TestCase):
             path = Path(directory) / "events.jsonl"
             path.write_text('{"runId":"123","state":"submitted"}\n{"truncated', encoding="utf-8")
             self.assertEqual(journal_events(path)[0]["runId"], "123")
+
+    def test_partial_journal_still_cancels_known_run(self):
+        class Client:
+            stopped = False
+
+            def ListRuns(self, request):
+                status = SimpleNamespace(
+                    status="finished" if self.stopped else "running",
+                    sub_status="stopped" if self.stopped else "",
+                )
+                return SimpleNamespace(run_dict={request.run_id: SimpleNamespace(status=status)})
+
+            def StopRun(self, request):
+                self.stopped = True
+                self.stopped_run_id = request.run_id
+
+            def close(self):
+                pass
+
+        client = Client()
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            path = Path(directory) / "events.jsonl"
+            path.write_text('{"runId":"123","state":"submitted"}\n{"truncated', encoding="utf-8")
+            with (
+                patch("transport.read_superlink_connection", return_value=object()),
+                patch("transport.init_http_client_from_connection", return_value=client),
+            ):
+                cancel_runs(path)
+            self.assertEqual(client.stopped_run_id, 123)
+            self.assertTrue(
+                any(
+                    event.get("runId") == "123" and event.get("state") == "finished:stopped"
+                    for event in journal_events(path)
+                )
+            )
+
+    def test_reconcile_keeps_known_run_unresolved_after_partial_line(self):
+        request_id = "partial-reconcile"
+        key = hashlib.sha256(("puff-demo\0" + request_id).encode()).hexdigest()
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            root = Path(directory)
+            path = root / key
+            path.mkdir()
+            (path / "events.jsonl").write_text(
+                '{"runId":"123","state":"submitted"}\n{"truncated', encoding="utf-8"
+            )
+            with sqlite3.connect(root / "requests.sqlite3") as db:
+                db.execute(
+                    "CREATE TABLE requests (id TEXT PRIMARY KEY, fingerprint TEXT, outcome TEXT)"
+                )
+                db.execute(
+                    "INSERT INTO requests VALUES (?, ?, ?)",
+                    (key, "synthetic", json.dumps({"state": "failed", "error": "Timeout"})),
+                )
+            with patch("reconcile.subprocess.run", return_value=SimpleNamespace(returncode=1)):
+                outcome = reconcile("puff-demo", request_id, root)
+            self.assertEqual(outcome["runIds"], ["123"])
+            self.assertEqual(outcome["remoteUnresolved"], ["123"])
+            self.assertEqual(outcome["terminalStates"], {})
 
 
 if __name__ == "__main__":

@@ -109,6 +109,72 @@ const append = (
   )
 
 describe("coordination event journal", () => {
+  it.effect("advances the content revision for owner instructions while retaining the project cursor for run status", () =>
+    Effect.gen(function* () {
+      const journal = yield* CoordinationEvents.Service
+      const { db } = yield* Database.Service
+      const { projectId, threadId, createdBy } = yield* ids()
+      const otherThread = yield* addThread(projectId, createdBy)
+      yield* append(journal, projectId, otherThread, "other thread output")
+
+      const instruction = yield* journal.append(
+        {
+          projectId,
+          threadId,
+          actorId: createdBy,
+          kind: "instruction.submitted",
+          occurredAt: new Date().toISOString(),
+          payload: { text: "Use the existing shared parser", requestId: "first-instruction" },
+        },
+        () => Effect.void,
+      )
+      expect(instruction.seq).toBe(1)
+      expect(
+        (yield* db
+          .select({ seq: ThreadTable.activity_seq })
+          .from(ThreadTable)
+          .where(eq(ThreadTable.id, threadId))
+          .get())?.seq,
+      ).toBe(1)
+
+      for (const kind of ["run.reserved", "run.started"] as const)
+        yield* journal.append(
+          { projectId, threadId, kind, occurredAt: new Date().toISOString(), payload: {} },
+          () => Effect.void,
+        )
+      expect(yield* journal.latestSequence(projectId)).toBe(3)
+      expect(
+        (yield* db
+          .select({ seq: ThreadTable.activity_seq })
+          .from(ThreadTable)
+          .where(eq(ThreadTable.id, threadId))
+          .get())?.seq,
+      ).toBe(1)
+
+      const correction = yield* journal.append(
+        {
+          projectId,
+          threadId,
+          actorId: createdBy,
+          kind: "instruction.submitted",
+          occurredAt: new Date().toISOString(),
+          payload: { text: "The shared parser now handles this case", requestId: "corrected-instruction" },
+        },
+        () => Effect.void,
+      )
+      expect(correction.seq).toBe(4)
+      expect(
+        (yield* db
+          .select({ seq: ThreadTable.activity_seq })
+          .from(ThreadTable)
+          .where(eq(ThreadTable.id, threadId))
+          .get())?.seq,
+      ).toBe(4)
+      expect((yield* journal.replayThread(threadId, -1, 10)).events.map((event) => event.seq)).toEqual([1, 2, 3, 4])
+      expect((yield* journal.replayProject(projectId, -1, 10)).events.map((event) => event.seq)).toEqual([0, 1, 2, 3, 4])
+    }),
+  )
+
   it.effect("delivers the same ordered durable events to two clients", () =>
     Effect.gen(function* () {
       const journal = yield* CoordinationEvents.Service

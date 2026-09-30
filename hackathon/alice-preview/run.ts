@@ -81,6 +81,7 @@ if (collisionStatus === 0 || !collisionError.includes("EADDRINUSE") || !recovere
 const measuredAt = new Date().toISOString()
 const capture = {
   scenario: "human-authored isolated Alice finding",
+  projectId,
   measuredAt,
   error: "EADDRINUSE",
   occupiedPort,
@@ -110,6 +111,7 @@ const admissionPath = join(directory, "admissions.json")
 const memberPath = join(directory, "member.json")
 const credentialsPath = join(directory, "credentials.json")
 const runnerPath = join(directory, "runner.json")
+const selectionsPath = join(directory, "selections.json")
 await Bun.write(
   identityPath,
   JSON.stringify({
@@ -123,6 +125,19 @@ await Bun.write(
   }),
 )
 await Bun.write(admissionPath, JSON.stringify({ allowed: [{ userId: "usr_alice", projectId }] }))
+// Selection is loaded when coordination is composed. These exact grants belong
+// to this launcher's trusted fixture Sessions, including the bounded helper's
+// planned Session. They never grant access to its unshared Session.
+await Bun.write(
+  selectionsPath,
+  JSON.stringify({
+    allowed: [
+      { userId: "usr_alice", projectId, sessionId: "ses_alice_preview", workerId: "wrk_alice_preview" },
+      { userId: "usr_serdar", projectId, sessionId: "ses_serdar_preview", workerId: "wrk_alice_preview" },
+      { userId: "usr_serdar", projectId, sessionId: "ses_serdar_bounded", workerId: "wrk_alice_preview" },
+    ],
+  }),
+)
 await Bun.write(credentialsPath, JSON.stringify(people))
 await Bun.write(
   runnerPath,
@@ -135,7 +150,9 @@ await Bun.write(
     deliveryIntervalMs: 100,
   }),
 )
-await Promise.all([identityPath, admissionPath, credentialsPath, runnerPath].map((path) => chmod(path, 0o600)))
+await Promise.all(
+  [identityPath, admissionPath, credentialsPath, runnerPath, selectionsPath].map((path) => chmod(path, 0o600)),
+)
 
 const configPath = process.env.PUFF_MODEL_CONFIG_PATH
 let config = configPath ? await Bun.file(configPath).json() : undefined
@@ -194,6 +211,7 @@ const env = {
   OPENCODE_CONFIG_CONTENT: JSON.stringify(config ?? { formatter: false, lsp: false }),
   OPENCODE_COORDINATION_IDENTITIES_PATH: identityPath,
   OPENCODE_COORDINATION_ADMISSIONS_PATH: admissionPath,
+  OPENCODE_COORDINATION_DEV_SESSION_SELECTIONS_PATH: selectionsPath,
   OPENCODE_COORDINATION_MOCK_RUNNER: "0",
   OPENCODE_RUNNER_CONFIG_PATH: runnerPath,
   OPENCODE_RUNNER_PASSWORD: worker.password,
@@ -267,7 +285,7 @@ try {
       .then((value) => value.ok)
       .catch(() => false)
     if (ready) break
-    if (server.exitCode !== null) throw new Error(`Backend exited: ${await Bun.file(logs).text()}`)
+    if (server.exitCode !== null) throw new Error(`Backend exited; inspect the private runtime log at ${logs}`)
     await Bun.sleep(200)
   }
   if (!ready) throw new Error(`Real coordination runner did not become ready; log: ${logs}`)
@@ -330,6 +348,16 @@ try {
     }),
     "Join Serdar",
   )
+  const otherMemberShare = await request(`/api/coordination/v1/projects/${projectId}/threads`, "serdar", "POST", {
+    sessionId: "ses_alice_preview",
+    title: "Another member cannot select Alice's Session",
+    requestId: "wrong-owner-selection",
+  })
+  const privateShare = await request(`/api/coordination/v1/projects/${projectId}/threads`, "serdar", "POST", {
+    sessionId: "ses_private_preview",
+    title: "An unselected Session cannot be shared",
+    requestId: "unselected-private-session",
+  })
   const sourceThread = requireOK(
     await request<{ id: string }>(`/api/coordination/v1/projects/${projectId}/threads`, "alice", "POST", {
       sessionId: "ses_alice_preview",
@@ -657,6 +685,8 @@ try {
     changedInstructionRetryRejected: changedRetry.status === 409,
     memberCannotReserve: memberReserve.status === 403,
     outsiderCannotRead: [403, 404].includes(outsiderRead.status),
+    otherMemberCannotShare: otherMemberShare.status === 403,
+    privateSessionCannotShare: privateShare.status === 403,
     privateSessionNotExported: !allThreads.some((thread) => thread.sessionId === "ses_private_preview"),
     runtimeHistoryClosed: historyClosed.status === 403,
     staleRunnerRejected: staleCallback.status === 403,

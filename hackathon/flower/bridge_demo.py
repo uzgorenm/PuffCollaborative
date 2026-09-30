@@ -24,10 +24,13 @@ def main():
             "workerId": "worker-compact",
             "sessionId": "compact",
             "revision": 3,
-            "kind": "activity",
+            "kind": "status",
             "occurredAt": "2026-09-29T18:00:03Z",
-            # Synthetic tool output illustrates the evidence-backed outcome field.
-            "content": {"toolName": "keyboard-focus-check", "toolStatus": "passed"},
+            # The current synthetic result retains the finding it verifies.
+            "content": {
+                "transition": "progress",
+                "recentOutcome": "Keyboard-focus and Escape checks passed for compact navigation.",
+            },
         }
     )
 
@@ -78,8 +81,8 @@ def main():
         "evidenceRefs": [
             {
                 "threadId": threads["compact"],
-                "eventId": "compact-2",
-                "seq": project_seq["compact-2"],
+                "eventId": "compact-3",
+                "seq": 3,
             },
             {"threadId": threads["full"], "eventId": "full-1", "seq": project_seq["full-1"]},
         ],
@@ -135,7 +138,7 @@ def main():
                         "eventId": event_id,
                         "revision": events[event_id]["revision"],
                     }
-                    for event_id in ("compact-2", "full-1")
+                    for event_id in ("compact-3", "full-1")
                 ],
             },
             "proposal": None,

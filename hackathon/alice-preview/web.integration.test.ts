@@ -7,7 +7,10 @@ test("real backend connection cites exact source, preserves the task, and reconc
   const previousPath = process.env.PUFF_BACKEND_MEMBER_PATH
   const previousUrl = process.env.PUFF_BACKEND_URL
   const root = resolve(import.meta.dir, "../..")
-  const child = Bun.spawn([process.execPath, resolve(root, "hackathon/alice-preview/run.ts")], { cwd: root, env: { ...process.env, PUFF_PREVIEW_SERVER_PORT: "4480" }, stdout: "pipe", stderr: "pipe" })
+  const env: NodeJS.ProcessEnv = { ...process.env, PUFF_PREVIEW_SERVER_PORT: "4480" }
+  delete env.PUFF_MODEL_CONFIG_PATH
+  delete env.PUFF_PREVIEW_NATIVE_SCENARIO
+  const child = Bun.spawn([process.execPath, resolve(root, "hackathon/alice-preview/run.ts")], { cwd: root, env, stdout: "pipe", stderr: "pipe" })
   const reader = child.stdout.getReader()
   let output = ""
   let memberPath = ""
@@ -70,7 +73,7 @@ test("real backend connection cites exact source, preserves the task, and reconc
     expect(refreshed.finding.targetActivitySeq).toBeGreaterThan(inspected.finding.targetActivitySeq)
     const refreshedPayload = { ...refreshed.finding, requestId: payload.requestId }
     await backend(`/threads/${target}/instructions`, "serdar", "POST", { requestId: "new-unrelated-task", text: "Update the welcome copy; server startup is already resolved." })
-    expect((await backend(`/threads/${target}`, "serdar")).thread.activitySeq).toBe(refreshed.finding.targetActivitySeq)
+    expect((await backend(`/threads/${target}`, "serdar")).thread.activitySeq).toBeGreaterThan(refreshed.finding.targetActivitySeq)
     expect((await call(`threads/${target}/reuse`, refreshedPayload)).status).toBe(409)
     const unrelatedFindings: LiveFinding[] = await (await call(`threads/${target}/findings?q=EADDRINUSE`)).json()
     const unrelated: LiveSource = await (await call(sourcePath(unrelatedFindings[0]))).json()

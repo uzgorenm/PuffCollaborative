@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises"
-import { matchingActiveWork, matchingError, validActiveWorkRun, validActiveWorkSource, validFindingSource, workspaceOrigin } from "./connected-protocol"
+import { matchingActiveWork, matchingError, validActiveWorkRun, validActiveWorkSource, validFindingSource, workspaceOrigin } from "./connected-protocol.ts"
 import type { SourceEvent, ThreadRecord, WorkCardRecord } from "./connected-protocol"
 import type { LiveEvent, LiveFinding, LiveReceipt, LiveSource, LiveThread, LiveThreadSummary, LiveWorkMatch, LiveWorkspace } from "./connected-types"
 
@@ -43,7 +43,7 @@ async function project(config: Config, request: Requester) {
 async function snapshot(config: Config, request: Requester, id: string, write = false) {
   const result = await request<Snapshot>(`/threads/${encoded(id)}`)
   if (result.thread.id !== id || result.thread.projectId !== config.projectId) throw new LiveError(403, "This session belongs to a different project.")
-  if (write && result.thread.createdBy !== config.userId) throw new LiveError(403, "Only your own sessions can receive an instruction from this workspace.")
+  if (write && result.thread.createdBy !== config.userId) throw new LiveError(403, "This preview sends instructions only to Threads shared by the configured member.")
   return result
 }
 function summary(record: Snapshot): LiveThreadSummary {
@@ -128,7 +128,8 @@ function receipt(instruction: Instruction, run: Run): LiveReceipt {
 function string(value: unknown) { return typeof value === "string" ? value : "" }
 export async function handleLive(request: Request, path: string[]): Promise<Response> {
   try {
-    if (request.method === "POST" && (!workspaceOrigin(request) || !request.headers.get("content-type")?.startsWith("application/json"))) throw new LiveError(403, "This action must originate from your Puff workspace.")
+    if (!workspaceOrigin(request, { allowMissingOrigin: request.method === "GET", webOrigin: process.env.PUFF_WEB_ORIGIN })
+      || (request.method === "POST" && request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "application/json")) throw new LiveError(403, "This action must originate from your Puff workspace.")
     const config = await configuration()
     const api = client(config)
     const memberProject = await project(config, api)

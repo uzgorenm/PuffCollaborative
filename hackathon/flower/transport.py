@@ -5,6 +5,7 @@ These Python CLI helpers are version-specific, not a stable public SDK.
 """
 
 import json
+import os
 import threading
 import time
 from pathlib import Path
@@ -20,6 +21,9 @@ from flwr.proto.control_pb2 import (
     StreamRunEventsRequest,
 )
 
+from journal import journal_events
+from private_state import open_private_file, secure_directory, secure_state_tree
+
 LOCK = threading.Lock()
 # Flower rewrites ~/.flwr/credentials.yaml on token refresh; on Windows concurrent
 # runs collide on that file, so connection setup and submission are serialized.
@@ -27,7 +31,18 @@ CONNECT = threading.Lock()
 
 
 def record(path, event):
-    with LOCK, Path(path).open("a", encoding="utf-8") as output:
+    secure_directory(Path(path).parent)
+    with (
+        LOCK,
+        os.fdopen(
+            open_private_file(path, os.O_RDWR | os.O_CREAT | os.O_APPEND), "a+", encoding="utf-8"
+        ) as output,
+    ):
+        output.seek(0, os.SEEK_END)
+        if output.tell():
+            output.seek(output.tell() - 1)
+            if output.read(1) != "\n":
+                output.write("\n")
         output.write(json.dumps(event) + "\n")
         output.flush()
 
@@ -141,7 +156,8 @@ def run_agent(project, payload, journal, stage):
 
 
 def cancel_runs(journal):
-    events = [json.loads(line) for line in Path(journal).read_text(encoding="utf-8").splitlines()]
+    secure_state_tree(Path(journal).parent)
+    events = journal_events(journal)
     ids = {e["runId"] for e in events if e.get("runId")}
     terminal = {e["runId"] for e in events if e["state"].startswith("finished:")}
     client = init_http_client_from_connection(read_superlink_connection("supergrid"))

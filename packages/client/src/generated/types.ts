@@ -2816,6 +2816,464 @@ export type ProjectCopiesRefreshOutput = void
 
 export type ServerCoordinationStatusOutput = { readonly ready: boolean }
 
+export type ServerCoordinationDataFlowerAwarenessReceiptInput = {
+  readonly threadId: { readonly threadId: string; readonly reportId: string; readonly noteId: string }["threadId"]
+  readonly reportId: { readonly threadId: string; readonly reportId: string; readonly noteId: string }["reportId"]
+  readonly noteId: { readonly threadId: string; readonly reportId: string; readonly noteId: string }["noteId"]
+}
+
+export type ServerCoordinationDataFlowerAwarenessReceiptOutput = {
+  readonly sessionID: string
+  readonly messageID: string
+  readonly admittedSeq: number
+  readonly promotedSeq?: number
+  readonly activeObserved: boolean
+}
+
+export type ServerCoordinationDataFlowerResultRegisterInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly requestId: {
+    readonly requestId: string
+    readonly reportId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+    readonly sourceActivitySeq: number
+    readonly targetActivitySeq: number
+    readonly cooperationVersions: { readonly [x: string]: number }
+    readonly awarenessNoteCandidates: ReadonlyArray<{
+      readonly noteId: string
+      readonly sourceThreadId: string
+      readonly targetThreadId: string
+      readonly sourceActivitySeq: number
+      readonly targetActivitySeq: number
+      readonly featureTopic: string
+      readonly text: string
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly candidateState: "pending"
+      readonly deliveryState: "not_attempted"
+    }>
+  }["requestId"]
+  readonly reportId: {
+    readonly requestId: string
+    readonly reportId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+    readonly sourceActivitySeq: number
+    readonly targetActivitySeq: number
+    readonly cooperationVersions: { readonly [x: string]: number }
+    readonly awarenessNoteCandidates: ReadonlyArray<{
+      readonly noteId: string
+      readonly sourceThreadId: string
+      readonly targetThreadId: string
+      readonly sourceActivitySeq: number
+      readonly targetActivitySeq: number
+      readonly featureTopic: string
+      readonly text: string
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly candidateState: "pending"
+      readonly deliveryState: "not_attempted"
+    }>
+  }["reportId"]
+  readonly sourceThreadId: {
+    readonly requestId: string
+    readonly reportId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+    readonly sourceActivitySeq: number
+    readonly targetActivitySeq: number
+    readonly cooperationVersions: { readonly [x: string]: number }
+    readonly awarenessNoteCandidates: ReadonlyArray<{
+      readonly noteId: string
+      readonly sourceThreadId: string
+      readonly targetThreadId: string
+      readonly sourceActivitySeq: number
+      readonly targetActivitySeq: number
+      readonly featureTopic: string
+      readonly text: string
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly candidateState: "pending"
+      readonly deliveryState: "not_attempted"
+    }>
+  }["sourceThreadId"]
+  readonly targetThreadId: {
+    readonly requestId: string
+    readonly reportId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+    readonly sourceActivitySeq: number
+    readonly targetActivitySeq: number
+    readonly cooperationVersions: { readonly [x: string]: number }
+    readonly awarenessNoteCandidates: ReadonlyArray<{
+      readonly noteId: string
+      readonly sourceThreadId: string
+      readonly targetThreadId: string
+      readonly sourceActivitySeq: number
+      readonly targetActivitySeq: number
+      readonly featureTopic: string
+      readonly text: string
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly candidateState: "pending"
+      readonly deliveryState: "not_attempted"
+    }>
+  }["targetThreadId"]
+  readonly sourceActivitySeq: {
+    readonly requestId: string
+    readonly reportId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+    readonly sourceActivitySeq: number
+    readonly targetActivitySeq: number
+    readonly cooperationVersions: { readonly [x: string]: number }
+    readonly awarenessNoteCandidates: ReadonlyArray<{
+      readonly noteId: string
+      readonly sourceThreadId: string
+      readonly targetThreadId: string
+      readonly sourceActivitySeq: number
+      readonly targetActivitySeq: number
+      readonly featureTopic: string
+      readonly text: string
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly candidateState: "pending"
+      readonly deliveryState: "not_attempted"
+    }>
+  }["sourceActivitySeq"]
+  readonly targetActivitySeq: {
+    readonly requestId: string
+    readonly reportId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+    readonly sourceActivitySeq: number
+    readonly targetActivitySeq: number
+    readonly cooperationVersions: { readonly [x: string]: number }
+    readonly awarenessNoteCandidates: ReadonlyArray<{
+      readonly noteId: string
+      readonly sourceThreadId: string
+      readonly targetThreadId: string
+      readonly sourceActivitySeq: number
+      readonly targetActivitySeq: number
+      readonly featureTopic: string
+      readonly text: string
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly candidateState: "pending"
+      readonly deliveryState: "not_attempted"
+    }>
+  }["targetActivitySeq"]
+  readonly cooperationVersions: {
+    readonly requestId: string
+    readonly reportId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+    readonly sourceActivitySeq: number
+    readonly targetActivitySeq: number
+    readonly cooperationVersions: { readonly [x: string]: number }
+    readonly awarenessNoteCandidates: ReadonlyArray<{
+      readonly noteId: string
+      readonly sourceThreadId: string
+      readonly targetThreadId: string
+      readonly sourceActivitySeq: number
+      readonly targetActivitySeq: number
+      readonly featureTopic: string
+      readonly text: string
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly candidateState: "pending"
+      readonly deliveryState: "not_attempted"
+    }>
+  }["cooperationVersions"]
+  readonly awarenessNoteCandidates: {
+    readonly requestId: string
+    readonly reportId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+    readonly sourceActivitySeq: number
+    readonly targetActivitySeq: number
+    readonly cooperationVersions: { readonly [x: string]: number }
+    readonly awarenessNoteCandidates: ReadonlyArray<{
+      readonly noteId: string
+      readonly sourceThreadId: string
+      readonly targetThreadId: string
+      readonly sourceActivitySeq: number
+      readonly targetActivitySeq: number
+      readonly featureTopic: string
+      readonly text: string
+      readonly evidenceRefs: ReadonlyArray<{
+        readonly threadId: string
+        readonly eventId: string
+        readonly seq: number
+      }>
+      readonly candidateState: "pending"
+      readonly deliveryState: "not_attempted"
+    }>
+  }["awarenessNoteCandidates"]
+}
+
+export type ServerCoordinationDataFlowerResultRegisterOutput = {
+  readonly reportId: string
+  readonly requestId: string
+  readonly registered: true
+}
+
+export type ServerCoordinationDataFlowerAwarenessDeliverInput = {
+  readonly threadId: { readonly threadId: string }["threadId"]
+  readonly reportId: { readonly reportId: string; readonly noteId: string; readonly messageId: string }["reportId"]
+  readonly noteId: { readonly reportId: string; readonly noteId: string; readonly messageId: string }["noteId"]
+  readonly messageId: { readonly reportId: string; readonly noteId: string; readonly messageId: string }["messageId"]
+}
+
+export type ServerCoordinationDataFlowerAwarenessDeliverOutput = {
+  readonly sessionID: string
+  readonly messageID: string
+  readonly admittedSeq: number
+  readonly promotedSeq?: number
+  readonly activeObserved: boolean
+}
+
+export type ServerCoordinationDataCooperationGetInput = { readonly threadId: { readonly threadId: string }["threadId"] }
+
+export type ServerCoordinationDataCooperationGetOutput = {
+  readonly featureTopic: string
+  readonly relationship: "open" | "complementary" | "alternative"
+  readonly analysisEnabled: boolean
+  readonly analysisTextEnabled?: boolean
+  readonly awarenessMode: "off" | "notify"
+  readonly threadId: string
+  readonly ownerId?: string
+  readonly sourceActivitySeq: number
+  readonly version: number
+  readonly updatedAt?: string
+}
+
+export type ServerCoordinationDataCooperationPutInput = {
+  readonly threadId: { readonly threadId: string }["threadId"]
+  readonly requestId: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly featureTopic: string
+    readonly relationship: "open" | "complementary" | "alternative"
+    readonly analysisEnabled: boolean
+    readonly analysisTextEnabled?: boolean
+    readonly awarenessMode: "off" | "notify"
+  }["requestId"]
+  readonly expectedVersion: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly featureTopic: string
+    readonly relationship: "open" | "complementary" | "alternative"
+    readonly analysisEnabled: boolean
+    readonly analysisTextEnabled?: boolean
+    readonly awarenessMode: "off" | "notify"
+  }["expectedVersion"]
+  readonly featureTopic: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly featureTopic: string
+    readonly relationship: "open" | "complementary" | "alternative"
+    readonly analysisEnabled: boolean
+    readonly analysisTextEnabled?: boolean
+    readonly awarenessMode: "off" | "notify"
+  }["featureTopic"]
+  readonly relationship: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly featureTopic: string
+    readonly relationship: "open" | "complementary" | "alternative"
+    readonly analysisEnabled: boolean
+    readonly analysisTextEnabled?: boolean
+    readonly awarenessMode: "off" | "notify"
+  }["relationship"]
+  readonly analysisEnabled: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly featureTopic: string
+    readonly relationship: "open" | "complementary" | "alternative"
+    readonly analysisEnabled: boolean
+    readonly analysisTextEnabled?: boolean
+    readonly awarenessMode: "off" | "notify"
+  }["analysisEnabled"]
+  readonly analysisTextEnabled?: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly featureTopic: string
+    readonly relationship: "open" | "complementary" | "alternative"
+    readonly analysisEnabled: boolean
+    readonly analysisTextEnabled?: boolean
+    readonly awarenessMode: "off" | "notify"
+  }["analysisTextEnabled"]
+  readonly awarenessMode: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly featureTopic: string
+    readonly relationship: "open" | "complementary" | "alternative"
+    readonly analysisEnabled: boolean
+    readonly analysisTextEnabled?: boolean
+    readonly awarenessMode: "off" | "notify"
+  }["awarenessMode"]
+}
+
+export type ServerCoordinationDataCooperationPutOutput = {
+  readonly featureTopic: string
+  readonly relationship: "open" | "complementary" | "alternative"
+  readonly analysisEnabled: boolean
+  readonly analysisTextEnabled?: boolean
+  readonly awarenessMode: "off" | "notify"
+  readonly threadId: string
+  readonly ownerId?: string
+  readonly sourceActivitySeq: number
+  readonly version: number
+  readonly updatedAt?: string
+}
+
+export type ServerCoordinationDataFlowerExportInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly requestId: {
+    readonly requestId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+  }["requestId"]
+  readonly sourceThreadId: {
+    readonly requestId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+  }["sourceThreadId"]
+  readonly targetThreadId: {
+    readonly requestId: string
+    readonly sourceThreadId: string
+    readonly targetThreadId: string
+  }["targetThreadId"]
+}
+
+export type ServerCoordinationDataFlowerExportOutput = {
+  readonly request: {
+    readonly requestId: string
+    readonly projectId: string
+    readonly targetWorkerId: string
+    readonly targetSessionId: string
+    readonly question: string
+    readonly evidenceRefs: ReadonlyArray<{
+      readonly workerId: string
+      readonly sessionId: string
+      readonly eventId: string
+      readonly revision: number
+    }>
+    readonly createdAt: string
+  }
+  readonly snapshot: {
+    readonly schemaVersion: 1
+    readonly projectId: string
+    readonly workers: ReadonlyArray<{
+      readonly workerId: string
+      readonly projectId: string
+      readonly ownerId?: string | undefined
+    }>
+    readonly sharedSessions: ReadonlyArray<{
+      readonly workerId: string
+      readonly sessionId: string
+      readonly ownerId: string
+      readonly title: string
+      readonly featureTopic: string
+      readonly relationship: "alternative" | "unspecified"
+      readonly revision: number
+      readonly status: string
+    }>
+    readonly events: ReadonlyArray<{
+      readonly eventId: string
+      readonly projectId: string
+      readonly workerId: string
+      readonly sessionId: string
+      readonly revision: number
+      readonly kind: "message" | "activity" | "status"
+      readonly occurredAt: string
+      readonly content: {
+        readonly toolName?: string | undefined
+        readonly toolStatus?: string | undefined
+        readonly transition?: string | undefined
+        readonly role?: string | undefined
+        readonly text?: string | undefined
+      }
+    }>
+  }
+  readonly provenance: ReadonlyArray<{
+    readonly threadId: string
+    readonly eventId: string
+    readonly eventSeq: number
+    readonly threadActivitySeq: number
+  }>
+  readonly bindings: ReadonlyArray<{
+    readonly projectId: string
+    readonly threadId: string
+    readonly workerId: string
+    readonly sessionId: string
+    readonly ownerId: string
+    readonly title: string
+    readonly featureTopic: string
+    readonly relationship: "alternative" | "unspecified"
+    readonly activitySeq: number
+    readonly evidenceRevision: number
+    readonly expectedVersion: number
+    readonly shared: true
+    readonly deterministicStatus: "queued" | "active" | "blocked" | "idle" | "done"
+    readonly contributors: ReadonlyArray<string>
+  }>
+  readonly cooperationVersions: { readonly [x: string]: number }
+}
+
+export type ServerCoordinationDataMeOutput = { readonly userId: string }
+
+export type ServerCoordinationDataProvisioningListOutput = {
+  readonly projects: ReadonlyArray<{ readonly projectId: string; readonly name: string; readonly modelReady: boolean }>
+  readonly privateSessions: false
+}
+
+export type ServerCoordinationDataSessionProvisionInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly requestId: { readonly requestId: string; readonly title: string }["requestId"]
+  readonly title: { readonly requestId: string; readonly title: string }["title"]
+}
+
+export type ServerCoordinationDataSessionProvisionOutput = {
+  readonly thread: {
+    readonly id: string
+    readonly projectId: string
+    readonly sessionId: string
+    readonly workerId: string
+    readonly title: string
+    readonly createdBy: string
+    readonly createdAt: string
+    readonly activitySeq: number
+  }
+  readonly sessionId: string
+  readonly workspaceId: string
+  readonly directory: string
+  readonly ownerUserId: string
+}
+
 export type ServerCoordinationDataProjectListOutput = ReadonlyArray<{
   readonly id: string
   readonly name: string
@@ -2851,6 +3309,115 @@ export type ServerCoordinationDataProjectGetOutput = {
     readonly role: "owner" | "member"
     readonly joinedAt: string
   }>
+}
+
+export type ServerCoordinationDataProjectBriefGetInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+}
+
+export type ServerCoordinationDataProjectBriefGetOutput = {
+  readonly brief?:
+    | {
+        readonly goal: string
+        readonly successCriteria: ReadonlyArray<string>
+        readonly roles: ReadonlyArray<{ readonly userId: string; readonly label: string }>
+        readonly tools: ReadonlyArray<string>
+        readonly sharingDefault: "private"
+        readonly suggestedAwarenessMode: "off" | "review-each-note" | "allow-validated-topic-notes"
+        readonly projectId: string
+        readonly version: number
+        readonly updatedBy: string
+        readonly updatedAt: string
+      }
+    | undefined
+}
+
+export type ServerCoordinationDataProjectBriefPutInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly requestId: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly content: {
+      readonly goal: string
+      readonly successCriteria: ReadonlyArray<string>
+      readonly roles: ReadonlyArray<{ readonly userId: string; readonly label: string }>
+      readonly tools: ReadonlyArray<string>
+      readonly sharingDefault: "private"
+      readonly suggestedAwarenessMode: "off" | "review-each-note" | "allow-validated-topic-notes"
+    }
+  }["requestId"]
+  readonly expectedVersion: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly content: {
+      readonly goal: string
+      readonly successCriteria: ReadonlyArray<string>
+      readonly roles: ReadonlyArray<{ readonly userId: string; readonly label: string }>
+      readonly tools: ReadonlyArray<string>
+      readonly sharingDefault: "private"
+      readonly suggestedAwarenessMode: "off" | "review-each-note" | "allow-validated-topic-notes"
+    }
+  }["expectedVersion"]
+  readonly content: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly content: {
+      readonly goal: string
+      readonly successCriteria: ReadonlyArray<string>
+      readonly roles: ReadonlyArray<{ readonly userId: string; readonly label: string }>
+      readonly tools: ReadonlyArray<string>
+      readonly sharingDefault: "private"
+      readonly suggestedAwarenessMode: "off" | "review-each-note" | "allow-validated-topic-notes"
+    }
+  }["content"]
+}
+
+export type ServerCoordinationDataProjectBriefPutOutput = {
+  readonly goal: string
+  readonly successCriteria: ReadonlyArray<string>
+  readonly roles: ReadonlyArray<{ readonly userId: string; readonly label: string }>
+  readonly tools: ReadonlyArray<string>
+  readonly sharingDefault: "private"
+  readonly suggestedAwarenessMode: "off" | "review-each-note" | "allow-validated-topic-notes"
+  readonly projectId: string
+  readonly version: number
+  readonly updatedBy: string
+  readonly updatedAt: string
+}
+
+export type ServerCoordinationDataPersonFocusListInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+}
+
+export type ServerCoordinationDataPersonFocusListOutput = ReadonlyArray<{
+  readonly projectId: string
+  readonly userId: string
+  readonly version: number
+  readonly text: string | null
+  readonly updatedAt: string
+}>
+
+export type ServerCoordinationDataPersonFocusPutInput = {
+  readonly projectId: { readonly projectId: string }["projectId"]
+  readonly requestId: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly text: string | null
+  }["requestId"]
+  readonly expectedVersion: {
+    readonly requestId: string
+    readonly expectedVersion: number
+    readonly text: string | null
+  }["expectedVersion"]
+  readonly text: { readonly requestId: string; readonly expectedVersion: number; readonly text: string | null }["text"]
+}
+
+export type ServerCoordinationDataPersonFocusPutOutput = {
+  readonly projectId: string
+  readonly userId: string
+  readonly version: number
+  readonly text: string | null
+  readonly updatedAt: string
 }
 
 export type ServerCoordinationDataMemberGrantInput = {
@@ -2916,6 +3483,7 @@ export type ServerCoordinationDataThreadCreateOutput = {
 export type ServerCoordinationDataThreadGetInput = { readonly threadId: { readonly threadId: string }["threadId"] }
 
 export type ServerCoordinationDataThreadGetOutput = {
+  readonly ownerId?: string | undefined
   readonly thread: {
     readonly id: string
     readonly projectId: string
@@ -2973,6 +3541,23 @@ export type ServerCoordinationDataThreadGetOutput = {
     readonly deliveryState: "none" | "pending" | "delivered" | "failed"
     readonly decidedBy?: string | undefined
     readonly decidedAt?: string | undefined
+    readonly review?:
+      | {
+          readonly permissionRequestId: string
+          readonly sessionId: string
+          readonly toolCallId: string
+          readonly sourceMessageId: string
+          readonly scopeHash: string
+          readonly toolName: string
+          readonly inputJson?: string | undefined
+          readonly permission: string
+          readonly patterns: ReadonlyArray<string>
+          readonly savePatterns: ReadonlyArray<string>
+          readonly metadataJson?: string | undefined
+          readonly summary: string
+          readonly complete: boolean
+        }
+      | undefined
   }>
   readonly workCard?:
     | {
@@ -3257,6 +3842,23 @@ export type ServerCoordinationDataApprovalClaimOutput = {
   readonly deliveryState: "none" | "pending" | "delivered" | "failed"
   readonly decidedBy?: string | undefined
   readonly decidedAt?: string | undefined
+  readonly review?:
+    | {
+        readonly permissionRequestId: string
+        readonly sessionId: string
+        readonly toolCallId: string
+        readonly sourceMessageId: string
+        readonly scopeHash: string
+        readonly toolName: string
+        readonly inputJson?: string | undefined
+        readonly permission: string
+        readonly patterns: ReadonlyArray<string>
+        readonly savePatterns: ReadonlyArray<string>
+        readonly metadataJson?: string | undefined
+        readonly summary: string
+        readonly complete: boolean
+      }
+    | undefined
 }
 
 export type ServerCoordinationDataApprovalDecideInput = {
@@ -3294,6 +3896,23 @@ export type ServerCoordinationDataApprovalDecideOutput = {
   readonly deliveryState: "none" | "pending" | "delivered" | "failed"
   readonly decidedBy?: string | undefined
   readonly decidedAt?: string | undefined
+  readonly review?:
+    | {
+        readonly permissionRequestId: string
+        readonly sessionId: string
+        readonly toolCallId: string
+        readonly sourceMessageId: string
+        readonly scopeHash: string
+        readonly toolName: string
+        readonly inputJson?: string | undefined
+        readonly permission: string
+        readonly patterns: ReadonlyArray<string>
+        readonly savePatterns: ReadonlyArray<string>
+        readonly metadataJson?: string | undefined
+        readonly summary: string
+        readonly complete: boolean
+      }
+    | undefined
 }
 
 export type ServerCoordinationDataProjectReplayInput = {
@@ -3310,6 +3929,8 @@ export type ServerCoordinationDataProjectReplayOutput = {
     readonly seq: number
     readonly kind:
       | "project.created"
+      | "project.brief.updated"
+      | "person.focus.updated"
       | "membership.changed"
       | "thread.created"
       | "comment.created"
@@ -3352,6 +3973,8 @@ export type ServerCoordinationDataProjectStreamOutput = {
   readonly seq: number
   readonly kind:
     | "project.created"
+    | "project.brief.updated"
+    | "person.focus.updated"
     | "membership.changed"
     | "thread.created"
     | "comment.created"
@@ -3392,6 +4015,8 @@ export type ServerCoordinationDataThreadReplayOutput = {
     readonly seq: number
     readonly kind:
       | "project.created"
+      | "project.brief.updated"
+      | "person.focus.updated"
       | "membership.changed"
       | "thread.created"
       | "comment.created"
@@ -3434,6 +4059,8 @@ export type ServerCoordinationDataThreadStreamOutput = {
   readonly seq: number
   readonly kind:
     | "project.created"
+    | "project.brief.updated"
+    | "person.focus.updated"
     | "membership.changed"
     | "thread.created"
     | "comment.created"
@@ -3644,6 +4271,8 @@ export type ServerCoordinationDataActivityListOutput = {
     readonly sourceThread: { readonly threadId: string; readonly sessionId: string; readonly href: string } | null
     readonly kind:
       | "project.created"
+      | "project.brief.updated"
+      | "person.focus.updated"
       | "membership.changed"
       | "thread.created"
       | "comment.created"

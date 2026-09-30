@@ -1,5 +1,5 @@
 import { describe, expect } from "bun:test"
-import { Effect, Schema } from "effect"
+import { Effect, Schema, Redacted } from "effect"
 import { Coordination } from "@opencode-ai/schema/coordination"
 import { Permission } from "@opencode-ai/schema/permission"
 import { Session } from "@opencode-ai/schema/session"
@@ -7,6 +7,7 @@ import { RunnerHarnessApproval } from "@opencode-ai/core/runner-harness/approval
 import { Database } from "@opencode-ai/core/database/database"
 import { DatabaseMigration } from "@opencode-ai/core/database/migration"
 import { PermissionV2 } from "@opencode-ai/core/permission"
+import { RunnerRedaction } from "@opencode-ai/core/runner-harness/security/redaction"
 import type { RunnerHarnessContracts } from "@opencode-ai/core/runner-harness/contracts"
 import migration from "@opencode-ai/core/database/migration/20260929202000_runner_harness_approval"
 import { testEffect } from "../lib/effect"
@@ -18,7 +19,7 @@ const projectId = Schema.decodeUnknownSync(Coordination.ProjectID)("prj_approval
 const workerId = Schema.decodeUnknownSync(Coordination.WorkerID)("wrk_approval_bridge")
 const sessionId = Schema.decodeUnknownSync(Session.ID)("ses_approval_bridge")
 
-function fixture(db: Database.Interface["db"]) {
+function fixture(db: Database.Interface["db"], redact: (text: string) => string = (text) => text.replaceAll("inert", "[redacted]")) {
   const request = Schema.decodeUnknownSync(Permission.Request)({
     id: "per_approval_bridge",
     sessionID: sessionId,
@@ -51,6 +52,7 @@ function fixture(db: Database.Interface["db"]) {
   let authenticated = true
   let authorityDelivery: "pending" | "delivered" = "pending"
   let authorizedDecision: { readonly id: string; readonly decision: "approve" | "reject" } | undefined
+  let tool: { name: string; input: Readonly<Record<string, unknown>> } | undefined = { name: "bash", input: { command: "echo inert" } }
 
   const lifecycle: Pick<RunnerHarnessContracts.Lifecycle, "get" | "approvalRequested" | "approvalResolved"> = {
     get: () => Effect.succeed(current),
@@ -102,7 +104,8 @@ function fixture(db: Database.Interface["db"]) {
       lifecycle,
       permission,
       authority,
-      redact: (text) => text.replaceAll("inert", "[redacted]"),
+      redact,
+      toolCall: ({ sessionId: actualSession, messageId, callId }) => Effect.succeed(actualSession === sessionId && messageId === "msg_tool_call" && callId === "call_approval_bridge" ? tool : undefined),
       now: () => 1_000,
     })
   const bridge = reopen()
@@ -135,10 +138,74 @@ function fixture(db: Database.Interface["db"]) {
     setDecision: (id: string, decision: "approve" | "reject") => {
       authorizedDecision = { id, decision }
     },
+    setTool: (value: typeof tool) => { tool = value },
   }
 }
 
 describe("runner approval bridge with real SQLite and inert native permission actions", () => {
+  it.effect("redacts secret fields while retaining valid reviewable JSON arguments", () =>
+    Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      yield* DatabaseMigration.applyOnly(db, [migration])
+      const test = fixture(db, RunnerRedaction.make([Redacted.make("registered-fixture-secret")]))
+      const native = Schema.decodeUnknownSync(Permission.Request)({ ...test.request, metadata: { password: "unregistered-fixture-secret", description: "registered-fixture-secret" } })
+      test.pending.set(native.id, native)
+      test.setTool({ name: "bash", input: { command: "echo safe", headers: { authorization: "Bearer fixture-value" }, password: "unregistered-fixture-secret" } })
+      const mapped = yield* test.bridge.requested({ execution: test.execution, request: native })
+      const approval = Schema.decodeUnknownSync(Coordination.Approval)({ id: mapped.approvalId, threadId, runId, toolCallId: mapped.toolCallId, version: 1, state: "pending", requestedAt: "2026-09-29T20:20:00.000Z", deliveryState: "none" })
+      const thread = Schema.decodeUnknownSync(Coordination.Thread)({ id: threadId, projectId, sessionId, workerId, title: "Actual approval", createdBy: "usr_alice", createdAt: "2026-09-29T20:20:00.000Z", activitySeq: 0 })
+      const review = yield* test.bridge.review(approval, thread)
+      expect(review?.complete).toBe(true)
+      expect(JSON.parse(review!.inputJson!)).toEqual({ command: "echo safe", headers: { authorization: "[REDACTED]" }, password: "[REDACTED]" })
+      expect(JSON.parse(review!.metadataJson!)).toEqual({ password: "[REDACTED]", description: "[REDACTED]" })
+    }),
+  )
+
+  it.effect("reviews only an exact durable mapping and current native scope after reopening", () =>
+    Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      yield* DatabaseMigration.applyOnly(db, [migration])
+      const test = fixture(db)
+      const native = Schema.decodeUnknownSync(Permission.Request)({ ...test.request, metadata: { command: "echo inert" } })
+      test.pending.set(native.id, native)
+      const mapped = yield* test.bridge.requested({ execution: test.execution, request: native })
+      const approval = Schema.decodeUnknownSync(Coordination.Approval)({ id: mapped.approvalId, threadId, runId, toolCallId: mapped.toolCallId, version: 1, state: "pending", requestedAt: "2026-09-29T20:20:00.000Z", deliveryState: "none" })
+      const thread = Schema.decodeUnknownSync(Coordination.Thread)({ id: threadId, projectId, sessionId, workerId, title: "Actual approval", createdBy: "usr_alice", createdAt: "2026-09-29T20:20:00.000Z", activitySeq: 0 })
+      const review = yield* test.reopen().review(approval, thread)
+      expect(review).toMatchObject({ permissionRequestId: native.id, sessionId, toolCallId: mapped.toolCallId, sourceMessageId: "msg_tool_call", toolName: "bash", inputJson: '{"command":"echo [redacted]"}', permission: "bash", patterns: ["echo [redacted]"], savePatterns: ["*"], metadataJson: '{"command":"echo [redacted]"}', complete: true })
+      expect(review?.scopeHash).toMatch(/^[a-f0-9]{64}$/)
+      expect(yield* test.bridge.review({ ...approval, toolCallId: "call_other" }, thread)).toBeUndefined()
+      test.pending.set(native.id, { ...native, resources: ["changed native scope"] })
+      expect(yield* test.bridge.review(approval, thread)).toBeUndefined()
+      test.pending.set(native.id, native)
+      test.setTool(undefined)
+      expect((yield* test.bridge.review(approval, thread))?.complete).toBe(false)
+      expect((yield* test.bridge.review(approval, thread))?.inputJson).toBeUndefined()
+      test.setPhase("completed")
+      expect(yield* test.bridge.review(approval, thread)).toBeUndefined()
+      test.setPhase("waiting_approval")
+      test.pending.delete(native.id)
+      expect(yield* test.bridge.review(approval, thread)).toBeUndefined()
+    }),
+  )
+
+  it.effect("marks bounded permission details incomplete instead of silently hiding scope", () =>
+    Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      yield* DatabaseMigration.applyOnly(db, [migration])
+      const test = fixture(db)
+      const native = Schema.decodeUnknownSync(Permission.Request)({ ...test.request, resources: ["x".repeat(2_000)], metadata: { command: "y".repeat(20_000) } })
+      test.pending.set(native.id, native)
+      const mapped = yield* test.bridge.requested({ execution: test.execution, request: native })
+      const approval = Schema.decodeUnknownSync(Coordination.Approval)({ id: mapped.approvalId, threadId, runId, toolCallId: mapped.toolCallId, version: 1, state: "pending", requestedAt: "2026-09-29T20:20:00.000Z", deliveryState: "none" })
+      const thread = Schema.decodeUnknownSync(Coordination.Thread)({ id: threadId, projectId, sessionId, workerId, title: "Actual approval", createdBy: "usr_alice", createdAt: "2026-09-29T20:20:00.000Z", activitySeq: 0 })
+      const review = yield* test.bridge.review(approval, thread)
+      expect(review?.complete).toBe(false)
+      expect(review?.patterns[0].length).toBeLessThanOrEqual(512)
+      expect(review?.metadataJson?.length).toBeLessThanOrEqual(8_000)
+    }),
+  )
+
   it.effect("maps one coordinator approval to native once and persists an exact retry", () =>
     Effect.gen(function* () {
       const { db } = yield* Database.Service

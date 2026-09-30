@@ -18,6 +18,52 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`coordination_flower_delivery\` (
+          \`report_id\` text NOT NULL,
+          \`note_id\` text NOT NULL,
+          \`message_id\` text NOT NULL,
+          \`owner_id\` text NOT NULL,
+          \`created_at\` integer NOT NULL,
+          CONSTRAINT \`coordination_flower_delivery_pk\` PRIMARY KEY(\`report_id\`, \`note_id\`)
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_flower_result\` (
+          \`report_id\` text PRIMARY KEY,
+          \`project_id\` text NOT NULL,
+          \`request_id\` text NOT NULL,
+          \`service_id\` text NOT NULL,
+          \`content\` text NOT NULL,
+          \`created_at\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_person_focus_revision\` (
+          \`project_id\` text NOT NULL,
+          \`user_id\` text NOT NULL,
+          \`version\` integer NOT NULL,
+          \`focus_text\` text,
+          \`updated_at\` integer NOT NULL,
+          \`request_id\` text NOT NULL,
+          \`event_seq\` integer NOT NULL,
+          CONSTRAINT \`coordination_person_focus_revision_pk\` PRIMARY KEY(\`project_id\`, \`user_id\`, \`version\`),
+          CONSTRAINT \`fk_coordination_person_focus_revision_project_id_coordination_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`coordination_project\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_project_brief_revision\` (
+          \`project_id\` text NOT NULL,
+          \`version\` integer NOT NULL,
+          \`content\` text NOT NULL,
+          \`updated_by\` text NOT NULL,
+          \`updated_at\` integer NOT NULL,
+          \`request_id\` text NOT NULL,
+          \`event_seq\` integer NOT NULL,
+          CONSTRAINT \`coordination_project_brief_revision_pk\` PRIMARY KEY(\`project_id\`, \`version\`),
+          CONSTRAINT \`fk_coordination_project_brief_revision_project_id_coordination_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`coordination_project\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`data_migration\` (
           \`name\` text PRIMARY KEY,
           \`time_completed\` integer NOT NULL
@@ -129,6 +175,17 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`coordination_cooperation_revision\` (
+          \`thread_id\` text NOT NULL,
+          \`version\` integer NOT NULL,
+          \`owner_id\` text NOT NULL,
+          \`request_id\` text NOT NULL,
+          \`content\` text NOT NULL,
+          \`updated_at\` integer NOT NULL,
+          CONSTRAINT \`coordination_cooperation_revision_pk\` PRIMARY KEY(\`thread_id\`, \`version\`)
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`coordination_membership\` (
           \`project_id\` text NOT NULL,
           \`user_id\` text NOT NULL,
@@ -148,6 +205,25 @@ export default {
           \`created_at\` integer NOT NULL,
           \`request_id\` text NOT NULL,
           CONSTRAINT \`fk_coordination_project_id_project_id_fk\` FOREIGN KEY (\`id\`) REFERENCES \`project\`(\`id\`) ON DELETE RESTRICT
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`coordination_session_provisioning\` (
+          \`id\` text PRIMARY KEY,
+          \`project_id\` text NOT NULL,
+          \`owner_id\` text NOT NULL,
+          \`request_id\` text NOT NULL,
+          \`title\` text NOT NULL,
+          \`worker_id\` text NOT NULL,
+          \`session_id\` text NOT NULL,
+          \`workspace_id\` text NOT NULL,
+          \`directory\` text NOT NULL,
+          \`config_signature\` text NOT NULL,
+          \`model\` text NOT NULL,
+          \`phase\` text NOT NULL,
+          \`thread\` text,
+          \`created_at\` integer NOT NULL,
+          \`updated_at\` integer NOT NULL
         );
       `)
       yield* tx.run(`
@@ -434,6 +510,18 @@ export default {
         );
       `)
       yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_flower_delivery_message_idx\` ON \`coordination_flower_delivery\` (\`message_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_flower_result_request_idx\` ON \`coordination_flower_result\` (\`project_id\`,\`request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_person_focus_request_idx\` ON \`coordination_person_focus_revision\` (\`project_id\`,\`user_id\`,\`request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_project_brief_request_idx\` ON \`coordination_project_brief_revision\` (\`project_id\`,\`updated_by\`,\`request_id\`);`,
+      )
+      yield* tx.run(
         `CREATE UNIQUE INDEX \`runner_harness_approval_permission_idx\` ON \`runner_harness_approval\` (\`permission_request_id\`);`,
       )
       yield* tx.run(
@@ -471,6 +559,9 @@ export default {
         `CREATE INDEX \`coordination_comment_thread_event_idx\` ON \`coordination_comment\` (\`thread_id\`,\`event_seq\`);`,
       )
       yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_cooperation_request_idx\` ON \`coordination_cooperation_revision\` (\`thread_id\`,\`request_id\`);`,
+      )
+      yield* tx.run(
         `CREATE INDEX \`coordination_membership_user_idx\` ON \`coordination_membership\` (\`user_id\`,\`project_id\`);`,
       )
       yield* tx.run(
@@ -478,6 +569,18 @@ export default {
       )
       yield* tx.run(
         `CREATE UNIQUE INDEX \`coordination_project_actor_request_idx\` ON \`coordination_project\` (\`created_by\`,\`request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_provisioning_request_idx\` ON \`coordination_session_provisioning\` (\`project_id\`,\`owner_id\`,\`request_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_provisioning_session_idx\` ON \`coordination_session_provisioning\` (\`session_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_provisioning_workspace_idx\` ON \`coordination_session_provisioning\` (\`workspace_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`coordination_provisioning_directory_idx\` ON \`coordination_session_provisioning\` (\`directory\`);`,
       )
       yield* tx.run(
         `CREATE UNIQUE INDEX \`coordination_instruction_request_idx\` ON \`coordination_instruction\` (\`thread_id\`,\`actor_id\`,\`request_id\`);`,

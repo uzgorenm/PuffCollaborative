@@ -7,6 +7,7 @@ This module never delivers context, approves proposals or blocks a coding agent.
 import argparse
 import hashlib
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -15,6 +16,10 @@ from contextlib import closing
 from pathlib import Path
 
 from contracts import prepare
+from journal import journal_events
+from private_state import open_private_file, secure_directory, secure_state_tree
+
+CHAIN_DEADLINE_SECONDS = 300
 
 
 class CoordinationFailure(RuntimeError):
@@ -23,22 +28,13 @@ class CoordinationFailure(RuntimeError):
         super().__init__(outcome["error"])
 
 
-def journal_events(path):
-    if not path.exists():
-        return []
-    events = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            events.append(json.loads(line))
-        except json.JSONDecodeError:
-            # A killed process can leave one incomplete final journal line.
-            continue
-    return events
-
-
-def execute(prepared, directory, timeout=300):
+def execute(prepared, directory, timeout=CHAIN_DEADLINE_SECONDS):
+    directory = secure_directory(directory)
     source, journal = directory / "input.json", directory / "events.jsonl"
-    source.write_text(json.dumps(prepared), encoding="utf-8")
+    with os.fdopen(
+        open_private_file(source, os.O_WRONLY | os.O_CREAT | os.O_TRUNC), "w", encoding="utf-8"
+    ) as output:
+        output.write(json.dumps(prepared))
     worker = str(Path(__file__).with_name("chain_worker.py"))
     timed_out = False
     with subprocess.Popen(
@@ -110,8 +106,8 @@ def coordinate(request, snapshot, *, state_dir=None, runner=execute):
     # Hash only the selected input, not private/unrelated UI data.
     fingerprint = hashlib.sha256(json.dumps(prepared, sort_keys=True).encode()).hexdigest()
     key = hashlib.sha256((request["projectId"] + "\0" + request["requestId"]).encode()).hexdigest()
-    root = Path(state_dir) if state_dir else Path(__file__).parent / ".runtime"
-    root.mkdir(parents=True, exist_ok=True)
+    root = secure_state_tree(Path(state_dir) if state_dir else Path(__file__).parent / ".runtime")
+    os.close(open_private_file(root / "requests.sqlite3", os.O_RDWR | os.O_CREAT))
     with closing(sqlite3.connect(root / "requests.sqlite3", timeout=1)) as db, db:
         db.execute(
             "CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, fingerprint TEXT, outcome TEXT)"
@@ -155,10 +151,12 @@ def coordinate(request, snapshot, *, state_dir=None, runner=execute):
         outcome = json.loads(row[1])
     else:
         directory = root / key
-        directory.mkdir(exist_ok=True)
+        secure_state_tree(directory)
         try:
             outcome = runner(
-                prepared, directory, timeout=max(0.1, 300 - (time.monotonic() - started))
+                prepared,
+                directory,
+                timeout=max(0.1, CHAIN_DEADLINE_SECONDS - (time.monotonic() - started)),
             )
         except Exception as error:  # noqa: BLE001 -- persist failures at the job boundary
             outcome = {

@@ -13,6 +13,35 @@ test("origin guard accepts the browser Host when Next normalizes its internal UR
   assert.equal(workspaceOrigin(new Request("http://localhost:3010/api/live")), false)
 })
 
+test("origin guard rejects attacker-controlled and noncanonical hosts", () => {
+  for (const host of ["rebind.example:3010", "127.0.0.1.evil.test:3010", "127.0.0.1:3011", "user@127.0.0.1:3010", "127.0.0.1:3010/path", "127.0.0.1:3010?x=1"]) {
+    assert.equal(workspaceOrigin(new Request("http://localhost:3010/api/live", { headers: { Host: host, Origin: `http://${host}`, "Sec-Fetch-Site": "same-origin" } })), false, host)
+  }
+  assert.equal(workspaceOrigin(new Request("http://rebind.example:3010/api/live", { headers: { Origin: "http://rebind.example:3010" } })), false)
+})
+
+test("origin guard permits absent Origin only for explicitly enabled loopback reads", () => {
+  for (const origin of ["http://127.0.0.1:3010", "http://localhost:3010", "http://[::1]:3010"]) {
+    const request = new Request(`${origin}/api/live/workspace`)
+    assert.equal(workspaceOrigin(request), false)
+    assert.equal(workspaceOrigin(request, { allowMissingOrigin: true }), true)
+  }
+  assert.equal(workspaceOrigin(new Request("http://localhost:3010/api/live", { headers: { Origin: "http://outside.example", "Sec-Fetch-Site": "same-origin" } }), { allowMissingOrigin: true }), false)
+  assert.equal(workspaceOrigin(new Request("http://localhost:3010/api/live", { headers: { "Sec-Fetch-Site": "cross-site" } }), { allowMissingOrigin: true }), false)
+})
+
+test("origin guard uses the configured loopback web origin without trusting a foreign Host", () => {
+  const options = { webOrigin: "http://127.0.0.1:3010" }
+  assert.equal(workspaceOrigin(new Request("http://localhost:3010/api/live", { headers: { Host: "127.0.0.1:3010", Origin: options.webOrigin } }), options), true)
+  assert.equal(workspaceOrigin(new Request("http://localhost:3010/api/live", { headers: { Origin: "http://localhost:3010" } }), options), false)
+  assert.equal(workspaceOrigin(new Request("http://localhost:3010/api/live", { headers: { Host: "rebind.example:3010", Origin: options.webOrigin } }), options), false)
+  assert.equal(workspaceOrigin(new Request("http://localhost:3011/api/live", { headers: { Origin: options.webOrigin } }), options), false)
+  assert.equal(workspaceOrigin(new Request("https://localhost:3010/api/live", { headers: { Origin: options.webOrigin } }), options), false)
+  for (const webOrigin of ["http://outside.example:3010", "http://user@localhost:3010", "http://localhost:3010/other", "http://localhost:3010/?token=x", "not a URL"]) {
+    assert.equal(workspaceOrigin(new Request("http://localhost:3010/api/live", { headers: { Origin: "http://localhost:3010" } }), { webOrigin }), false, webOrigin)
+  }
+})
+
 test("matching server conflict recognizes the source error without matching unrelated failures", () => {
   assert.equal(matchingError("EADDRINUSE on port 3000", String(event.payload.body)), true)
   assert.equal(matchingError("EADDRINUSE on port 8080", String(event.payload.body)), false)

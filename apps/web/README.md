@@ -1,75 +1,88 @@
 # Puff web workspace
 
-## Connected Alice flow
+The copied Next.js interface now defaults to a real authenticated coordination service. It groups recorded work by person, then by individual Session; one person can run several Sessions in parallel. The original sample workspace is available through **Try demo** and stays separate from live data.
 
-`/live` reads the registered coordination backend through server-side member authentication. It shows each person's work summary and sessions, actual conversations and Run states, and exact source inspection for a recorded `EADDRINUSE` finding. The owner can add that finding as one attributed instruction to the original receiving session. Private unshared sessions remain outside the shared backend view.
+## Run the combined product
 
-Start the isolated backend with `bun hackathon/alice-preview/run.ts` from the repository root, then run the web command it prints. Open <http://127.0.0.1:3010/live>. See [the launcher instructions](../../hackathon/alice-preview/README.md) for model configuration and verification. Member credentials are read from `PUFF_BACKEND_MEMBER_PATH` on the web server and are never returned to the browser. This preview binds to loopback and uses one configured member identity; a hosted multi-user deployment needs individual web authentication.
+From the repository root, with Bun on PATH:
 
-The source scenario records a real local port collision and health check as a human-authored finding. Without an OpenCode model configuration, receiving instructions persist in the backend queue and execution remains unavailable. Source reuse is an explicit owner action. The narrow error matcher covers `EADDRINUSE`; automatic Flower awareness and receiving-model use require separate live evidence.
+```sh
+bun run product
+```
 
-A browser demo built with React 19 and Next.js 16. The project overview groups work by person: **name → total work summary → individual sessions**. Opening a session shows its own conversation, task, status, and related context. One person can keep several sessions in parallel.
+Open <http://127.0.0.1:3006>. The launcher owns a loopback-only backend, Next.js process, isolated SQLite database and approved Git worktrees. It stops its own children on Ctrl-C. Data and individual local member credentials persist in the private sibling `.puff-product-runtime` directory. Another launcher cannot use that same runtime concurrently; the backend address remains stable across restarts.
 
-The workspace uses a real local Next API, `POST /api/workspace`, with filesystem persistence. Seeded `WorkspaceState` data from `lib/workspace.ts` and a deterministic guidance engine illustrate a team scenario. Sam and Alice, their conversations, statuses, and paths are example context. Responses do not execute agents, call paid models, edit repository files, or represent real teammate presence.
+The fixed local roster is Serdar, Serhat, Talha and Ferit. The default browser identity is Serdar. `PUFF_PRODUCT_MEMBER=serhat` selects the default login for a new connection; an existing browser connection retains its identity until explicitly changed. Connection settings can authenticate another member with its local credential. Display names do not grant access.
 
-The app uses product copy without scripted/demo labels. Its technical boundary remains this local scenario, not a connection to live agents. Generated messages describe proposed plans and context additions rather than claiming code execution. Existing saved generated copy is migrated without rewriting user messages, tasks, or source references.
-
-## Test the full experience
-
-Open the running workspace and choose **Reset workspace**, then confirm. This restores the six starting sessions for You, Sam, and Alice. **Undo reset** restores your previous workspace, including after reload; the backup is retained in browser storage until undo or the next reset.
-
-1. **Project setup:** choose **New project** in the sidebar. Enter a name and goal, keep Sam and Alice for the two teammates, then keep the default three tasks and choose **Create project**. Each person has two separate sessions.
-2. **Overlapping frontend work:** choose **New session**, pick a model in the composer, and type **Start frontend for the project navigation feature**. Choose **Start session**. After checking project context, Puff surfaces Sam's navigation session and offers **Finish navigation states** and **Build session search and filters**, with explicit scope boundaries. Choose either, then type **Continue, show me the implementation**. Reload and reopen the session to verify the task, selected model, source link, and conversation were saved. The overview shortcut simply prefills a task; it is not required.
-3. **Solved server error:** return to **Project overview**, choose **Reuse a solved problem**, then **Send message**. The prepared prompt reports `EADDRINUSE` on port 3000. Inspect Alice's source conversation and choose **Add context to this session**. Repeat the same error to verify that the attributed context is not added twice.
-4. **Parallel personal work:** choose **Find my context** and open your other sessions from the bottom summaries or sidebar. Use the overview's **My work** filter to view both workstreams together.
-
-Use **Reset workspace** whenever you want to repeat these flows from the starting state. Custom setup tasks intentionally produce independent waiting plans; they do not borrow Alice's completed finding unless the source scenario is retained.
-
-## Run
+The root Bun dependencies and this package's npm dependencies must be installed. This package retains its own npm lockfile:
 
 ```sh
 cd apps/web
 npm ci
-npm run dev
 ```
 
-Open <http://127.0.0.1:3005>. For a production preview, run `npm run build` and then `npm start`.
+For a standalone interface, `npm run dev` listens on port 3006 and Connection settings accepts a running loopback coordination backend. Without a connected backend, live mode shows the connection error and never invents teammate activity. `npm run build` and `npm start` provide a production preview of the interface.
 
-This package installs independently with its own npm lockfile under `apps/`, outside the existing Bun `packages/*` workspace. It does not change the desktop app or its dependency lockfile.
+## Coding model configuration
 
-## Interactive workflows
+A model provider is required before a real coding Session can be created. Configure the launcher with an existing OpenCode provider configuration; do not commit that file or paste keys into chat:
 
-1. **Set up a project.** Enter its name and goal, review the people, and assign a task to a person. Assignment creates a separate local demo session with the supplied task and an illustrative first-step plan.
-2. **Review the team.** The overview and main sidebar show each person's combined work before listing their sessions. The sidebar shows five session rows initially, with an expandable overflow and a collapsed 90-minute recent-update view. Open a session to read its conversation, then return to the overview. Filtering to My work keeps your own parallel workstreams together.
-3. **Review overlapping work.** A frontend/navigation task can surface Sam's existing navigation sessions. Open the source conversation, create complementary work, or continue with an independent alternative. Complementary work proposes a separate scope such as keyboard accessibility and project-switching checks, with a reference to the source. It preserves both conversations and approaches.
-4. **Reuse a finding with its source.** An `EADDRINUSE` or port-in-use prompt can surface Alice's completed development-server session. Review the original conversation, then add the finding as context to your own session. The reference retains the source session and message, and the same finding is deduplicated within the receiving session. The example adaptation checks the process that owns port 3000 and uses this project's configured development port, 3005; compare the actual error before applying that advice. An unrelated server error is not treated as a solved port conflict.
-5. **Keep parallel and private work distinct.** Each sample person starts with two sessions. Creating another session does not replace that person's earlier work. Private sessions are shown only for You and are excluded from other people's visible work and matching context. This is local demo visibility behavior; production authentication and access control are not implemented here.
+```sh
+PUFF_MODEL_PROVIDER=provider-id PUFF_MODEL_ID=model-id PUFF_PROVIDER_CONFIG=/absolute/private/opencode.json bun run product
+```
 
-These actions use the local API's canonical workspace. The browser retains a workspace ID, cached snapshot, and undo backup. Model choices are scenario profiles, preserved on requests, sessions, and assistant messages for a later provider adapter. Assignment, guidance, and context adaptation do not start model execution, deliver a task to a teammate, stop another agent, or prove live collaboration. The existing hackathon workflow acceptance gates remain open.
+The provider configuration stays in the isolated global OpenCode config directory, outside agent worktrees. Each provisioned Session has a durable owner and a separate approved worktree. The model readiness check confirms the registered/native-supported model, not a successful paid model request.
 
-The original generated Puff logo is `public/puff-logo.png`; the interface uses this asset for its brand mark.
+## Live workflows
 
-## Local API and backend handoff
+- Save a versioned project brief and your personal focus. Person totals combine recorded Session summaries and label their freshness separately from stated focus.
+- Create an explicitly shared Session and send owner instructions. New Sessions do not replace existing parallel work. Failed or interrupted requests retain the exact request identity through reload.
+- Read teammate conversations and add comments. Only a provisioned Session's verified owner can instruct, cancel its Run, or decide a tool permission.
+- Inspect exact cited events before sending reviewed context. Source identity and target identity remain distinct. This creates a human instruction; receipt, execution and actual use are separate evidence.
+- Review the actual native tool, arguments and permission scope before approving. The scope is rechecked after a versioned claim. Missing or changed review details keep Allow unavailable. A recorded decision awaiting forwarding is shown separately from delivery.
+- Opt selected Sessions into Flower analysis with a topic and open/complementary/alternative relationship. Deliberate alternatives remain valid. Analysis defaults off and requires owner consent. A separate text choice permits bounded owner instructions and already-redacted runner output; metadata-only analysis excludes that text. Runtime journals retain run IDs, mapped reports and pending proposals.
 
-`lib/session-api.ts` defines the serializable command contract. `lib/session-service.ts` validates and executes commands; `lib/session-engine.ts` analyzes scope and creates deterministic guidance. `lib/workspace-store.ts` writes workspaces atomically under `.puff-workspaces/`, with per-workspace serialization so simultaneous tasks do not overwrite each other.
+Private Sessions are not implemented by this provisioning service (`privateSessions:false`); the live UI explicitly creates shared Sessions. Demo privacy controls remain illustrative.
 
-Commands: `bootstrap`, `replace` (setup/reset/undo), `analyze`, `create`, `message`, and `add-context`. Invalid models, members, choices, sources, and private scopes fail explicitly. The interface shows errors instead of pretending an action was saved. This local service has no production authentication or cross-device sharing; teammates should connect the command boundary to the authoritative coordination backend and provider runner before claiming live coordination.
+## Flower processing
 
-## Separate simulator adapter
+Install the pinned environment described in [the Flower README](../../hackathon/flower/README.md), authenticate Flower separately, and provide its Python executable:
 
-The existing read-only `/api/sessions` adapter remains available separately from the interactive workspace. It reads the local scenario simulator at `http://127.0.0.1:4187`, or a loopback URL supplied through `PUFF_API_URL`, with a one-second timeout. Successful simulator data is marked `simulator` and explicitly described as simulated; unavailable or invalid simulator data falls back to illustrative `demo` sessions. The interactive `WorkspaceState` view does not poll this adapter.
+```sh
+PUFF_FLOWER_PYTHON=/absolute/path/to/flower/.venv/bin/python bun run product
+```
+
+The serialized background connector captures only server-authorized selected evidence, executes the existing two-AgentApp/three-run chain, validates citations and revisions, and submits source/version-checked WorkCards. A trusted analysis identity registers informational findings. When the target owner opted into notifications, the existing active Session can admit the finding and promote it at the next safe boundary. A stopped or changed target can leave delivery pending/stale; it is not reported as use. Lost responses remain an unknown outcome until a durable receipt confirms admission. Historical receipt reconciliation never replays stale analysis or delivery. Redirection proposals are never automatically adopted.
+
+Hosted analysis depends on Flower login, service availability and provider configuration. Local fixture tests do not establish successful live model execution, hosted analysis or receiving-agent use. The legacy simulator `/api/sessions` route remains separate and is not used by the live controller.
 
 ## Verify
 
-Run these commands from `apps/web`:
+From `apps/web`:
 
 ```sh
 npm test
-bun typecheck
+npm run typecheck
 npm run build
 ```
 
-The workspace tests cover independent sample data, parallel sessions, overlap matching, source-specific server findings, caller-visible source scope, and independent/complementary task creation. Type checking and the production build are separate checks; browser workflows and the resulting video require their own visual review.
+Transport tests use a real local HTTP fixture; controller tests exercise identity switching, exact retries, source references and permission review. Core/server fixtures verify real worktrees, ownership, the embedded OpenCode runner and safe-boundary admission against a deterministic test model. Browser acceptance and actual hosted execution are separate checks. Integration evidence is recorded in [next-product-integration.md](../../docs/hackathon/next-product-integration.md).
+
+The Puff logo remains `public/puff-logo.png`.
+
+## Repeat the original demo
+
+Choose **Try demo**, then **Reset workspace** and confirm to restore the source interface's six starting Sessions for You, Sam and Alice. **Undo reset** restores the previous demo workspace, including after reload. These controls affect browser demo storage; the live service remains separate.
+
+The original walkthrough supports project setup/task assignment, reviewing Sam's overlapping frontend work, starting complementary work or an alternative, and inspecting Alice's recorded `EADDRINUSE` finding before adding it as context. Its compact sidebar shows five Session rows before an expandable overflow and a collapsed recent-update view. Custom tasks produce independent illustrative plans; an unrelated server error never inherits the port-conflict finding. Choose **Return to live workspace** to resume the authenticated service.
+
+The latest teammate task flow uses `POST /api/workspace` and atomic filesystem storage under `.puff-workspaces/`. New session → typed frontend task → scope choices → continued conversation survives reload. `lib/session-api.ts`, `session-service.ts` and `session-engine.ts` preserve this separate command boundary. Its seeded conversations and deterministic guidance do not call a model or edit repository files. This local task store has no individual authentication or cross-device sharing and is used only by the demo controller.
+
+## Connected Alice preview
+
+The team's additional `/live` page preserves the narrow Alice source-reuse integration. It reads a registered coordination backend using one server-configured member (`PUFF_BACKEND_MEMBER_PATH`), shows actual Sessions/Run states, and lets that member inspect an exact `EADDRINUSE` source before adding context to a receiving Thread they shared. Its seeded legacy Sessions have trusted sharing grants but no provisioned owner record; creator grouping is labeled "Shared by" and is this preview's UI policy. The default live controller requires verified provisioned ownership and uses per-member cookie connections.
+
+Run `bun hackathon/alice-preview/run.ts` and follow its printed web command; see [the preview instructions](../../hackathon/alice-preview/README.md). Its recorded source uses a real local port-collision/health-check scenario. The teammate's native model requests returned HTTP 401; queued/promoted instructions are not evidence of successful model use. The single-member preview requires individual authentication before any hosted multi-user deployment. Use separate checkouts for concurrent Next.js previews, or stop one before starting another from this checkout.
 
 ## Render the walkthrough video
 

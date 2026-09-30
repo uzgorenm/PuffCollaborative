@@ -113,6 +113,17 @@ def validate_refs(refs, allowed):
         raise ValueError("Unknown or stale evidence reference")
 
 
+def validate_current_source_refs(refs, sessions, source_session_id):
+    # A finding's sourceRevision must describe its cited source evidence.
+    # Target history may provide context without claiming target freshness.
+    if any(
+        ref["sessionId"] == source_session_id
+        and ref["revision"] != sessions[source_session_id]["revision"]
+        for ref in refs
+    ):
+        raise ValueError("Finding cites non-current evidence")
+
+
 def reject_secrets(value):
     # A backstop, not a confidentiality proof. The caller must select permitted content.
     text = json.dumps(value)
@@ -147,9 +158,23 @@ def prepare(request, snapshot):
     if len(selected_ids) != 2 or not selected_ids.issubset(by_id):
         raise ValueError("Supply evidence references for exactly two shared sessions")
     selected = [by_id[sid] for sid in sorted(selected_ids)]
-    workers = {(w["workerId"], w["projectId"], w["ownerId"]) for w in snapshot["workers"]}
-    if any((s["workerId"], request["projectId"], s["ownerId"]) not in workers for s in selected):
-        raise ValueError("Unknown project/worker/owner mapping")
+    workers = {}
+    for worker in snapshot["workers"]:
+        if (
+            not isinstance(worker, dict)
+            or set(worker) - {"workerId", "projectId", "ownerId"}
+            or not isinstance(worker.get("workerId"), str)
+            or not worker["workerId"]
+            or worker.get("projectId") != request["projectId"]
+            or worker["workerId"] in workers
+            or ("ownerId" in worker and not isinstance(worker["ownerId"], str))
+        ):
+            raise ValueError("Invalid trusted runner roster")
+        workers[worker["workerId"]] = worker
+    for session in selected:
+        worker = workers.get(session["workerId"])
+        if not worker or ("ownerId" in worker and worker["ownerId"] != session["ownerId"]):
+            raise ValueError("Unknown project/worker/owner mapping")
     inputs, warnings, seen = [], [], set()
     for session in selected:
         events = []
@@ -205,8 +230,8 @@ def prepare(request, snapshot):
             {
                 "schemaVersion": 1,
                 "projectId": request["projectId"],
-                # Owner identity was already checked against the trusted worker
-                # roster; Flower only needs session metadata for comparison.
+                # The trusted export binds Session ownership separately from
+                # its runner host. Flower only needs comparison metadata.
                 "session": {key: value for key, value in session.items() if key != "ownerId"},
                 "events": events[-20:],
             }
@@ -270,6 +295,7 @@ def make_report(prepared, analyses, result, run_id):
             raise ValueError("Invalid awareness source")
         if {r["sessionId"] for r in note["evidenceRefs"]} != set(sessions):
             raise ValueError("Awareness must cite source and target evidence")
+        validate_current_source_refs(note["evidenceRefs"], sessions, source["sessionId"])
         # Conservative backstop; model output is never delivery authorization.
         if re.search(
             r"(?i)\b(stop|abandon|switch|must|should|please|instead|implement|replace)\b",
@@ -293,6 +319,10 @@ def make_report(prepared, analyses, result, run_id):
         )
     if finding["proposal"]:
         validate_refs(finding["proposal"]["evidenceRefs"], allowed)
+        source_session_id = next(sid for sid in sessions if sid != request["targetSessionId"])
+        validate_current_source_refs(
+            finding["proposal"]["evidenceRefs"], sessions, source_session_id
+        )
         proposals.append(
             {
                 **finding["proposal"],

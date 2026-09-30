@@ -255,6 +255,8 @@ export interface Approvals {
   }) => Effect.Effect<ApprovalMapping, Failure>
   readonly resolve: (command: ApprovalCommand) => Effect.Effect<void, Failure>
   readonly get: (approvalId: string) => Effect.Effect<ApprovalMapping | undefined, Failure>
+  /** Read current native permission details only when they match the durable scope and active execution. */
+  readonly review: (approval: Coordination.Approval, thread: Coordination.Thread) => Effect.Effect<Coordination.ApprovalReview | undefined, Failure>
   readonly invalidate: (input: {
     readonly runId: Coordination.RunID
     readonly reason: "cancelled" | "terminal" | "native_request_missing"

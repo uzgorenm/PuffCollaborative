@@ -33,6 +33,17 @@ test("two members share a thread while another thread runs", async () => {
           })
         ).status,
       ).toBe(200)
+    expect(
+      (
+        await testbed.request("/api/coordination/v1/projects/prj_e2e_main/threads", "alice", "POST", {
+          sessionId: "ses_e2e_one",
+          title: "Unselected fixture session",
+          requestId: "unselected-session",
+        })
+      ).status,
+    ).toBe(403)
+    for (const sessionId of ["ses_e2e_one", "ses_e2e_two"])
+      testbed.selectSession("usr_alice", "prj_e2e_main", sessionId)
     const [one, two] = await Promise.all(
       ["ses_e2e_one", "ses_e2e_two"].map((sessionId) =>
         testbed.request<{ id: string }>("/api/coordination/v1/projects/prj_e2e_main/threads", "alice", "POST", {

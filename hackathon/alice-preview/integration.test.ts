@@ -2,8 +2,11 @@ import { expect, test } from "bun:test"
 import { join } from "node:path"
 
 test("isolated Alice preview verifies persisted exact evidence and authenticated runner boundaries", async () => {
+  const env: NodeJS.ProcessEnv = { ...process.env, PUFF_PREVIEW_SERVER_PORT: "4479" }
+  delete env.PUFF_MODEL_CONFIG_PATH
+  delete env.PUFF_PREVIEW_NATIVE_SCENARIO
   const child = Bun.spawn([process.execPath, join(import.meta.dir, "run.ts"), "--check-only"], {
-    env: { ...process.env, PUFF_PREVIEW_SERVER_PORT: "4479" },
+    env,
     stdout: "pipe",
     stderr: "pipe",
   })

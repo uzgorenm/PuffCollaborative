@@ -19,3 +19,7 @@ export function mockWorker() {
 export function mockInstance() {
   return process.env.OPENCODE_COORDINATION_MOCK_INSTANCE_ID?.trim() || "local-mock"
 }
+
+export function provisioningPath() {
+  return process.env.OPENCODE_COORDINATION_PROVISIONING_PATH?.trim() || undefined
+}

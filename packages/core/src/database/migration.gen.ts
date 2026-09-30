@@ -51,5 +51,9 @@ export const migrations = (
     import("./migration/20260929202644_runner_harness_interrupt_evidence"),
     import("./migration/20260929205100_runner_harness_artifact_baseline"),
     import("./migration/20260929205500_runner_harness_artifact_report"),
+    import("./migration/20260929210000_coordination_project_context"),
+    import("./migration/20260929233322_coordination_provisioning"),
+    import("./migration/20260929234437_cooperation"),
+    import("./migration/20260929234925_flower_results"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]

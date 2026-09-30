@@ -14,6 +14,7 @@ import { ThreadTable } from "../threads/sql"
 const maxPageSize = 256
 const defaultSubscriberCapacity = 256
 const contentRevisionKinds = new Set<Coordination.EventKind>([
+  "instruction.submitted",
   "comment.created",
   "run.tool",
   "run.output",

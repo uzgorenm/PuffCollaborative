@@ -1,10 +1,12 @@
 import { Effect, Deferred, Redacted } from "effect"
 import { eq, inArray } from "drizzle-orm"
 import { EventV2 } from "@opencode-ai/core/event"
+import { trustedPrompt } from "@opencode-ai/core/coordination/flower/results"
 import { Git } from "@opencode-ai/core/git"
 import { AppProcess } from "@opencode-ai/core/process"
 import { ProjectV2 } from "@opencode-ai/core/project"
 import { SessionV2 } from "@opencode-ai/core/session"
+import { SessionMessage } from "@opencode-ai/core/session/message"
 import { SessionExecution } from "@opencode-ai/core/session/execution"
 import { SessionRunner } from "@opencode-ai/core/session/runner"
 import { SessionRunnerModel } from "@opencode-ai/core/session/runner/model"
@@ -238,7 +240,12 @@ export function makeRunnerFactory(config: Config) {
         localExecution: lifecycle,
         runtimeFailed: lifecycle.runtimeFailed,
       })
-      const ingestion = make({ sessions, events, permissions: permission })
+      const ingestion = make({
+        sessions,
+        events,
+        permissions: permission,
+        trustedSteer: ({ run, messageID }) => trustedPrompt(input.db, run, messageID),
+      })
       const delivery = ReportDelivery.make({
         db: input.db,
         callbacks: {
@@ -266,6 +273,17 @@ export function makeRunnerFactory(config: Config) {
         authority,
         permission,
         redact: policy.redact,
+        toolCall: ({ sessionId, messageId, callId }) =>
+          sessions.message({ sessionID: sessionId, messageID: SessionMessage.ID.make(messageId) }).pipe(
+            Effect.map((message) => {
+              if (!message || message.type !== "assistant") return undefined
+              const matches = message.content.filter((part) => part.type === "tool" && part.id === callId)
+              const tool = matches.length === 1 ? matches[0] : undefined
+              return tool?.type === "tool" && tool.state.status === "running"
+                ? { name: tool.name, input: tool.state.input }
+                : undefined
+            }),
+          ),
       })
       const cancellations = RunnerCancellation.make({
         sessions: binding,
@@ -300,7 +318,9 @@ export function makeRunnerFactory(config: Config) {
       })
       yield* Deferred.succeed(lifecycleReady, local)
       return {
+        owner: config.owner,
         sessionBinding: binding.coordinator,
+        approvalReview: approvals.review,
         runnerPort: {
           start: local.start,
           interrupt: cancellations.interrupt,

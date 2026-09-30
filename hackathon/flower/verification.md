@@ -1,5 +1,8 @@
 # Flower chain verification — September 29, 2026
 
+This is the historical pre-login checkpoint. A later synthetic SuperGrid chain
+completed; see the [live receipt](../../docs/hackathon/evidence/codex-flower-live.md).
+
 Implementation: `a03c33ac5d4ba5d84eb49ba784dcbb7e2ac6c31c`, based on
 Puff OpenCode main `f9035487d`. Checks ran against the same code tree immediately
 before that commit. This is source/unit/build evidence, **not a live cooperation

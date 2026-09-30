@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite"
 import type { CoordinationContracts } from "@opencode-ai/core/coordination/contracts"
+import type { SessionSelection } from "@opencode-ai/core/coordination/access/selection"
 import { Project } from "@opencode-ai/core/project"
 import { Context, Effect, Layer } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
@@ -59,8 +60,27 @@ const sessionBinding: CoordinationContracts.SessionBinding = {
     }),
 }
 
+const sessionSelection: SessionSelection = {
+  canShareSession: (userId, projectId, sessionId, selectedWorkerId) =>
+    Effect.try({
+      try: () => {
+        const db = new Database(databasePath, { readonly: true })
+        try {
+          return !!db
+            .query(
+              "SELECT 1 FROM puff_e2e_session_selection WHERE user_id = ? AND project_id = ? AND session_id = ? AND worker_id = ?",
+            )
+            .get(userId, projectId, sessionId, selectedWorkerId)
+        } finally {
+          db.close()
+        }
+      },
+      catch: (): CoordinationContracts.Failure => ({ code: "unavailable", message: "Fixture selection unavailable" }),
+    }),
+}
+
 const app = HttpRouter.toWebHandler(
-  createRoutes(undefined, { runnerPort, sessionBinding }).pipe(Layer.provide(HttpServer.layerServices)),
+  createRoutes(undefined, { runnerPort, sessionBinding, sessionSelection }).pipe(Layer.provide(HttpServer.layerServices)),
   { disableLogger: true },
 )
 const server = Bun.serve({
