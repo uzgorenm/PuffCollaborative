@@ -79,7 +79,8 @@ def execute(prepared, directory, timeout=CHAIN_DEADLINE_SECONDS):
     auth_failed = any(e.get("errorCode") == "authentication-failed" for e in events)
     error = "Chain deadline exceeded" if timed_out else "Flower chain failed"
     if auth_failed:
-        error = "SuperGrid authentication failed; refresh flwr login supergrid"
+        federation = os.environ.get("PUFF_FLOWER_FEDERATION", "supergrid")
+        error = f"Flower federation authentication failed for {federation}; check its local connection"
     return {
         "state": "failed",
         "error": error,

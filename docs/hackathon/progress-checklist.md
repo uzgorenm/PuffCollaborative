@@ -7,6 +7,8 @@
 
 **Earlier connected Alice checkpoint:** Next.js `/live` reads actual coordination projects, people, Sessions and Runs; exact source inspection and owner-requested context reuse preserve the receiving task. Thirty-five local tests, typecheck, build and browser checks passed. The first credential returned HTTP 401 after native promotion. [Historical evidence and handoff](evidence/2026-09-29-alice-connected-product.md). The replacement-key result is recorded above; guardian analysis and live gates remain open.
 
+**Two-user MiniMax M3 integration:** at `09c625f`, Alice and Bob completed separate tasks in isolated Sessions, then submitted follow-ups through `/live`. Each saw both Sessions, could write only to their own, and saw the assistant response. Web, app, server, simulator, Alice-preview and Flower checks passed. This does not prove cross-session finding admission or Flower cooperation; WF02, G2 and WF10 remain open. [Receipt and exact checks](evidence/2026-09-29-two-user-minimax-m3.md).
+
 **Repeatable React walkthrough:** source `a5624203ac` passes 19 tests, typecheck, build, and browser checks for reset/reload/undo, setup, Sam overlap, Alice's source reuse, and personal context. The app uses product copy; [receipt](evidence/2026-09-29-repeatable-web-walkthrough.md) records the scripted local-data boundary. Live gates are unchanged.
 
 **Compact React sidebar:** source `1497e7cbbf` removes visible status words while retaining colored dots, tooltips, and accessible labels. Fourteen tests, typecheck, production build, and sidebar navigation pass. [Backend handoff receipt](evidence/2026-09-29-compact-web-sidebar.md). The interface remains a local demo pending backend wiring.

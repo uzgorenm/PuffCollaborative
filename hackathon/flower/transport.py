@@ -49,8 +49,9 @@ def record(path, event):
 
 def run_agent(project, payload, journal, stage):
     app = build_local_agent(Path(project))
+    federation = os.environ.get("PUFF_FLOWER_FEDERATION", "supergrid")
     with CONNECT:
-        connection = read_superlink_connection("supergrid")
+        connection = read_superlink_connection(federation)
         client = init_http_client_from_connection(connection)
     run_id = None
     try:
@@ -160,7 +161,8 @@ def cancel_runs(journal):
     events = journal_events(journal)
     ids = {e["runId"] for e in events if e.get("runId")}
     terminal = {e["runId"] for e in events if e["state"].startswith("finished:")}
-    client = init_http_client_from_connection(read_superlink_connection("supergrid"))
+    federation = os.environ.get("PUFF_FLOWER_FEDERATION", "supergrid")
+    client = init_http_client_from_connection(read_superlink_connection(federation))
     try:
         for run_id in ids - terminal:
             status = (

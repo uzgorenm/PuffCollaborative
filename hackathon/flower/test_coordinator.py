@@ -239,6 +239,13 @@ class ContractsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             make_report(self.prepared, self.analyses, self.finding, "test")
 
+    def test_factual_mandatory_constraint_is_not_work_redirection(self):
+        self.finding["awareness"]["text"] = (
+            "Every navigation item must show visible keyboard focus and support Tab access."
+        )
+        report = make_report(self.prepared, self.analyses, self.finding, "test")
+        self.assertEqual(len(report["awarenessNotes"]), 1)
+
     def test_wrong_request_project_or_target_fails(self):
         for field in ["projectId", "targetSessionId", "targetWorkerId"]:
             request = {**self.request, field: "other"}
