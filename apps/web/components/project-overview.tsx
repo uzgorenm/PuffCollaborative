@@ -20,6 +20,8 @@ export type ProjectOverviewProps = {
   sessionLabels?: Record<string, string>
   sessionDetails?: Record<string, string>
   personWorkSummaries?: Record<string, string>
+  onReset?: () => void
+  onUndoReset?: () => void
 }
 
 const statusLabels = { running: "Working", waiting: "Ready", complete: "Completed" }
@@ -38,15 +40,19 @@ export function ProjectOverview(props: ProjectOverviewProps) {
         <p className="overview-goal">{props.project.goal}</p>
       </div>
       <div className="overview-actions">
-        <span className="overview-demo-badge"><span aria-hidden="true" />{props.mode === "live" ? "Connected service data" : "Interactive demo"}</span>
+        {props.mode === "live" && <span className="overview-demo-badge"><span aria-hidden="true" />Connected service data</span>}
         <div className="overview-action-buttons">
           <button type="button" className="overview-settings" onClick={props.onSetup}>Project settings</button>
           <button type="button" className="overview-new-session" onClick={props.onNewSession}><span aria-hidden="true">+</span> New session</button>
         </div>
+        {props.mode !== "live" && props.onReset && <div className="overview-reset-actions">
+          {props.onUndoReset && <button type="button" onClick={props.onUndoReset}>Undo reset</button>}
+          <button type="button" onClick={props.onReset}>Reset workspace</button>
+        </div>}
       </div>
     </header>
 
-    {props.mode !== "live" && <nav className="overview-workflows" aria-label="Try a demo workflow">
+    {props.mode !== "live" && <nav className="overview-workflows" aria-label="Project workflows">
       <span className="overview-workflows-label">Try a workflow</span>
       <button type="button" onClick={() => props.onStartScenario("overlap")}>Avoid duplicate work<span aria-hidden="true">↗</span></button>
       <button type="button" onClick={() => props.onStartScenario("solution")}>Reuse a solved problem<span aria-hidden="true">↗</span></button>

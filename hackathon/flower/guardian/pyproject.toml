@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "puff-guardian"
 version = "0.1.0"
-description = "Per-agent Puff guardian: compares one coding agent with the shared board and proposes a correction"
+description = "Puff guardian: one Flower agent per coding agent that shares source-cited findings between agents over a shared board"
 license = "MIT"
 requires-python = ">=3.11,<3.14"
 dependencies = ["flwr==1.39.0", "openai>=2.16.0,<3.0.0"]
@@ -14,7 +14,7 @@ dependencies = ["flwr==1.39.0", "openai>=2.16.0,<3.0.0"]
 packages = ["agent"]
 
 [tool.flwr.app]
-publisher = "puff-local"
+publisher = "fertonzi"
 flwr-version-target = "1.39.0"
 
 [tool.flwr.app.components]

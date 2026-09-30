@@ -70,6 +70,12 @@ Transport tests use a real local HTTP fixture; controller tests exercise identit
 
 The Puff logo remains `public/puff-logo.png`.
 
+## Repeat the original demo
+
+Choose **Try demo**, then **Reset workspace** and confirm to restore the source interface's six starting Sessions for You, Sam and Alice. **Undo reset** restores the previous demo workspace, including after reload. These controls affect browser demo storage; the live service remains separate.
+
+The original walkthrough supports project setup/task assignment, reviewing Sam's overlapping frontend work, starting complementary work or an alternative, and inspecting Alice's recorded `EADDRINUSE` finding before adding it as context. Its compact sidebar shows five Session rows before an expandable overflow and a collapsed recent-update view. Custom tasks produce independent illustrative plans; an unrelated server error never inherits the port-conflict finding. Choose **Return to live workspace** to resume the authenticated service.
+
 ## Render the walkthrough video
 
 `scripts/render_walkthrough.py` turns screenshots captured from the running interface into one MP4. It retains the captured application UI, adds a bottom caption band, and overlays an animated mouse cursor and click rings. This is a screenshot-based walkthrough of browser interactions, with cursor animation added during encoding; it is not a continuous screen recording or evidence of live agent execution.

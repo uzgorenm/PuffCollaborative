@@ -15,14 +15,51 @@ Grid communication**. No app is published by these commands.
 Status: a fresh **synthetic** two-AgentApp chain completed on SuperGrid with
 three terminal runs and a source-linked result. See the
 [live receipt](../../docs/hackathon/evidence/codex-flower-live.md). Real Puff
-session export, receiving-agent use and Flower Hub publication remain unverified.
+sessions through hosted Flower remain unverified in this combined product.
 The earlier authentication failure is recorded in [verification.md](verification.md).
 The Activity/Jev producer-to-chain adapter is also locally connected. Its
 separate synthetic adapter checkpoint could not reach SuperLink and started no
 new hosted run; see the [bridge receipt](../../docs/hackathon/evidence/2026-09-29-ferit-activity-flower-bridge.md).
 Local adapter output does not establish a model response or live Puff delivery.
 
-## Guardian mode (default product path)
+The incoming team's September 29 record reports synthetic Endeavor runs
+`15257103598039078808` (coordination) and `12842551889246562196` (Guardian),
+and publication of [`@fertonzi/puff-guardian`](https://flower.ai/apps/fertonzi/puff-guardian)
+v0.1.0. The Guardian manifest retains that publisher. These are historical team
+reports; this integration did not independently verify Hub publication or run
+the combined product against hosted Flower.
+
+## Combined product integration
+
+The combined launcher (`bun product` from the repository root) uses server-owned
+Session provisioning and trusted selection. Sharing a Session does not grant
+hosted analysis consent. Member `GET /api/coordination/v1/threads/:id/cooperation`
+reads settings; owner-only `PUT` requires a stable `requestId` and
+`expectedVersion`. Analysis defaults off, and `analysisTextEnabled` is a separate
+opt-in that defaults false. It permits only bounded owner instructions and
+redacted runner output; tool arguments, diffs and comment transcripts are excluded.
+
+Member `POST /api/coordination/v1/projects/:id/flower/export` accepts only
+`requestId`, `sourceThreadId` and `targetThreadId`. The server captures current
+consent, Session owners, bindings and exact event provenance. `product_export.py`
+maps this envelope to the retained three-run chain. `evidenceRevision` identifies
+the selected event sequence; `activitySeq` remains the independent WorkCard and
+source-currentness value. Neither is substituted for the other.
+
+Analysis-only `POST /api/coordination/v1/projects/:id/flower/results` registers
+validated candidates against the captured consent and source revisions. Current
+consent also gates card writes. Target-owner `POST
+/api/coordination/v1/threads/:id/flower/awareness` admits registered informational
+notes only while that Session is active. Admission and transcript promotion have
+distinct durable receipts, readable through the per-note awareness `GET` route.
+Redirection remains a proposal requiring human approval. Native fixtures verify
+safe-boundary promotion and continuation output with a local HTTP provider;
+they do not establish paid-model or hosted Flower acceptance.
+
+## Retained Guardian worker (manual integration)
+
+The standalone `worker.py` workflow below is retained for its historical manual
+adapter. The combined launcher uses the consent-gated product path above.
 
 `guardian/` is a third AgentApp, run once per coding agent whenever Jev flags a
 meaningful change in that agent. Input (capped at 6 KB): the agent's latest
@@ -190,9 +227,9 @@ send only `expectedVersion`, `sourceActivitySeq`, and `card` as the request
 payload. `analysisMetadata` is a diagnostic sidecar, not a server field. A
 successful chain state means Flower completed and candidates were mapped; it
 does not mean the server persisted them or OpenCode delivered them.
-The current server has no published session-level sharing/topic controls or
-awareness delivery/admission API, so those remain server/OpenCode integration
-gates (C2/C4/C8). A returned candidate is never evidence of delivery or use.
+The combined product exposes the consent and result/admission ports above.
+This standalone CLI still returns candidates without writing or admitting them.
+A returned candidate is never evidence of delivery or use.
 
 Run `python bridge_demo.py` from this directory for the local producer-to-
 consumer walkthrough. It uses the checked-in synthetic navigation history and a
@@ -220,13 +257,11 @@ text as a command or use classification to gate coding execution.
 not a replacement for the current server contract in
 [`docs/coordination-contract.md`](../../docs/coordination-contract.md). The
 server distinguishes `Event.seq`, `Thread.activitySeq`, and `WorkCard.version`;
-the bridge keeps them separate. The current server can compare-and-swap WorkCard
-updates, but it does not expose a complete Flower job/result or awareness-note
-delivery API. Session consent/topic/relationship metadata is also missing from
-the published `Thread` schema. C2/C4/C8 therefore remain open; this bridge does
-not edit or replace shared backend schemas.
+the bridge keeps them separate. The combined server supplies separate cooperation,
+export, result and awareness APIs; this normalized adapter does not replace those
+authentication and consent boundaries.
 
-**Selected export remains unimplemented.** `prepare` validates the envelope it
+**Standalone JSON validation is not selected export authorization.** `prepare` validates the envelope it
 receives but cannot authenticate an owner or prove that `sharedSessions` came
 from current opt-in decisions. A production caller must first resolve the
 authenticated owner's selected A/B Threads, project membership, worker/Session
@@ -235,8 +270,8 @@ from those Threads; and resolve each cited `Event.id` with its project-wide
 `Event.seq` separately from the captured `Thread.activitySeq` and replay cursor.
 That trusted capture must precede `coordinate`, and the server must repeat
 source/target consent, identity and currentness checks before saving or
-delivering a result. No such producer or authenticated Flower job/result port
-is implemented here. A client-supplied JSON envelope, local field filtering,
+delivering a result. The combined product implements those server ports; this
+low-level API cannot establish that a caller used them. A client-supplied JSON envelope, local field filtering,
 and owner-only `.runtime` permissions are not evidence of private export consent.
 
 ```json

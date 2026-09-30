@@ -7,11 +7,19 @@ export async function atomicPrivateFile(file: string, content: string | Uint8Arr
   try {
     await handle.writeFile(content)
     await handle.sync()
-  } finally { await handle.close() }
+  } finally {
+    await handle.close()
+  }
   try {
-    if (exclusive) { await link(temporary, file); await unlink(temporary) }
-    else await rename(temporary, file)
-  } catch (error) { await unlink(temporary).catch(() => {}); throw error }
+    if (exclusive) {
+      await link(temporary, file)
+      await unlink(temporary)
+    } else await rename(temporary, file)
+  } catch (error) {
+    await unlink(temporary).catch(() => {})
+    throw error
+  }
 }
 
-export const atomicPrivateJson = (file: string, value: unknown, exclusive = false) => atomicPrivateFile(file, JSON.stringify(value, null, 2), exclusive)
+export const atomicPrivateJson = (file: string, value: unknown, exclusive = false) =>
+  atomicPrivateFile(file, JSON.stringify(value, null, 2), exclusive)

@@ -2,8 +2,8 @@ import copy
 import unittest
 
 from contracts import prepare
-from smoke import example
 from product_export import build_product_job
+from smoke import example
 
 
 class ProductWorkerOwnershipTest(unittest.TestCase):

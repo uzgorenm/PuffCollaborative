@@ -16,5 +16,7 @@ test("atomic private writes ignore interrupted temporary files and protect exist
     expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ version: 2 })
     expect((await stat(file)).mode & 0o777).toBe(0o600)
     expect((await readdir(directory)).sort()).toEqual(["saved.json", "saved.json.interrupted.next"])
-  } finally { await rm(directory, { recursive: true, force: true }) }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })

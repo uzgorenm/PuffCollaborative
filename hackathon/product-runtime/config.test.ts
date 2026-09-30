@@ -10,8 +10,10 @@ test("runtime preserves individual credentials and never aliases member and work
     const first = await initializeSettings(directory)
     const again = await initializeSettings(directory)
     expect(again).toEqual(first)
-    expect(first.members.map(member => member.username)).toEqual(["serdar", "serhat", "talha", "ferit"])
-    expect(new Set([...first.members.map(member => member.password), first.runtimePassword, first.workerPassword]).size).toBe(6)
+    expect(first.members.map((member) => member.username)).toEqual(["serdar", "serhat", "talha", "ferit"])
+    expect(
+      new Set([...first.members.map((member) => member.password), first.runtimePassword, first.workerPassword]).size,
+    ).toBe(6)
     expect((await stat(join(directory, "settings.json"))).mode & 0o777).toBe(0o600)
     expect(JSON.parse(await readFile(join(directory, "settings.json"), "utf8"))).toEqual(first)
     const environment = runtimeEnvironment(directory, first)
@@ -19,5 +21,7 @@ test("runtime preserves individual credentials and never aliases member and work
     expect(environment.OPENCODE_DB).toBe(join(directory, "opencode.sqlite"))
     expect(environment.PUFF_MEMBER_USERNAME).toBe("serdar")
     expect(environment.PUFF_MEMBER_PASSWORD).toBe(first.members[0].password)
-  } finally { await rm(directory, { recursive: true, force: true }) }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })

@@ -1,8 +1,16 @@
 # Puff progress and verification
 
+**Combined product integration:** `187f1453c2` adds the live Next.js controller and persistent runtime, owner-bound dynamic Sessions, native approval review, and owner-consented Flower export/results/active awareness. [Evidence](next-product-integration.md) records real-service browser execution with a local deterministic model, restart persistence, exact cross-Session context review, consent/retry checks and native admission → promotion → continuation output. These are integrated fixture checks. A real provider has not been configured for this product copy and no hosted Flower chain was submitted; live WF/G gates remain open. Latest team UI/native fix-reuse changes are preserved in the integration merge.
+
+**Repeatable React walkthrough:** source `a5624203ac` passes 19 tests, typecheck, build, and browser checks for reset/reload/undo, setup, Sam overlap, Alice's source reuse, and personal context. The app uses product copy; [receipt](evidence/2026-09-29-repeatable-web-walkthrough.md) records the scripted local-data boundary. Live gates are unchanged.
+
+**Compact React sidebar:** source `1497e7cbbf` removes visible status words while retaining colored dots, tooltips, and accessible labels. Fourteen tests, typecheck, production build, and sidebar navigation pass. [Backend handoff receipt](evidence/2026-09-29-compact-web-sidebar.md). The interface remains a local demo pending backend wiring.
+
 **Browser UI workflows (September 29):** Next.js/React source `0c002da6c9` adds person → total summary → sessions, project setup/task assignment, overlap choices, attributed finding reuse, and private local sessions at `apps/web`. Fourteen tests, package typecheck, production build, browser persistence/source-deduplication checks, and a 2:26 cursor walkthrough passed. [Evidence and limitations](evidence/2026-09-29-react-web-workflows.md). The interface is explicitly an interactive demo; no live-awareness, real-presence, or execution gate is closed by these checks.
 
 **Main browser sidebar (September 29):** source `790518a2c9688e9fc1d09f3b6b02a29b965c7a03` adds the Stanford Hackathon project tree, personal threads, teammate sections, and rolling 90-minute summaries to `apps/web`; the separate `/puff` overview page is removed. Production builds, app typecheck, 47 browser tests, and desktop/mobile browser inspection passed. [Evidence and limits](evidence/2026-09-29-main-web-sidebar.md). Activity comes from demo or simulator sessions; WF01/WF02 and G5 remain open.
+
+**OpenCode Team Activity panel (September 29):** source `dac982301277871c5371f0e2dda02747bcb7e5ea` mounts coordination API activity beside the standard app content and in the classic project sidebar. App typecheck, production build, and browser rendering passed. The coordination API was unavailable, so sign-in and live activity were not verified. No WF case or gate is closed. [Receipt](evidence/2026-09-29-opencode-team-activity-sidebar.md).
 
 This is the coordinator's working checklist. A feature counts as progress when its behavior can be demonstrated with evidence. Use the [workflow cases](acceptance-workflows.md) to run the checks and the [integration gates](integration-gates.md) to resolve interfaces. Human ownership remains Serhat (server), Talha (OpenCode), Serdar (interface), Ferit (Flower).
 
@@ -70,6 +78,13 @@ These checkpoints do not close G0 through G7 or WF01 through WF10. Selected acti
 **Later source-inspection checkpoint:** [receipt at `e332cbf539`](evidence/2026-09-29-source-inspection.md) records exact inline citation lookup, original-attempt tool-decision retry and real Session identity. Coordinator checks passed 67 focused tests, 46 browser tests, app/desktop typechecks and app build. Native N1/N2/N3 acceptance and live WF02/WF10 remain open; a synthetic HTTP response is not a Flower delivery receipt.
 
 **Native backend preview:** [receipt at `3147b79f2f`](evidence/2026-09-29-desktop-backend-preview.md) records the Electron desktop connected to the registered coordination service. Two shared Session records appeared separately; an instruction submitted from the desktop queued and completed through the mock runner, and its exact source event was inspected. App, desktop and server typechecks passed; 56 focused app tests and the 51-assertion server integration passed. This preview does not close WF01–WF10 or G0–G7. Live awareness and Flower exchange remain open.
+
+**Flower checkpoint — September 29:** Agent 1's
+[receipt](evidence/2026-09-29-flower-chain.md) records two separate AgentApp builds,
+local boundary/lifecycle checks and a blocked synthetic SuperGrid attempt.
+Authentication failed before run IDs were returned. G2/WF10 remain open; no
+live collaboration or publication is claimed. Serhat's C3/C8 mapping is still
+needed before the provisional input/output adapter can be called integrated.
 
 - `PASS`: the stated behavior passed at the receipt's code version and required evidence level. Check its box and link the receipt.
 - `NOT RUN`: no matching evidence. Leave unchecked even if code or fixtures exist.
@@ -207,3 +222,6 @@ For a source/unit-only gate, mark irrelevant runtime fields `not exercised`; do 
 ## Serdar desktop checkpoint — September 29
 
 Native/UI code `f4c8ad9ee4f9c9e411e161e6ea6980099ecc85c0` on serdar/ui: session rail, original coding composer/tools/inline diff, exact-bound panel and motion; focused checks/builds/production comparison recorded in [native receipt](evidence/2026-09-29-serdar-native.md). Full app suite retains one known Punjabi locale failure. Actual native rendering uses synthetic fixtures plus external mock-backed coordination service. Final independent D01–D06 retest remains in the QA receipt; this does not close live WF02/WF10 or sharing/export/awareness contract gates. No main integration by the UI lead.
+
+
+**Native error-reuse correction:** [receipt](evidence/2026-09-29-error-fix-reuse.md) at UI code `d9609a30aa` records 71 focused app checks, 47 browser checks, typecheck/build and 13 real HTTP client/backend checks with actual isolated patch/test execution. Error reuse and grouped people are test-backend complete; real selected worker fix reports and live Flower discovery remain open. No live gate is closed by these checks.

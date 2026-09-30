@@ -29,7 +29,8 @@ export function projectRail(input: {
   const scenario = input.simulation?.scenarios.find((item) => item.projectId === input.projectId)
   const rows = input.threads.filter((thread) => thread.projectId === input.projectId).map((thread) => {
     const card = cards.get(thread.id)
-    const fresh = !!card && card.projectId === input.projectId && card.sourceActivitySeq === thread.activitySeq
+    const fresh = !!card && card.projectId === input.projectId && card.threadId === thread.id &&
+      card.sourceActivitySeq === thread.activitySeq
     const snapshot = snapshots.get(thread.id)
     const exact = snapshot?.thread.projectId === input.projectId && snapshot.thread.sessionId === thread.sessionId &&
       snapshot.thread.workerId === thread.workerId && snapshot.thread.activitySeq === thread.activitySeq
@@ -42,9 +43,25 @@ export function projectRail(input: {
         simulated ? input.t(simulated) : (card.progress.trim() || card.currentTask.trim() || input.missing),
       runState: run?.state,
       creatorIsMember: members.some((member) => member.userId === thread.createdBy),
+      currentCard: fresh ? card : undefined,
     }
   })
-  return { members, rows }
+  const groups = members.map((member) => {
+    const sessions = rows.filter((row) => row.thread.createdBy === member.userId)
+    const reports = rows.flatMap((row) => {
+      const card = row.currentCard
+      const sourceRef = card?.evidenceRefs.find((ref) => ref.threadId === row.thread.id && ref.eventId.trim())
+      if (!card?.contributors.includes(member.userId) || !sourceRef) return []
+      const text = card.progress.trim() || card.recentVerifiedOutcome?.trim() || card.currentTask.trim()
+      return text ? [{ threadId: row.thread.id, threadTitle: row.thread.title, text, sourceRef }] : []
+    })
+    const reported = new Set(reports.map((report) => report.threadId))
+    const startedTopics = [...new Set(sessions.filter((row) => !reported.has(row.thread.id))
+      .map((row) => row.currentCard?.currentTask.trim()).filter((task): task is string => !!task))]
+    const summary = [...new Set(reports.map((report) => report.text))].join(" ")
+    return { member, sessions, startedTopics, reports, summary }
+  })
+  return { members, rows, groups, unknownRows: rows.filter((row) => !row.creatorIsMember) }
 }
 
 function simulatedSummaryKey(threadId: string, stage: number) {

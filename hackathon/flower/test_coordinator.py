@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from contracts import make_report, prepare, validate_analysis
 from coordinator import CoordinationFailure, coordinate, execute, journal_events
+from product_export import build_product_job
 from reconcile import reconcile
 from smoke import example
 from transport import cancel_runs, record
@@ -39,6 +40,67 @@ def analysis_for(item, run_id):
 
 
 class ContractsTest(unittest.TestCase):
+    def test_consented_instruction_revision_can_advance_beyond_content_activity(self):
+        request, snapshot = example()
+        bindings = []
+        provenance = []
+        for index, session in enumerate(snapshot["sharedSessions"]):
+            event = next(
+                item for item in snapshot["events"] if item["sessionId"] == session["sessionId"]
+            )
+            event["revision"] = 17 + index
+            session["revision"] = event["revision"]
+            next(
+                ref for ref in request["evidenceRefs"] if ref["sessionId"] == session["sessionId"]
+            )["revision"] = event["revision"]
+            binding = {
+                "projectId": request["projectId"],
+                "threadId": f"thread-{index}",
+                **{
+                    key: session[key]
+                    for key in (
+                        "workerId",
+                        "sessionId",
+                        "ownerId",
+                        "title",
+                        "featureTopic",
+                        "relationship",
+                    )
+                },
+                "activitySeq": event["revision"] - 1,
+                "evidenceRevision": event["revision"],
+                "expectedVersion": 0,
+                "shared": True,
+                "deterministicStatus": "active",
+                "contributors": [],
+            }
+            bindings.append(binding)
+            provenance.append(
+                {
+                    "threadId": binding["threadId"],
+                    "eventId": event["eventId"],
+                    "eventSeq": event["revision"],
+                    "threadActivitySeq": binding["activitySeq"],
+                }
+            )
+        envelope = {
+            "request": request,
+            "snapshot": snapshot,
+            "provenance": provenance,
+            "bindings": bindings,
+            "cooperationVersions": {binding["threadId"]: 1 for binding in bindings},
+        }
+        job = build_product_job(envelope)
+        source = bindings[0]
+        self.assertEqual(job.session_revisions[source["sessionId"]], source["evidenceRevision"])
+        self.assertEqual(
+            job.bindings_by_session[source["sessionId"]]["activitySeq"], source["activitySeq"]
+        )
+        changed = copy.deepcopy(envelope)
+        changed["bindings"][0]["evidenceRevision"] += 1
+        with self.assertRaises(ValueError):
+            build_product_job(changed)
+
     def setUp(self):
         self.request, self.snapshot = example()
         self.prepared = prepare(self.request, self.snapshot)

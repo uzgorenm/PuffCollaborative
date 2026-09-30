@@ -18,6 +18,8 @@ export type WorkspaceProject = {
 
 export type WorkspaceState = { project: WorkspaceProject; sessions: WorkspaceSession[] }
 
+const serverStartupGuidance = "The startup error was a port conflict: another process owned port 3000. Identify its owner first. This project uses development port 3005, so use its configured dev command. Reusing 3000 requires a deliberate restart after confirming the process belongs to this project. This finding is specific to that startup error; compare your error before applying it."
+
 export function createDemoWorkspace(projectName = "Puff", goal = "Build a collaborative workspace"): WorkspaceState {
   return {
     project: {
@@ -126,7 +128,7 @@ export function createDemoWorkspace(projectName = "Puff", goal = "Build a collab
         ],
         messages: [
           { role: "user", text: "Investigate why the development server fails to start with EADDRINUSE." },
-          { role: "assistant", text: "The scenario's error was a port conflict: another process owned port 3000. Identify its owner first. This project uses development port 3005, so use its configured dev command. Reusing 3000 requires a deliberate restart after confirming the process belongs to this project. This finding is specific to that startup error; compare your error before applying it." },
+          { role: "assistant", text: serverStartupGuidance },
         ],
       },
       {
@@ -150,6 +152,39 @@ export function createDemoWorkspace(projectName = "Puff", goal = "Build a collab
       },
     ],
   }
+}
+
+export function refreshWorkspacePresentation(workspace: WorkspaceState): WorkspaceState {
+  return {
+    ...workspace,
+    sessions: workspace.sessions.map((session) => ({
+      ...session,
+      summary: session.summary === "Task assigned in this demo; the first step is ready to review." ? "The first step is ready to review." : session.summary,
+      messages: session.messages.map((message) => {
+        if (message.role !== "assistant") return message
+        const text = refreshGeneratedGuidance(message.text)
+        return text === message.text ? message : { ...message, text }
+      }),
+    })),
+  }
+}
+
+function refreshGeneratedGuidance(text: string): string {
+  // Match complete generated templates so saved user prose and quoted context survive.
+  if (text === serverStartupGuidance.replace("The startup error", "The scenario's error")) return serverStartupGuidance
+  const independent = text.match(/^Demo plan for ([\s\S]+): clarify the outcome for “([\s\S]+)”, inspect the relevant project context, and propose a small first step\.(?: ([\s\S]+) is related work; keep this task independent and compare scope before implementing\.)? This creates a local demo session; it does not run an agent or change another session\.$/)
+  if (independent) return `Plan for ${independent[1]}: clarify the outcome for “${independent[2]}”, inspect the relevant project context, and propose a small first step.${independent[3] ? ` ${independent[3]} is related work; keep this task independent and compare scope before implementing.` : ""}`
+  const complementary = text.match(/^Demo plan for ([\s\S]+): review ([\s\S]+) as source context, then take a complementary scope: ([\s\S]+)\. Keep a separate approach and record your own findings\. This creates a local demo session; it does not run an agent, copy the source implementation, or stop the source session\.$/)
+  if (complementary) return `Plan for ${complementary[1]}: review ${complementary[2]} as source context, then consider this proposed complementary scope: ${complementary[3]}. Keep a separate approach and record your own findings.`
+  const next = text.match(/^Demo next step: keep “([\s\S]+)” as this session's task, inspect the relevant context for “([\s\S]+)”, and propose a small check\. This walkthrough does not execute an agent or modify project files\.$/)
+  if (next) return `Next step: keep “${next[1]}” as this session's task, inspect the relevant context for “${next[2]}”, and propose a small check.`
+  const context = text.match(/^Demo context check: ([\s\S]+)'s port-conflict finding is already in this session\. Reuse that attributed context: check who owns port 3000, preserve that process, use this project's port 3005, and verify this server before continuing “([\s\S]+)”\. The finding has not been added a second time\.$/)
+  if (context) return `Context check: ${context[1]}'s port-conflict finding is already in this session. Reuse that attributed context: check who owns port 3000, preserve that process, use this project's port 3005, and verify this server before continuing “${context[2]}”. The finding has not been added a second time.`
+  const adaptation = text.match(/^(Context from [\s\S]+\n\nProblem: [\s\S]+\n\nFinding: [\s\S]+)\n\nDemo adaptation for “([\s\S]+)”:\n1\. Check which process owns port 3000\.\n2\. Preserve that session and use this project's configured port, 3005\.\n3\. Verify this session's server starts on that port before resuming the original task\.\n\nThis is a walkthrough plan, not a live execution result\.$/)
+  if (adaptation) return `${adaptation[1]}\n\nSuggested steps for “${adaptation[2]}”:\n1. Check which process owns port 3000.\n2. Preserve that session and use this project's configured port, 3005.\n3. Verify this session's server starts on that port before resuming the original task.`
+  const investigation = text.match(/^Demo plan: continue investigating this server error independently\. Compare the error, inspect which process owns the port, and record the next check in this session\. Keep the original task, “([\s\S]+)”, in scope\. No finding has been copied or execution performed\.$/)
+  if (investigation) return `Plan: continue investigating this server error independently. Compare the error, inspect which process owns the port, and record the next check in this session. Keep the original task, “${investigation[1]}”, in scope.`
+  return text
 }
 
 export function findRelatedWork(prompt: string, sessions: WorkspaceSession[]): WorkspaceSession[] {
@@ -184,8 +219,8 @@ export function createTaskSession(prompt: string, owner: string, project: Worksp
         : { task: "Review independent edge cases", detail: "independent edge-case checks and review" }
   const task = complementary ? complementaryScope.task : requested
   const plan = complementary
-    ? `Demo plan for ${project.name}: review ${reference} as source context, then take a complementary scope: ${complementaryScope.detail}. Keep a separate approach and record your own findings. This creates a local demo session; it does not run an agent, copy the source implementation, or stop the source session.`
-    : `Demo plan for ${project.name}: clarify the outcome for “${task}”, inspect the relevant project context, and propose a small first step.${reference ? ` ${reference} is related work; keep this task independent and compare scope before implementing.` : ""} This creates a local demo session; it does not run an agent or change another session.`
+    ? `Plan for ${project.name}: review ${reference} as source context, then consider this proposed complementary scope: ${complementaryScope.detail}. Keep a separate approach and record your own findings.`
+    : `Plan for ${project.name}: clarify the outcome for “${task}”, inspect the relevant project context, and propose a small first step.${reference ? ` ${reference} is related work; keep this task independent and compare scope before implementing.` : ""}`
   return {
     id: `demo-task-${crypto.randomUUID()}`,
     title: task.length > 72 ? `${task.slice(0, 69)}…` : task,
@@ -193,7 +228,7 @@ export function createTaskSession(prompt: string, owner: string, project: Worksp
     initials: member?.initials ?? name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(),
     color: member?.color ?? "orange",
     status: "waiting",
-    summary: complementary ? `Proposed complementary scope: ${complementaryScope.detail}.` : "Task assigned in this demo; the first step is ready to review.",
+    summary: complementary ? `Proposed complementary scope: ${complementaryScope.detail}.` : "The first step is ready to review.",
     updatedAt: new Date().toISOString(),
     messages: [{ role: "user", text: requested }, { role: "assistant", text: plan }],
     task,
