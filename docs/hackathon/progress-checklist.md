@@ -1,5 +1,7 @@
 # Puff progress and verification
 
+**Connected Alice browser slice:** Next.js `/live` now reads actual coordination projects, people, Sessions and Runs; exact source inspection and owner-requested context reuse preserve the receiving task. Thirty-five local tests, typecheck, build and browser checks pass. The original task and reused context were promoted into the real native Session, but Flower rejected both model requests with HTTP 401. [Evidence and handoff](evidence/2026-09-29-alice-connected-product.md). Successful model use, guardian analysis and live gates remain open pending valid model access.
+
 **Repeatable React walkthrough:** source `a5624203ac` passes 19 tests, typecheck, build, and browser checks for reset/reload/undo, setup, Sam overlap, Alice's source reuse, and personal context. The app uses product copy; [receipt](evidence/2026-09-29-repeatable-web-walkthrough.md) records the scripted local-data boundary. Live gates are unchanged.
 
 **Compact React sidebar:** source `1497e7cbbf` removes visible status words while retaining colored dots, tooltips, and accessible labels. Fourteen tests, typecheck, production build, and sidebar navigation pass. [Backend handoff receipt](evidence/2026-09-29-compact-web-sidebar.md). The interface remains a local demo pending backend wiring.
