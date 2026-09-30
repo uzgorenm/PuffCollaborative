@@ -1,0 +1,294 @@
+{
+  "testedSource": "ccfb9d21968ccc6c1c3715eaef56f3cdd0e1aceb",
+  "mockRunner": false,
+  "provider": "Flower Endeavor",
+  "loopbackBackendPort": 4484,
+  "frontendPort": 3010,
+  "originalInputCount": 2,
+  "originalMessageCount": 9,
+  "runs": [
+    {
+      "run_id": "run_47e3a62f-9f3a-4eca-9373-dbaed2d860b7",
+      "thread_id": "thr_139e0cea-d349-46b4-bd2e-facbb5c10c05",
+      "session_id": "ses_d34fd920a5da79efe0659859cf16643bda38717a",
+      "phase": "failed",
+      "runner_message_id": "msg_0f00535c80017oLaf7A0EruLVT",
+      "admitted_message_id": "msg_0f00535c80017oLaf7A0EruLVT",
+      "last_session_seq": 4,
+      "sharedState": "failed",
+      "input": {
+        "admittedSeq": 1,
+        "promotedSeq": 2,
+        "textSha256": "a8ad1a061577b327b02182fb13f4d68dff80a0c2ac1bb828a7a578a6d93d5bb0",
+        "hasAttributedContext": true,
+        "citesCurrentAliceOutput": true
+      },
+      "nativeMessages": [
+        {
+          "id": "msg_0f005b731001tN4sDArQZZ77VP",
+          "seq": 3,
+          "agent": "serdar-bounded",
+          "error": {
+            "type": "unknown",
+            "message": "server_error: Flower Endeavor providers failed."
+          },
+          "textContentCount": 0
+        }
+      ]
+    },
+    {
+      "run_id": "run_544af105-1355-4121-ac06-4f3b0af34e53",
+      "thread_id": "thr_4b50ed53-8b9e-4735-9a84-61a077fd64a3",
+      "session_id": "ses_serdar_bounded",
+      "phase": "failed",
+      "runner_message_id": "msg_0effdfa370010LtZJhdo8vNG7Q",
+      "admitted_message_id": "msg_0effdfa370010LtZJhdo8vNG7Q",
+      "last_session_seq": 3,
+      "sharedState": "failed",
+      "input": {
+        "admittedSeq": 0,
+        "promotedSeq": 1,
+        "textSha256": "a8ad1a061577b327b02182fb13f4d68dff80a0c2ac1bb828a7a578a6d93d5bb0",
+        "hasAttributedContext": true,
+        "citesCurrentAliceOutput": true
+      },
+      "nativeMessages": [
+        {
+          "id": "msg_0effe88f0001tFScdca8WG8KQu",
+          "seq": 2,
+          "agent": "serdar-bounded",
+          "error": {
+            "type": "unknown",
+            "message": "server_error: Flower Endeavor providers failed."
+          },
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0f000060e001rdlYYpkS0BH3Hp",
+          "seq": 6,
+          "agent": "serdar-bounded",
+          "error": {
+            "type": "unknown",
+            "message": "server_error: Flower Endeavor providers failed."
+          },
+          "textContentCount": 0
+        }
+      ]
+    },
+    {
+      "run_id": "run_cbeecef2-25dd-4144-a805-117114af9fb9",
+      "thread_id": "thr_4b50ed53-8b9e-4735-9a84-61a077fd64a3",
+      "session_id": "ses_serdar_bounded",
+      "phase": "failed",
+      "runner_message_id": "msg_0efff76eb001lAd99Lv6IZw183",
+      "admitted_message_id": "msg_0efff76eb001lAd99Lv6IZw183",
+      "last_session_seq": 7,
+      "sharedState": "failed",
+      "input": {
+        "admittedSeq": 4,
+        "promotedSeq": 5,
+        "textSha256": "84f40e384095362d1a9214a7e1b0c3abe9de2c13ca6afcf5dec1f6c1cfd8eaa6",
+        "hasAttributedContext": true,
+        "citesCurrentAliceOutput": true
+      },
+      "nativeMessages": [
+        {
+          "id": "msg_0effe88f0001tFScdca8WG8KQu",
+          "seq": 2,
+          "agent": "serdar-bounded",
+          "error": {
+            "type": "unknown",
+            "message": "server_error: Flower Endeavor providers failed."
+          },
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0f000060e001rdlYYpkS0BH3Hp",
+          "seq": 6,
+          "agent": "serdar-bounded",
+          "error": {
+            "type": "unknown",
+            "message": "server_error: Flower Endeavor providers failed."
+          },
+          "textContentCount": 0
+        }
+      ]
+    },
+    {
+      "run_id": "run_5402f564-35a1-44b2-83a0-eb000ac56168",
+      "thread_id": "thr_758bff92-50c3-436d-9dde-4e7c16fb7aec",
+      "session_id": "ses_alice_preview",
+      "phase": "recovery_required",
+      "runner_message_id": "msg_0efb4103c001Az7JKEBT4rBrn4",
+      "admitted_message_id": "msg_0efb4103c001Az7JKEBT4rBrn4",
+      "last_session_seq": 19,
+      "sharedState": "recovery_required",
+      "input": {
+        "admittedSeq": 0,
+        "promotedSeq": 1,
+        "textSha256": "5978cae9b44a6e2e5306f6fb9188f48315d033d7ef53d62a5e7327e45a2763b5",
+        "hasAttributedContext": false,
+        "citesCurrentAliceOutput": false
+      },
+      "nativeMessages": [
+        {
+          "id": "msg_0efb433e8001zbbZXly2SftVuY",
+          "seq": 2,
+          "agent": "alice-preview",
+          "error": null,
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0efb456e0001hQ56uCoj6xeUgA",
+          "seq": 8,
+          "agent": "alice-preview",
+          "error": null,
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0efb64c12001LBZ62Au4ASfJ5C",
+          "seq": 14,
+          "agent": "alice-preview",
+          "error": null,
+          "textContentCount": 1
+        }
+      ]
+    },
+    {
+      "run_id": "run_13716ae1-18ae-4056-b8f8-72e58ea54a12",
+      "thread_id": "thr_abba0445-2832-4c8b-838d-43a47b1937dd",
+      "session_id": "ses_2cd8d7779d236ad126b3460c1ad1ba61ba50b16e",
+      "phase": "failed",
+      "runner_message_id": "msg_0eff85eff001WNWdpbyZP8ImKn",
+      "admitted_message_id": "msg_0eff85eff001WNWdpbyZP8ImKn",
+      "last_session_seq": 16,
+      "sharedState": "failed",
+      "input": {
+        "admittedSeq": 1,
+        "promotedSeq": 2,
+        "textSha256": "5978cae9b44a6e2e5306f6fb9188f48315d033d7ef53d62a5e7327e45a2763b5",
+        "hasAttributedContext": false,
+        "citesCurrentAliceOutput": false
+      },
+      "nativeMessages": [
+        {
+          "id": "msg_0eff89062001eDdugnxzTdd3Rt",
+          "seq": 3,
+          "agent": "alice-preview",
+          "error": null,
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0eff8ada6001ISP5yZCUrat62u",
+          "seq": 9,
+          "agent": "alice-preview",
+          "error": null,
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0eff92a11001M7Db5ReFUZY1di",
+          "seq": 15,
+          "agent": "alice-preview",
+          "error": {
+            "type": "unknown",
+            "message": "server_error: Flower Endeavor providers failed."
+          },
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0effb1b69001jd95aWqkfjOOjB",
+          "seq": 19,
+          "agent": "alice-preview",
+          "error": null,
+          "textContentCount": 1
+        }
+      ]
+    },
+    {
+      "run_id": "run_f6e23352-1807-4d28-8b52-23b26823124e",
+      "thread_id": "thr_abba0445-2832-4c8b-838d-43a47b1937dd",
+      "session_id": "ses_2cd8d7779d236ad126b3460c1ad1ba61ba50b16e",
+      "phase": "waiting_approval",
+      "runner_message_id": "msg_0effaa0040013E2KzjRK8GBtH4",
+      "admitted_message_id": "msg_0effaa0040013E2KzjRK8GBtH4",
+      "last_session_seq": 24,
+      "sharedState": "waiting_approval",
+      "input": {
+        "admittedSeq": 17,
+        "promotedSeq": 18,
+        "textSha256": "78bf14903ee477d431d51c24346e21d1b13d6220f874a2ad0fb0ab47ad65f002",
+        "hasAttributedContext": false,
+        "citesCurrentAliceOutput": false
+      },
+      "nativeMessages": [
+        {
+          "id": "msg_0eff89062001eDdugnxzTdd3Rt",
+          "seq": 3,
+          "agent": "alice-preview",
+          "error": null,
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0eff8ada6001ISP5yZCUrat62u",
+          "seq": 9,
+          "agent": "alice-preview",
+          "error": null,
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0eff92a11001M7Db5ReFUZY1di",
+          "seq": 15,
+          "agent": "alice-preview",
+          "error": {
+            "type": "unknown",
+            "message": "server_error: Flower Endeavor providers failed."
+          },
+          "textContentCount": 0
+        },
+        {
+          "id": "msg_0effb1b69001jd95aWqkfjOOjB",
+          "seq": 19,
+          "agent": "alice-preview",
+          "error": null,
+          "textContentCount": 1
+        }
+      ]
+    }
+  ],
+  "recoveryCallbacks": [
+    {
+      "callback_id": "runner_cb_67b38096-d248-4d9e-8f57-ec598e35c5ca",
+      "producer_key": "recovery:hold:waiting_approval",
+      "ordinal": 10,
+      "callback": {
+        "kind": "state",
+        "expectedState": "waiting_approval",
+        "nextState": "recovery_required"
+      },
+      "acknowledged_at": 1790732047806
+    }
+  ],
+  "sourceApproval": {
+    "id": "apr_per_0effb1b7e0013Nr1XU2out5R1s",
+    "run_id": "run_f6e23352-1807-4d28-8b52-23b26823124e",
+    "version": 1,
+    "state": "pending",
+    "delivery_state": "none"
+  },
+  "currentSource": {
+    "threadId": "thr_abba0445-2832-4c8b-838d-43a47b1937dd",
+    "eventId": "evt_0effb1b80001plxhk4s6bnz7eW",
+    "seq": 66,
+    "cardVersion": 2,
+    "activitySeq": 67,
+    "modelMessageId": "msg_0effb1b69001jd95aWqkfjOOjB"
+  },
+  "experiments": {
+    "oneStepReceiving": "failed twice",
+    "twoStepReceiving": "failed once",
+    "tokenCap": 1024,
+    "tools": "denied",
+    "simpleGeneratedFixtureResponse": "HTTP 200 response.completed",
+    "twoStepSourceChangeRetained": false
+  }
+}
