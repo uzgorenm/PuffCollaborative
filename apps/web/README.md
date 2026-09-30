@@ -2,7 +2,7 @@
 
 A browser demo built with React 19 and Next.js 16. The project overview groups work by person: **name → total work summary → individual sessions**. Opening a session shows its own conversation, task, status, and related context. One person can keep several sessions in parallel.
 
-The interactive demo uses local sample `WorkspaceState` data from `lib/workspace.ts`. You, Sam, and Alice illustrate a team scenario. Their conversations and work statuses are examples; the demo does not execute agents or represent real teammate presence.
+The workspace uses a real local Next API, `POST /api/workspace`, with filesystem persistence. Seeded `WorkspaceState` data from `lib/workspace.ts` and a deterministic guidance engine illustrate a team scenario. Sam and Alice, their conversations, statuses, and paths are example context. Responses do not execute agents, call paid models, edit repository files, or represent real teammate presence.
 
 The app uses product copy without scripted/demo labels. Its technical boundary remains this local scenario, not a connection to live agents. Generated messages describe proposed plans and context additions rather than claiming code execution. Existing saved generated copy is migrated without rewriting user messages, tasks, or source references.
 
@@ -11,7 +11,7 @@ The app uses product copy without scripted/demo labels. Its technical boundary r
 Open the running workspace and choose **Reset workspace**, then confirm. This restores the six starting sessions for You, Sam, and Alice. **Undo reset** restores your previous workspace, including after reload; the backup is retained in browser storage until undo or the next reset.
 
 1. **Project setup:** choose **New project** in the sidebar. Enter a name and goal, keep Sam and Alice for the two teammates, then keep the default three tasks and choose **Create project**. Each person has two separate sessions.
-2. **Overlapping frontend work:** choose **Avoid duplicate work**, then **Start session**. Puff surfaces Sam's existing navigation work. Choose **Open existing session**, **Work on a complementary task**, or **Explore another approach**; the latter two create independent sessions with a source reference.
+2. **Overlapping frontend work:** choose **New session**, pick a model in the composer, and type **Start frontend for the project navigation feature**. Choose **Start session**. After checking project context, Puff surfaces Sam's navigation session and offers **Finish navigation states** and **Build session search and filters**, with explicit scope boundaries. Choose either, then type **Continue, show me the implementation**. Reload and reopen the session to verify the task, selected model, source link, and conversation were saved. The overview shortcut simply prefills a task; it is not required.
 3. **Solved server error:** return to **Project overview**, choose **Reuse a solved problem**, then **Send message**. The prepared prompt reports `EADDRINUSE` on port 3000. Inspect Alice's source conversation and choose **Add context to this session**. Repeat the same error to verify that the attributed context is not added twice.
 4. **Parallel personal work:** choose **Find my context** and open your other sessions from the bottom summaries or sidebar. Use the overview's **My work** filter to view both workstreams together.
 
@@ -37,9 +37,15 @@ This package installs independently with its own npm lockfile under `apps/`, out
 4. **Reuse a finding with its source.** An `EADDRINUSE` or port-in-use prompt can surface Alice's completed development-server session. Review the original conversation, then add the finding as context to your own session. The reference retains the source session and message, and the same finding is deduplicated within the receiving session. The example adaptation checks the process that owns port 3000 and uses this project's configured development port, 3005; compare the actual error before applying that advice. An unrelated server error is not treated as a solved port conflict.
 5. **Keep parallel and private work distinct.** Each sample person starts with two sessions. Creating another session does not replace that person's earlier work. Private sessions are shown only for You and are excluded from other people's visible work and matching context. This is local demo visibility behavior; production authentication and access control are not implemented here.
 
-These actions update the browser's demo state. Assignment, complementary plans, and context adaptation do not start model execution, deliver a task to a teammate, stop another agent, or prove live collaboration. The existing hackathon workflow acceptance gates remain open.
+These actions use the local API's canonical workspace. The browser retains a workspace ID, cached snapshot, and undo backup. Model choices are scenario profiles, preserved on requests, sessions, and assistant messages for a later provider adapter. Assignment, guidance, and context adaptation do not start model execution, deliver a task to a teammate, stop another agent, or prove live collaboration. The existing hackathon workflow acceptance gates remain open.
 
 The original generated Puff logo is `public/puff-logo.png`; the interface uses this asset for its brand mark.
+
+## Local API and backend handoff
+
+`lib/session-api.ts` defines the serializable command contract. `lib/session-service.ts` validates and executes commands; `lib/session-engine.ts` analyzes scope and creates deterministic guidance. `lib/workspace-store.ts` writes workspaces atomically under `.puff-workspaces/`, with per-workspace serialization so simultaneous tasks do not overwrite each other.
+
+Commands: `bootstrap`, `replace` (setup/reset/undo), `analyze`, `create`, `message`, and `add-context`. Invalid models, members, choices, sources, and private scopes fail explicitly. The interface shows errors instead of pretending an action was saved. This local service has no production authentication or cross-device sharing; teammates should connect the command boundary to the authoritative coordination backend and provider runner before claiming live coordination.
 
 ## Separate simulator adapter
 

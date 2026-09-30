@@ -8,6 +8,7 @@ export type WorkspaceSession = Session & {
   relation?: string
   relatedSessionId?: string
   receivedFindings?: string[]
+  scopeBoundary?: string
 }
 
 export type WorkspaceProject = {
@@ -21,6 +22,7 @@ export type WorkspaceState = { project: WorkspaceProject; sessions: WorkspaceSes
 const serverStartupGuidance = "The startup error was a port conflict: another process owned port 3000. Identify its owner first. This project uses development port 3005, so use its configured dev command. Reusing 3000 requires a deliberate restart after confirming the process belongs to this project. This finding is specific to that startup error; compare your error before applying it."
 
 export function createDemoWorkspace(projectName = "Puff", goal = "Build a collaborative workspace"): WorkspaceState {
+  const now = Date.now()
   return {
     project: {
       name: projectName.trim() || "Puff",
@@ -41,13 +43,14 @@ export function createDemoWorkspace(projectName = "Puff", goal = "Build a collab
         color: "green",
         status: "running",
         summary: "Planning project membership endpoints and the data the frontend needs.",
-        updatedAt: "2026-09-29T19:06:00.000Z",
+        updatedAt: new Date(now - 4 * 60_000).toISOString(),
         task: "Build the backend API for projects and project membership.",
         scope: "project",
         topic: "backend",
+        scopeBoundary: "Project membership and shared-session API contracts; frontend navigation and access-policy review have separate sessions.",
         messages: [
           { role: "user", text: "Build the backend API for projects and project membership." },
-          { role: "assistant", text: "The API work covers listing projects and their members. Your access review is a separate parallel session; its decisions will inform the membership contract. Sam is handling the frontend navigation." },
+          { role: "assistant", text: "The API scope covers listing projects, their members, and shared sessions. Contract references: docs/coordination-contract.md and the request boundary in apps/web/app/api/sessions/route.ts. First map the response shapes the frontend needs, then check membership before returning shared work. Your access review has its own session; its decisions will inform this contract. Sam's navigation session covers the sidebar, project switcher, and session list." },
         ],
       },
       {
@@ -58,10 +61,11 @@ export function createDemoWorkspace(projectName = "Puff", goal = "Build a collab
         color: "green",
         status: "waiting",
         summary: "Reviewing who can see a project's shared sessions before connecting access rules to the API.",
-        updatedAt: "2026-09-29T19:04:00.000Z",
+        updatedAt: new Date(now - 11 * 60_000).toISOString(),
         task: "Review project access rules alongside the API implementation.",
         scope: "project",
         topic: "backend",
+        scopeBoundary: "Review membership and visibility rules; endpoint implementation remains in the project API session.",
         relation: "Parallel to You · Build the project API",
         relatedSessionId: "demo-you-api",
         messages: [
@@ -77,13 +81,14 @@ export function createDemoWorkspace(projectName = "Puff", goal = "Build a collab
         color: "purple",
         status: "running",
         summary: "Building the frontend sidebar, project switcher, and session list.",
-        updatedAt: "2026-09-29T19:05:00.000Z",
+        updatedAt: new Date(now - 7 * 60_000).toISOString(),
         task: "Build frontend project navigation with a sidebar and project switcher.",
         scope: "project",
         topic: "navigation",
+        scopeBoundary: "The sidebar shell, project switcher, and base session list. Loading, empty, error, keyboard accessibility, and session search remain distinct follow-up scopes.",
         messages: [
           { role: "user", text: "Build frontend project navigation with a sidebar and project switcher." },
-          { role: "assistant", text: "My scope is the sidebar, project switcher, and session list. A teammate could independently check keyboard accessibility or test project switching. They can reference this scope while keeping their own approach and session." },
+          { role: "assistant", text: "My scope is the sidebar shell, project switcher, and base session list. Working references are apps/web/app/page.tsx, apps/web/app/workflow.css, and apps/web/components/project-overview.tsx. The plan is to keep the selected project visible, group sessions by person, and make opening a session predictable. The mobile drawer has its own session. Loading, empty, error, and keyboard accessibility states would be useful separate work; session search and owner/status filters are another independent feature." },
         ],
       },
       {
@@ -94,10 +99,11 @@ export function createDemoWorkspace(projectName = "Puff", goal = "Build a collab
         color: "purple",
         status: "waiting",
         summary: "Checking drawer behavior and session navigation at smaller screen sizes.",
-        updatedAt: "2026-09-29T19:03:00.000Z",
+        updatedAt: new Date(now - 19 * 60_000).toISOString(),
         task: "Check the frontend navigation layout on mobile while the main navigation is built.",
         scope: "project",
         topic: "navigation",
+        scopeBoundary: "Mobile drawer behavior and small-screen navigation; keep this separate from the sidebar shell and session search.",
         relation: "Parallel to Sam · Build project navigation",
         relatedSessionId: "demo-sam-frontend",
         messages: [
@@ -113,10 +119,11 @@ export function createDemoWorkspace(projectName = "Puff", goal = "Build a collab
         color: "blue",
         status: "complete",
         summary: "Found a port 3000 conflict and documented the project's development port, 3005.",
-        updatedAt: "2026-09-29T18:58:00.000Z",
+        updatedAt: new Date(now - 31 * 60_000).toISOString(),
         task: "Investigate why the development server fails to start with EADDRINUSE.",
         scope: "project",
         topic: "dev-server",
+        scopeBoundary: "Recorded EADDRINUSE diagnosis for frontend development port 3000 and the configured port 3005; database, authentication, and dependency errors require a separate diagnosis.",
         findings: [
           {
             id: "server-port",
@@ -139,10 +146,11 @@ export function createDemoWorkspace(projectName = "Puff", goal = "Build a collab
         color: "blue",
         status: "running",
         summary: "Checking that the configured development port is reflected in startup guidance and regression checks.",
-        updatedAt: "2026-09-29T19:02:00.000Z",
+        updatedAt: new Date(now - 24 * 60_000).toISOString(),
         task: "Review regression coverage after resolving the development server startup problem.",
         scope: "project",
         topic: "testing",
+        scopeBoundary: "Review the startup instructions in apps/web/package.json and propose port-conflict regression checks; no execution results are recorded here.",
         relation: "Follows Alice · Fix the failing development server",
         relatedSessionId: "demo-alice-server",
         messages: [
@@ -193,15 +201,24 @@ export function findRelatedWork(prompt: string, sessions: WorkspaceSession[]): W
 }
 
 export function findSolvedProblem(prompt: string, sessions: WorkspaceSession[]): { session: WorkspaceSession; finding: NonNullable<WorkspaceSession["findings"]>[number] } | undefined {
+  if (!matchesStartupProblem(prompt)) return undefined
+  const session = sessions.find((session) => session.topic === "dev-server" && session.status === "complete" && session.findings?.some((finding) => finding.id === "server-port"))
+  const finding = session?.findings?.find((finding) => finding.id === "server-port")
+  return session && finding ? { session, finding } : undefined
+}
+
+export function matchesStartupProblem(prompt: string): boolean {
   const text = prompt.toLowerCase().replace(/[’‘]/g, "'")
+  // A different explicit port or database/socket conflict does not establish
+  // a match for the frontend's recorded port 3000 startup problem.
+  if (/\b(?:database|postgres(?:ql)?|mysql|redis|mongo(?:db)?|sqlite)\b/.test(text)) return false
+  const endpoints = /(?:\bport["']?\s*[:=]?\s*|(?:\d{1,3}\.){3}\d{1,3}\s*:|localhost\s*:|\[[0-9a-f:]+\]\s*:|:{2,3})(\d{2,5})\b/g
+  if ([...text.matchAll(endpoints)].some((match) => match[1] !== "3000")) return false
   const portFailure = /\beaddrinuse\b/.test(text) || /\b(?:port(?:\s+\d+)?\s+(?:(?:is|was|already|still|has|a)\s+)*(?:in use|busy|occupied|conflict|collision)|(?:conflict|collision)\s+(?:on|with)\s+(?:the\s+)?port)\b/.test(text)
   // A generic startup phrase can suggest reviewing this source. A named, different
   // server failure must not become a claimed match to the fixture's port conflict.
   const serverStartupFailure = /\b(?:server\s+(?:(?:keeps|is|still|just)\s+)*(?:fails?|failing|won't start|can't start|cannot start|doesn't start|does not start|failed to start|fails to start|not starting)|(?:failing|failed)\s+(?:(?:dev|development)\s+)?server)\s*[.!?]?\s*$/.test(text)
-  if (!portFailure && !serverStartupFailure) return undefined
-  const session = sessions.find((session) => session.topic === "dev-server" && session.status === "complete" && session.findings?.some((finding) => finding.id === "server-port"))
-  const finding = session?.findings?.find((finding) => finding.id === "server-port")
-  return session && finding ? { session, finding } : undefined
+  return portFailure || serverStartupFailure
 }
 
 export function createTaskSession(prompt: string, owner: string, project: WorkspaceProject, mode: "independent" | "complementary" = "independent", related?: WorkspaceSession): WorkspaceSession {

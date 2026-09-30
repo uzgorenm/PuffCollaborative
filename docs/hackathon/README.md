@@ -1,5 +1,7 @@
 # Puff team workspace
 
+**Typed web task flow:** `apps/web` now has model selection, source-backed recommendations, continued conversations, and an isolated persistent Next API. Package tests, typecheck, build, and typed-task/source-reuse/reload/reset/undo browser checks passed. Guidance uses seeded scenarios; live Flower/OpenCode gates remain open. [Plan and boundary](web-session-api-plan.md).
+
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
 
 **Repeatable React walkthrough:** source `a5624203ac` adds Reset workspace with persistent Undo, product copy without scripted/demo labels, and narrow saved-copy migration. All 19 tests, typecheck, build, and setup/overlap/source-reuse/personal-context browser checks pass. [Receipt and boundary](evidence/2026-09-29-repeatable-web-walkthrough.md); [click-by-click test instructions](../../apps/web/README.md#test-the-full-experience). Live workflow gates remain open.

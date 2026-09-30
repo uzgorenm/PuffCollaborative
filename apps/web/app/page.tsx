@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState } from "react"
 import { ProjectOverview } from "../components/project-overview"
-import { createDemoWorkspace, createTaskSession, findRelatedWork, findSolvedProblem, refreshWorkspacePresentation } from "../lib/workspace"
-import type { WorkspaceSession, WorkspaceState } from "../lib/workspace"
+import { createDemoWorkspace, createTaskSession, findSolvedProblem, refreshWorkspacePresentation } from "../lib/workspace"
+import type { WorkspaceState } from "../lib/workspace"
+import { defaultModel, models } from "../lib/session-api"
+import type { FindingRef, ModelId, SessionApiReply, SessionCommand, TaskAnalysis, TaskOption, TaskRequest } from "../lib/session-api"
+import { MessageContent } from "../components/message-content"
 import "./workflow.css"
 
 const icons: Record<string, string> = {
@@ -43,6 +46,13 @@ function validWorkspace(value: unknown): value is WorkspaceState {
   return new Set(value.sessions.map(session => session.id)).size === value.sessions.length
 }
 
+async function requestWorkspace(command: SessionCommand): Promise<SessionApiReply> {
+  const response = await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(command) })
+  const result = await response.json()
+  if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "Could not save this action. Please try again.")
+  return result
+}
+
 export default function Workspace() {
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => createDemoWorkspace(defaults.name, defaults.goal))
   const [view, setView] = useState<"overview" | "new" | "chat" | "setup">("overview")
@@ -59,7 +69,17 @@ export default function Workspace() {
   const [freshSetup, setFreshSetup] = useState(false)
   const [step, setStep] = useState(0)
   const [setupError, setSetupError] = useState("")
-  const [overlap, setOverlap] = useState<WorkspaceSession | null>(null)
+  const [analysis, setAnalysis] = useState<{ request: TaskRequest; result: TaskAnalysis } | null>(null)
+  const [modelId, setModelId] = useState<ModelId>(defaultModel)
+  const [pending, setPending] = useState<{ prompt: string; mode: "check" | "reply" | "create" } | null>(null)
+  const [ready, setReady] = useState(false)
+  const [working, setWorking] = useState(false)
+  const [error, setError] = useState("")
+  const serverId = useRef("")
+  const bootRequest = useRef<Promise<SessionApiReply> | null>(null)
+  const operation = useRef(0)
+  const busy = useRef(false)
+  const durable = useRef(false)
   const [solved, setSolved] = useState<SolvedMatch | null>(null)
   const [inspecting, setInspecting] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -75,27 +95,49 @@ export default function Workspace() {
   const fixAdded = Boolean(solved && active?.receivedFindings?.includes(`${solved.session.id}:${solved.finding.id}`))
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("puff-workspace-v2")
-      const parsed: unknown = saved ? JSON.parse(saved) : null
-      if (validWorkspace(parsed)) setWorkspace(refreshWorkspacePresentation(parsed))
-      if (saved && !validWorkspace(parsed)) setToast("Saved workspace could not be read. A fresh workspace is ready.")
-    } catch { setToast("Saved workspace could not be read. You can restore it if a backup is available.") }
-    try {
-      const backup = localStorage.getItem("puff-workspace-backup-v2")
-      const previous: unknown = backup ? JSON.parse(backup) : null
-      if (validWorkspace(previous)) setRestorePoint(refreshWorkspacePresentation(previous))
-    } catch { setToast("The saved restore point could not be read.") }
-    setHydrated(true)
+    let disposed = false
+    async function connect() {
+      const initial = (() => {
+        try {
+          const saved = localStorage.getItem("puff-workspace-v2")
+          const parsed: unknown = saved ? JSON.parse(saved) : null
+          return validWorkspace(parsed) ? refreshWorkspacePresentation(parsed) : undefined
+        } catch { return undefined }
+      })()
+      try {
+        const backup = localStorage.getItem("puff-workspace-backup-v2")
+        const previous: unknown = backup ? JSON.parse(backup) : null
+        if (validWorkspace(previous)) setRestorePoint(refreshWorkspacePresentation(previous))
+        const preference = localStorage.getItem("puff-model")
+        if (models.some(model => model.id === preference)) setModelId(preference as ModelId)
+      } catch { /* The API remains usable when browser storage is unavailable. */ }
+      try {
+        const savedId = (() => { try { return localStorage.getItem("puff-workspace-server-id") ?? undefined } catch { return undefined } })()
+        bootRequest.current ??= requestWorkspace({ command: "bootstrap", workspaceId: savedId, initialWorkspace: savedId ? undefined : initial })
+          .catch(failure => {
+            if (savedId && failure instanceof Error && /not found/i.test(failure.message)) return requestWorkspace({ command: "bootstrap", initialWorkspace: initial })
+            throw failure
+          })
+        const result = await bootRequest.current
+        if (disposed) return
+        serverId.current = result.workspaceId
+        setWorkspace(result.workspace); setReady(true); setHydrated(true)
+        try { localStorage.setItem("puff-workspace-server-id", result.workspaceId) } catch { /* Current visit is still backed by the API. */ }
+      } catch (failure) {
+        if (!disposed) { setError(failure instanceof Error ? failure.message : "The workspace could not connect. Reload to try again."); setHydrated(true) }
+      }
+    }
+    connect()
+    return () => { disposed = true }
   }, [])
   useEffect(() => {
-    if (!hydrated) return
+    if (!hydrated || !ready) return
     try {
       if (restorePoint) localStorage.setItem("puff-workspace-backup-v2", JSON.stringify(restorePoint))
       localStorage.setItem("puff-workspace-v2", JSON.stringify(workspace))
       if (!restorePoint) localStorage.removeItem("puff-workspace-backup-v2")
     } catch { setToast("Browser storage is unavailable. Changes will last for this visit.") }
-  }, [workspace, restorePoint, hydrated])
+  }, [workspace, restorePoint, hydrated, ready])
   useEffect(() => {
     content.current?.scrollTo({ top: 0 })
     if (view === "new" || view === "chat") input.current?.focus({ preventScroll: true })
@@ -114,48 +156,78 @@ export default function Workspace() {
     const keyboard = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault()
-        setView("new"); setSelected(null); setDraft(""); setOwner("You"); setScope("project")
-        setOverlap(null); setSolved(null); setInspecting(false); setSidebarOpen(false)
+        cancelPending(); setView("new"); setSelected(null); setDraft(""); setOwner("You"); setScope("project")
+        setAnalysis(null); setSolved(null); setInspecting(false); setSidebarOpen(false)
       }
-      if (event.key === "Escape") { setOverlap(null); setInspecting(false); setSidebarOpen(false); setResetting(false) }
+      if (event.key === "Escape") { cancelPending(); setAnalysis(null); setInspecting(false); setSidebarOpen(false); setResetting(false) }
     }
     window.addEventListener("keydown", keyboard)
     return () => window.removeEventListener("keydown", keyboard)
   }, [])
 
-  function overview() { setView("overview"); setSelected(null); setSidebarOpen(false); setOverlap(null); setInspecting(false) }
-  function resetWorkspace() {
+  function cancelPending() {
+    operation.current += 1; setPending(null)
+    if (!durable.current) { busy.current = false; setWorking(false) }
+  }
+  function finishOperation(token: number, write = false) {
+    if (write) durable.current = false
+    if (token === operation.current || write) { busy.current = false; setWorking(false) }
+    if (token === operation.current) setPending(null)
+  }
+  function chooseModel(value: ModelId) {
+    setModelId(value)
+    try { localStorage.setItem("puff-model", value) } catch { /* Keep the current selection for this visit. */ }
+  }
+  async function replaceWorkspace(next: WorkspaceState) {
+    if (!ready || busy.current) return false
+    busy.current = true; setWorking(true); setError("")
+    const token = ++operation.current
+    durable.current = true
+    try {
+      const reply = await requestWorkspace({ command: "replace", workspaceId: serverId.current, workspace: next })
+      if (token !== operation.current) { await reconcileWorkspace(); return false }
+      setWorkspace(reply.workspace); return true
+    } catch (failure) { if (token === operation.current) setError(failure instanceof Error ? failure.message : "Could not save your workspace."); return false }
+    finally { finishOperation(token, true) }
+  }
+  function overview() { cancelPending(); setView("overview"); setSelected(null); setSidebarOpen(false); setAnalysis(null); setInspecting(false) }
+  async function resetWorkspace() {
+    if (!ready || busy.current) return
     try { localStorage.setItem("puff-workspace-backup-v2", JSON.stringify(workspace)) }
     catch { setToast("Could not save your current workspace. Free browser storage and try again."); return }
     setRestorePoint(workspace)
-    setWorkspace(createDemoWorkspace(defaults.name, defaults.goal))
+    if (!await replaceWorkspace(createDemoWorkspace(defaults.name, defaults.goal))) return
     setResetting(false); setSolved(null); setDraft(""); setQuery(""); setExpandedPeople([])
     overview(); setToast("Starting workspace restored. You can undo this reset.")
   }
-  function undoReset() {
+  async function undoReset() {
     if (!restorePoint) return
-    setWorkspace(restorePoint); setRestorePoint(null); setResetting(false); setSolved(null)
+    if (!await replaceWorkspace(restorePoint)) return
+    setRestorePoint(null); setResetting(false); setSolved(null)
     setDraft(""); setQuery(""); setExpandedPeople([])
     overview(); setToast("Your previous workspace is restored.")
   }
   function openSession(id: string) {
     if (!sessions.some(session => session.id === id)) return
-    setView("chat"); setSelected(id); setDraft(""); setSidebarOpen(false); setOverlap(null); setInspecting(false)
+    cancelPending(); chooseModel(models.find(model => model.id === sessions.find(session => session.id === id)?.modelId)?.id ?? defaultModel)
+    setView("chat"); setSelected(id); setDraft(""); setSidebarOpen(false); setAnalysis(null); setInspecting(false)
   }
   function newSession(prompt = "") {
+    cancelPending(); setError("")
     setView("new"); setSelected(null); setDraft(prompt); setOwner("You"); setScope("project")
-    setOverlap(null); setSolved(null); setInspecting(false); setSidebarOpen(false)
+    setAnalysis(null); setSolved(null); setInspecting(false); setSidebarOpen(false)
   }
   function beginSetup(fresh = false) {
+    cancelPending(); setError("")
     setFreshSetup(fresh)
     setSetup(fresh ? { ...defaults, tasks: [...defaults.tasks] } : {
       name: workspace.project.name, goal: workspace.project.goal,
       sam: workspace.project.members[1].name, alice: workspace.project.members[2].name,
       tasks: ["demo-you-api", "demo-sam-frontend", "demo-alice-server"].map((id, index) => workspace.sessions.find(session => session.id === id)?.task ?? defaults.tasks[index]),
     })
-    setStep(0); setSetupError(""); setView("setup"); setSidebarOpen(false); setOverlap(null); setInspecting(false)
+    setStep(0); setSetupError(""); setView("setup"); setSidebarOpen(false); setAnalysis(null); setInspecting(false)
   }
-  function advanceSetup() {
+  async function advanceSetup() {
     if (step === 0 && (!setup.name.trim() || !setup.goal.trim())) { setSetupError("Add a project name and goal to continue."); return }
     const names = ["You", setup.sam.trim(), setup.alice.trim()]
     if (step === 1 && (names.some(name => !name) || new Set(names.map(name => name.toLowerCase())).size !== 3 || names.slice(1).some(name => name.toLowerCase() === "serdar"))) { setSetupError("Use two different teammate names. You and Serdar are reserved for your work."); return }
@@ -184,7 +256,7 @@ export default function Workspace() {
         if (workspace.sessions.find(session => session.id === id)?.task.trim() === task || preserved.some(session => session.owner === names[index] && session.task.trim() === task)) return []
         return [createTaskSession(task, names[index], project)]
       })
-      setWorkspace({ project, sessions: [...added, ...preserved] })
+      if (!await replaceWorkspace({ project, sessions: [...added, ...preserved] })) return
       setSolved(null); setSelected(null); setView("overview"); setToast("Project settings saved with your existing sessions and context.")
       return
     }
@@ -222,54 +294,86 @@ export default function Workspace() {
         }
       }),
     }
-    setWorkspace(next); setSolved(null); setSelected(null); setView("overview"); setToast("Project created. Your team's work is ready to review.")
+    if (!await replaceWorkspace(next)) return
+    setSolved(null); setSelected(null); setView("overview"); setToast("Project created. Your team's work is ready to review.")
   }
-  function addTask(mode: "independent" | "complementary", related?: WorkspaceSession) {
-    const session = { ...createTaskSession(draft, owner, workspace.project, mode, related), scope: owner === "You" ? scope : "project" as const }
-    setWorkspace(previous => ({ ...previous, sessions: [session, ...previous.sessions] }))
-    setSelected(session.id); setView("chat"); setDraft(""); setOverlap(null); setSolved(null)
-    setToast("Session created. Your separate task is ready to review.")
+  function applyReply(reply: SessionApiReply) {
+    setWorkspace(reply.workspace)
+    const source = reply.finding && reply.workspace.sessions.find(session => session.id === reply.finding?.sourceSessionId)
+    const finding = source?.findings?.find(finding => finding.id === reply.finding?.findingId)
+    setSolved(source && finding && reply.finding ? { session: source, finding, targetId: reply.finding.targetId } : null)
   }
-  function send() {
+  async function reconcileWorkspace(finding?: FindingRef) {
+    const token = operation.current
+    try {
+      const reply = await requestWorkspace({ command: "bootstrap", workspaceId: serverId.current })
+      setWorkspace(reply.workspace)
+      if (finding && token === operation.current) applyReply({ ...reply, finding })
+    } catch (failure) { if (token === operation.current) setError(failure instanceof Error ? failure.message : "Could not refresh the workspace.") }
+  }
+  async function createSession(request: TaskRequest, choice?: TaskOption) {
+    if (!ready || busy.current) return
+    if (choice?.action === "open" && choice.sourceSessionId) { openSession(choice.sourceSessionId); return }
+    busy.current = true; setWorking(true); setError("")
+    const token = ++operation.current
+    durable.current = true
+    setPending({ prompt: request.prompt, mode: "create" })
+    try {
+      const reply = await requestWorkspace({ command: "create", workspaceId: serverId.current, ...request, choiceId: choice?.id, sourceSessionId: choice?.sourceSessionId })
+      if (token !== operation.current) { await reconcileWorkspace(); return }
+      applyReply(reply); setSelected(reply.sessionId ?? null); setView("chat"); setDraft(""); setAnalysis(null); chooseModel(request.modelId)
+    } catch (failure) { if (token === operation.current) { if (!choice) setDraft(request.prompt); setError(failure instanceof Error ? failure.message : "Could not create this session.") } }
+    finally { finishOperation(token, true) }
+  }
+  async function send() {
     const text = draft.trim()
-    if (!text) return
-    if (view === "new") {
-      const eligible = sessions.filter(session => session.scope === "project" || (owner === "You" && session.owner === "You"))
-      const related = findRelatedWork(text, eligible).filter(session => session.status !== "complete")
-      if (related.length) { setOverlap(related.find(session => session.status === "running") ?? related[0]); return }
-      addTask("independent"); return
-    }
-    if (!active) return
-    const match = findSolvedProblem(text, sessions.filter(session => session.id !== active.id && (session.scope === "project" || (active.owner === "You" && session.owner === "You"))))
-    const already = Boolean(match && active.receivedFindings?.includes(`${match.session.id}:${match.finding.id}`))
-    const response = already
-      ? `Context check: ${match?.session.owner}'s port-conflict finding is already in this session. Reuse that attributed context: check who owns port 3000, preserve that process, use this project's port 3005, and verify this server before continuing “${active.task}”. The finding has not been added a second time.`
-      : `Next step: keep “${active.task}” as this session's task, inspect the relevant context for “${text}”, and propose a small check.`
-    setWorkspace(previous => ({ ...previous, sessions: previous.sessions.map(session => session.id === active.id ? {
-      ...session, updatedAt: new Date().toISOString(),
-      messages: [...session.messages, { role: "user" as const, text }, ...(!match || already ? [{ role: "assistant" as const, text: response }] : [])],
-      summary: match ? `Checking a server error while preserving the task: ${session.task}` : session.summary,
-    } : session) }))
-    setDraft(""); setSolved(match ? { ...match, targetId: active.id } : null)
-  }
-  function addFix() {
-    if (!solved) return
-    const key = `${solved.session.id}:${solved.finding.id}`
-    setWorkspace(previous => ({ ...previous, sessions: previous.sessions.map(session => {
-      if (session.id !== solved.targetId || session.receivedFindings?.includes(key)) return session
-      return { ...session, status: "waiting", updatedAt: new Date().toISOString(), receivedFindings: [...(session.receivedFindings ?? []), key],
-        summary: `Added ${solved.session.owner}'s port-conflict context; the original task remains ${session.task}`,
-        messages: [...session.messages, { role: "assistant" as const, text: `Context from ${solved.finding.source}\n\nProblem: ${solved.finding.problem}\n\nFinding: ${solved.finding.solution}\n\nSuggested steps for “${session.task}”:\n1. Check which process owns port 3000.\n2. Preserve that session and use this project's configured port, 3005.\n3. Verify this session's server starts on that port before resuming the original task.` }],
+    if (!text || !ready || busy.current) return
+    const request: TaskRequest = { prompt: text, owner, scope, modelId }
+    busy.current = true; setWorking(true); setError(""); setDraft("")
+    const token = ++operation.current
+    const isNew = view === "new"
+    const sessionId = active?.id
+    durable.current = !isNew
+    setPending({ prompt: text, mode: isNew ? "check" : "reply" }); setAnalysis(null)
+    try {
+      const command: SessionCommand = isNew
+        ? { command: "analyze", workspaceId: serverId.current, ...request }
+        : { command: "message", workspaceId: serverId.current, sessionId: sessionId ?? "", prompt: text, modelId }
+      const [reply] = await Promise.all([requestWorkspace(command), new Promise(resolve => setTimeout(resolve, isNew ? 1400 : 900))])
+      if (token !== operation.current) { if (!isNew) await reconcileWorkspace(reply.finding); return }
+      applyReply(reply)
+      if (isNew && reply.analysis?.kind === "overlap") setAnalysis({ request, result: reply.analysis })
+      if (isNew && reply.analysis?.kind === "clear") {
+        busy.current = false
+        await createSession(request)
       }
-    }) }))
-    setInspecting(false); setToast(`${solved.session.owner}'s context added with source attribution.`)
+    } catch (failure) {
+      if (token === operation.current) { setDraft(text); setError(failure instanceof Error ? failure.message : "Could not send this message.") }
+    } finally { finishOperation(token, !isNew) }
   }
-  function keepInvestigating() {
-    if (!solved) return
-    setWorkspace(previous => ({ ...previous, sessions: previous.sessions.map(session => session.id === solved.targetId ? {
-      ...session, updatedAt: new Date().toISOString(), messages: [...session.messages, { role: "assistant" as const, text: `Plan: continue investigating this server error independently. Compare the error, inspect which process owns the port, and record the next check in this session. Keep the original task, “${session.task}”, in scope.` }],
-    } : session) }))
-    setSolved(null); setInspecting(false)
+  async function addFix() {
+    if (!solved || !ready || busy.current) return
+    busy.current = true; setWorking(true); setError("")
+    const token = ++operation.current
+    durable.current = true
+    try {
+      const reply = await requestWorkspace({ command: "add-context", workspaceId: serverId.current, ...{ targetId: solved.targetId, sourceSessionId: solved.session.id, findingId: solved.finding.id } })
+      if (token !== operation.current) { await reconcileWorkspace(); return }
+      applyReply(reply); setInspecting(false); setToast(`${solved.session.owner}'s context added with source attribution.`)
+    } catch (failure) { if (token === operation.current) setError(failure instanceof Error ? failure.message : "Could not add this context.") }
+    finally { finishOperation(token, true) }
+  }
+  async function keepInvestigating() {
+    if (!solved || !ready || busy.current) return
+    busy.current = true; setWorking(true); setError("")
+    const token = ++operation.current
+    durable.current = true
+    try {
+      const reply = await requestWorkspace({ command: "message", workspaceId: serverId.current, sessionId: solved.targetId, prompt: "Continue investigating this independently; compare the error before applying a fix.", modelId })
+      if (token !== operation.current) { await reconcileWorkspace(); return }
+      applyReply(reply); setSolved(null); setInspecting(false)
+    } catch (failure) { if (token === operation.current) setError(failure instanceof Error ? failure.message : "Could not continue this session.") }
+    finally { finishOperation(token, true) }
   }
   function startScenario(scenario: "overlap" | "solution" | "solo") {
     if (scenario === "overlap") { newSession("Build project navigation frontend"); return }
@@ -294,7 +398,7 @@ export default function Workspace() {
         {workspace.project.members.map(member => {
           const owned = sessions.filter(session => session.owner === member.name && session.scope === "project")
           const matches = filtered.filter(session => session.owner === member.name && session.scope === "project")
-          const added = owned.filter(session => !["demo-you-api", "demo-you-auth", "demo-sam-frontend", "demo-sam-mobile", "demo-alice-server", "demo-alice-tests"].includes(session.id)).map(session => session.task)
+          const added = owned.filter(session => !["demo-you-api", "demo-you-auth", "demo-sam-frontend", "demo-sam-mobile", "demo-alice-server", "demo-alice-tests"].includes(session.id)).map(session => session.task.replace(/[.;]+$/, ""))
           const total = `${member.focus}${added.length ? ` Also: ${added.join("; ")}.` : ""}`
           const expanded = expandedPeople.includes(member.name)
           const recent = owned.filter(session => {
@@ -326,9 +430,20 @@ export default function Workspace() {
     <main className="main">
       <header className="topbar">
         <div className="breadcrumb"><button className="icon-button mobile-menu" aria-label="Toggle sidebar" onClick={() => setSidebarOpen(previous => !previous)}><Icon name="panel" /></button><Icon name="folder" size={16} /><span className="workflow-breadcrumb-project">{workspace.project.name}</span><span className="breadcrumb-divider">/</span><span className="breadcrumb-current">{view === "overview" ? "Overview" : view === "setup" ? "Setup" : view === "new" ? "New session" : "Session"}</span></div>
-        <div className="topbar-actions"><div className="presence">{workspace.project.members.map(member => <div key={member.name} className={`avatar ${member.color}`} title={member.name}>{member.initials}</div>)}</div><button className="invite-button" onClick={() => beginSetup()}><Icon name="settings" size={14} /><span>Project setup</span></button></div>
+        <div className="topbar-actions"><span className={`workflow-save-status ${ready ? "connected" : ""}`} role="status"><i />{working ? "Saving…" : ready ? "Workspace saved" : error ? "Disconnected" : "Connecting…"}</span><div className="presence">{workspace.project.members.map(member => <div key={member.name} className={`avatar ${member.color}`} title={member.name}>{member.initials}</div>)}</div><button className="invite-button" onClick={() => beginSetup()}><Icon name="settings" size={14} /><span>Project setup</span></button></div>
       </header>
       <section ref={content} className={`content workflow-content ${view === "setup" ? "setup-content" : ""}`}>
+        {error && <div className="workflow-api-error" role="alert"><strong>That action could not be saved.</strong><span>{error}</span>{ready && <button onClick={() => setError("")}>Dismiss</button>}{!ready && <button onClick={() => window.location.reload()}>Reconnect</button>}</div>}
+        {view === "new" && (pending || analysis) && <div className="workflow-task-review">
+          <article className="message user"><div className="message-label">{displayName(analysis?.request.owner ?? owner)}</div><div className="message-body">{analysis?.request.prompt ?? pending?.prompt}</div></article>
+          <article className="message assistant"><div className="message-label"><img className="workflow-message-logo" src="/puff-logo.png" alt="" />Puff<span className="workflow-message-model">{models.find(model => model.id === (analysis?.request.modelId ?? modelId))?.name}</span></div>
+            {pending && <div className="workflow-thinking" role="status"><span className="workflow-thinking-dots"><i /><i /><i /></span><div><strong>{pending.mode === "create" ? "Preparing your session" : "Checking project context"}</strong><p>{pending.mode === "create" ? "Keeping the source and your task together" : `Comparing scopes across ${sessions.length} sessions`}</p></div><button onClick={cancelPending}>{pending.mode === "check" ? "Cancel" : "Hide progress"}</button></div>}
+            {analysis && !pending && <section className="workflow-recommendations" aria-label="Work recommendations"><div className="workflow-analysis-tools"><label className="workflow-model-picker"><span>Model</span><select aria-label="Select model" value={modelId} onChange={event => chooseModel(event.target.value as ModelId)}>{models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label><button onClick={() => { setDraft(analysis.request.prompt); setAnalysis(null) }}>Edit task</button></div><div className="workflow-analysis-kicker"><Icon name="layers" size={14} />{analysis.result.checkedCount} sessions checked</div><h2>{analysis.result.headline}</h2><p>{analysis.result.explanation}</p>{(() => {
+              const source = sessions.find(session => session.id === analysis.result.sourceSessionId)
+              return source && <button className="workflow-existing-work" onClick={() => openSession(source.id)}><span className={`avatar ${source.color}`}>{source.initials}</span><span><strong>{source.owner} · {source.title}</strong><small>{source.summary}</small></span><Icon name="arrow" size={15} /></button>
+            })()}<div className="workflow-recommendation-grid">{analysis.result.options.filter(option => option.action === "create").map((option, index) => <button className="workflow-recommendation" key={option.id} onClick={() => createSession({ ...analysis.request, modelId }, option)}><span className="workflow-option-kicker">{index === 0 ? "BUILD ON THIS WORK" : index === 1 ? "A RELATED, SEPARATE TASK" : "YOUR ORIGINAL TASK"}</span><strong>{option.title}<Icon name="arrow" size={14} /></strong><p>{option.description}</p><small>{option.boundary}</small><span className="workflow-option-cta">Start this task →</span></button>)}</div><p className="workflow-analysis-footer">Your new session keeps its own scope and a link to this work.</p></section>}
+          </article>
+        </div>}
         {view === "overview" && <ProjectOverview project={workspace.project} sessions={sessions} onOpenSession={openSession} onNewSession={() => newSession()} onSetup={() => beginSetup()} onStartScenario={startScenario} onReset={() => setResetting(true)} onUndoReset={restorePoint ? undoReset : undefined} />}
         {view === "setup" && <form className="workflow-setup" onSubmit={event => { event.preventDefault(); advanceSetup() }}>
           <div className="workflow-setup-step">PROJECT SETUP · {step + 1} OF 3</div><h1>{["Give your project a home", "Bring your people together", "Start with a task for everyone"][step]}</h1><p className="workflow-setup-intro">{freshSetup ? "Set a goal, bring your people together, and assign their first tasks. Current sessions are replaced when you finish setup." : "Update your project details. Existing sessions and attributed context are kept; changed assignments get separate waiting sessions."}</p><div className="workflow-step-dots" aria-label={`Step ${step + 1} of 3`}>{[0, 1, 2].map(number => <span className={number <= step ? "active" : ""} key={number} />)}</div>
@@ -336,25 +451,25 @@ export default function Workspace() {
           {step === 1 && <><div className="workflow-fixed-person"><span className="avatar green">S</span><strong>Serdar</strong><span>You · project owner</span></div><label className="field">First teammate name<input aria-label="First teammate name" value={setup.sam} onChange={event => setSetup(previous => ({ ...previous, sam: event.target.value }))} autoFocus /></label><label className="field">Second teammate name<input aria-label="Second teammate name" value={setup.alice} onChange={event => setSetup(previous => ({ ...previous, alice: event.target.value }))} /></label></>}
           {step === 2 && ["You", setup.sam, setup.alice].map((name, index) => <label className="field" key={index}>{name}&apos;s first task<input aria-label={`${name}'s first task`} value={setup.tasks[index]} onChange={event => setSetup(previous => ({ ...previous, tasks: previous.tasks.map((task, position) => position === index ? event.target.value : task) }))} autoFocus={index === 0} /></label>)}
           {setupError && <p className="workflow-form-error" role="alert">{setupError}</p>}
-          <div className="workflow-setup-actions"><button type="button" className="workflow-secondary-button" onClick={step ? () => { setStep(step - 1); setSetupError("") } : overview}>{step ? "Back" : "Cancel"}</button><button className="workflow-primary-button" type="submit">{step === 2 ? (freshSetup ? "Create project" : "Save project settings") : "Continue"}<Icon name="arrow" size={14} /></button></div>
+          <div className="workflow-setup-actions"><button type="button" className="workflow-secondary-button" onClick={step ? () => { setStep(step - 1); setSetupError("") } : overview}>{step ? "Back" : "Cancel"}</button><button className="workflow-primary-button" type="submit" disabled={!ready || working}>{step === 2 ? (freshSetup ? "Create project" : "Save project settings") : "Continue"}<Icon name="arrow" size={14} /></button></div>
         </form>}
-        {view === "new" && <div className="workflow-new-view"><img className="workflow-welcome-logo" src="/puff-logo.png" alt="Puff" /><div className="eyebrow">A LITTLE CONTEXT. A LOT LESS CATCHING UP.</div><h1>What will you work on?</h1><p>Give one task its own session. Puff will surface related work before you begin.</p><div className="workflow-new-options"><label>Assigned to<select aria-label="Session owner" value={owner} onChange={event => { setOwner(event.target.value); if (event.target.value !== "You") setScope("project") }}>{workspace.project.members.map(member => <option key={member.name} value={member.name}>{displayName(member.name)}</option>)}</select></label><label>Visibility<select aria-label="Session visibility" value={scope} onChange={event => setScope(event.target.value as "project" | "private")}><option value="project">Project · shared</option>{owner === "You" && <option value="private">Private · only you</option>}</select></label></div></div>}
+        {view === "new" && !pending && !analysis && <div className="workflow-new-view"><img className="workflow-welcome-logo" src="/puff-logo.png" alt="Puff" /><div className="eyebrow">A LITTLE CONTEXT. A LOT LESS CATCHING UP.</div><h1>What will you work on?</h1><p>Give one task its own session. Puff will surface related work before you begin.</p><div className="workflow-new-options"><label>Assigned to<select aria-label="Session owner" value={owner} onChange={event => { setOwner(event.target.value); if (event.target.value !== "You") setScope("project") }}>{workspace.project.members.map(member => <option key={member.name} value={member.name}>{displayName(member.name)}</option>)}</select></label><label>Visibility<select aria-label="Session visibility" value={scope} onChange={event => setScope(event.target.value as "project" | "private")}><option value="project">Project · shared</option>{owner === "You" && <option value="private">Private · only you</option>}</select></label></div></div>}
         {view === "chat" && active && <div className="chat-view workflow-chat">
           <div className="workflow-chat-heading"><div className="eyebrow">{active.scope === "private" ? "PRIVATE SESSION" : "PROJECT SESSION"}</div><h1>{active.title}</h1><div className="message-meta"><span className={`avatar ${active.color}`}>{active.initials}</span><span>{displayName(active.owner)}</span><span className={`status-dot ${active.status}`} /><span>{labels[active.status]}</span>{active.scope === "private" && <span>· Private</span>}</div></div>
-          {active.relation && <div className="workflow-relation"><Icon name="layers" size={14} /><span>{displayRelation(active.relation)}</span></div>}
-          {active.messages.map((message, index) => <article className={`message ${message.role}`} key={`${active.id}-${index}`}><div className="message-label">{message.role === "user" ? displayName(active.owner) : <><img className="workflow-message-logo" src="/puff-logo.png" alt="" />Puff</>}</div><div className="message-body">{message.text}</div></article>)}
-          {solved?.targetId === active.id && <section className="workflow-finding-banner" aria-label="Related solved problem"><div className="workflow-finding-kicker">{fixAdded ? "CONTEXT ADDED" : "RELATED FINDING"}</div><h2>{solved.session.owner} solved a matching server error</h2><p>{solved.finding.title}. Compare the source with your error before applying the fix.</p><div className="workflow-finding-actions"><button onClick={() => setInspecting(true)}>Inspect {solved.session.owner}&apos;s fix</button><button className="workflow-apply-fix" onClick={addFix} disabled={fixAdded}>{fixAdded ? "Context already added" : "Add context to this session"}</button>{!fixAdded && <button onClick={keepInvestigating}>Keep investigating</button>}</div></section>}
+          {active.relation && <div className="workflow-relation"><Icon name="layers" size={14} /><span>{displayRelation(active.relation)}</span>{active.relatedSessionId && <button onClick={() => openSession(active.relatedSessionId!)}>Open source ↗</button>}</div>}{active.scopeBoundary && <p className="workflow-scope-boundary"><strong>Your scope</strong>{active.scopeBoundary}</p>}
+          {active.messages.map((message, index) => <article className={`message ${message.role}`} key={`${active.id}-${index}`}><div className="message-label">{message.role === "user" ? displayName(active.owner) : <><img className="workflow-message-logo" src="/puff-logo.png" alt="" />Puff<span className="workflow-message-model">{models.find(model => model.id === message.modelId)?.name}</span></>}</div><div className="message-body"><MessageContent text={message.text} /></div></article>)}
+          {pending?.mode === "reply" && <><article className="message user"><div className="message-label">{displayName(active.owner)}</div><div className="message-body">{pending.prompt}</div></article><div className="workflow-thinking" role="status"><span className="workflow-thinking-dots"><i /><i /><i /></span><div><strong>Reading this session and related work</strong><p>Keeping your task in scope</p></div><button onClick={cancelPending}>Hide progress</button></div></>}
+          {solved?.targetId === active.id && <section className="workflow-finding-banner" aria-label="Related solved problem"><div className="workflow-finding-kicker">{fixAdded ? "CONTEXT ADDED" : "RELATED FINDING"}</div><h2>{solved.session.owner} recorded a related startup fix</h2><p>{solved.finding.title}. Compare the source with your error before applying the fix.</p><div className="workflow-finding-actions"><button onClick={() => setInspecting(true)}>Inspect {solved.session.owner}&apos;s fix</button><button className="workflow-apply-fix" onClick={addFix} disabled={fixAdded}>{fixAdded ? "Context already added" : "Add context to this session"}</button>{!fixAdded && <button onClick={keepInvestigating}>Keep investigating</button>}</div></section>}
         </div>}
-        {(view === "new" || (view === "chat" && active)) && <div className="composer-wrap workflow-composer-wrap"><div className="composer"><div className="composer-context"><Icon name="folder" size={14} /><span>{workspace.project.name}</span><span className="context-divider">/</span><span>{displayName(view === "new" ? owner : active?.owner ?? "You")}</span></div><textarea ref={input} value={draft} onChange={event => setDraft(event.target.value)} placeholder={view === "new" ? "Describe a task…" : "Add a message or describe a problem…"} rows={2} aria-label="Session prompt" onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} /><div className="composer-toolbar"><span className="workflow-composer-note">{view === "new" ? "Checks related project work" : "Keep context in this session"}</span><button className="workflow-submit-session" disabled={!draft.trim()} onClick={send}>{view === "new" ? "Start session" : "Send message"}<Icon name="arrow" size={15} /></button></div></div><div className="keyboard-hint">Enter to {view === "new" ? "start" : "send"}<span>·</span>Shift + Enter for a new line</div></div>}
+        {((view === "new" && !analysis) || (view === "chat" && active)) && <div className="composer-wrap workflow-composer-wrap"><div className="composer"><div className="composer-context"><Icon name="folder" size={14} /><span>{workspace.project.name}</span><span className="context-divider">/</span><span>{displayName(view === "new" ? owner : active?.owner ?? "You")}</span></div><textarea ref={input} value={draft} onChange={event => setDraft(event.target.value)} placeholder={view === "new" ? "Describe a task…" : "Add a message or describe a problem…"} rows={2} aria-label="Session prompt" onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() } }} /><div className="composer-toolbar"><label className="workflow-model-picker"><span>Model</span><select aria-label="Select model" value={modelId} disabled={working} onChange={event => chooseModel(event.target.value as ModelId)}>{models.map(model => <option key={model.id} value={model.id}>{model.name} · {model.description}</option>)}</select></label><button className="workflow-submit-session" disabled={!draft.trim() || working || !ready} onClick={send}>{pending ? "Working…" : view === "new" ? "Start session" : "Send message"}<Icon name="arrow" size={15} /></button></div></div><div className="keyboard-hint">Enter to {view === "new" ? "start" : "send"}<span>·</span>Shift + Enter for a new line</div></div>}
       </section>
       {(view === "new" || view === "chat") && <section className={`workflow-dock ${dockOpen ? "" : "is-collapsed"}`} aria-label="Team work summaries"><div className="workflow-dock-header"><span><Icon name="layers" size={14} />Across this project</span><button className="icon-button" aria-label={dockOpen ? "Collapse team summaries" : "Expand team summaries"} aria-expanded={dockOpen} onClick={() => setDockOpen(previous => !previous)}><Icon name="chevron" size={14} /></button></div>{dockOpen && <div className="workflow-dock-people">{workspace.project.members.map(member => {
         const owned = sessions.filter(session => session.owner === member.name)
-        const added = owned.filter(session => !["demo-you-api", "demo-you-auth", "demo-sam-frontend", "demo-sam-mobile", "demo-alice-server", "demo-alice-tests"].includes(session.id)).map(session => session.task)
+        const added = owned.filter(session => !["demo-you-api", "demo-you-auth", "demo-sam-frontend", "demo-sam-mobile", "demo-alice-server", "demo-alice-tests"].includes(session.id)).map(session => session.task.replace(/[.;]+$/, ""))
         const total = `${member.focus}${added.length ? ` Also: ${added.join("; ")}.` : ""}`
         return <article className="workflow-dock-person" key={member.name}><header><span className={`avatar ${member.color}`}>{member.initials}</span><strong>{displayName(member.name)}</strong><span>{owned.length} sessions</span></header><p className="workflow-dock-total" title={total}>{total}</p><div className="workflow-dock-sessions">{owned.map(session => <button className={active?.id === session.id ? "selected" : ""} key={session.id} onClick={() => openSession(session.id)} aria-label={`Open team summary ${session.title}`}><span><i className={`status-dot ${session.status}`} />{session.title}{session.scope === "private" && <small>Private</small>}</span><p title={session.summary}>{session.summary}</p></button>)}</div></article>
       })}</div>}</section>}
     </main>
-    {overlap && <div className="modal-backdrop" onClick={() => setOverlap(null)}><section className="modal workflow-modal" role="dialog" aria-modal="true" aria-labelledby="overlap-title" onClick={event => event.stopPropagation()}><div className="modal-header"><h2 id="overlap-title">{overlap.owner === "You" ? "You are" : `${overlap.owner} is`} already working on this</h2><button className="icon-button" aria-label="Close related work" onClick={() => setOverlap(null)}><Icon name="close" /></button></div><p>Your task overlaps with existing project work. Choose how you want to continue.</p><div className="workflow-source-card"><span className="workflow-source-owner"><span className={`avatar ${overlap.color}`}>{overlap.initials}</span>{displayName(overlap.owner)} · {labels[overlap.status]}</span><h3>{overlap.title}</h3><p>{overlap.summary}</p></div><div className="workflow-modal-choices"><button className="workflow-primary-button" onClick={() => openSession(overlap.id)}>Open existing session</button><button onClick={() => addTask("complementary", overlap)}>Work on a complementary task<small>{overlap.topic === "navigation" ? "Accessibility checks and project-switching tests" : overlap.topic === "backend" ? "API contract tests and access-rule review" : overlap.topic === "dev-server" ? "Startup configuration and reproduction checks" : "Edge cases and verification review"}</small></button><button onClick={() => addTask("independent", overlap)}>Explore another approach<small>Your own session, with a reference to this work</small></button></div><button className="workflow-modal-cancel" onClick={() => setOverlap(null)}>Cancel</button></section></div>}
     {inspecting && solved && <div className="modal-backdrop" onClick={() => setInspecting(false)}><section className="modal workflow-modal workflow-source-modal" role="dialog" aria-modal="true" aria-labelledby="source-title" onClick={event => event.stopPropagation()}><div className="modal-header"><h2 id="source-title">{solved.finding.title}</h2><button className="icon-button" aria-label="Close source fix" onClick={() => setInspecting(false)}><Icon name="close" /></button></div><p className="workflow-source-attribution">{solved.finding.source}</p><div className="workflow-source-conversation">{solved.session.messages.map((message, index) => <article key={index}><strong>{message.role === "user" ? solved.session.owner : "Puff"}</strong><p>{message.text}</p></article>)}</div><div className="workflow-source-finding"><strong>Recorded finding</strong><p>{solved.finding.problem}</p><p>{solved.finding.solution}</p></div><button className="workflow-primary-button" disabled={fixAdded} onClick={addFix}>{fixAdded ? "Context already added" : "Add context to this session"}</button><button className="workflow-modal-cancel" onClick={() => setInspecting(false)}>Back to my session</button></section></div>}
     {resetting && <div className="modal-backdrop" onClick={() => setResetting(false)}><section className="modal workflow-modal" role="dialog" aria-modal="true" aria-labelledby="reset-title" onClick={event => event.stopPropagation()}><div className="modal-header"><h2 id="reset-title">Reset workspace?</h2><button className="icon-button" aria-label="Close reset workspace" onClick={() => setResetting(false)}><Icon name="close" /></button></div><p>Restore the starting workspace with Sam&apos;s frontend sessions and Alice&apos;s server fix. Your current workspace is saved so you can undo this reset.</p><div className="workflow-finding-actions"><button className="workflow-primary-button" onClick={resetWorkspace}>Reset workspace</button><button onClick={() => setResetting(false)}>Keep current workspace</button></div></section></div>}
     {toast && <div className="toast workflow-toast" role="status"><Icon name="check" size={14} />{toast}</div>}
