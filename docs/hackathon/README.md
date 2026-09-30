@@ -1,12 +1,20 @@
 # Puff team workspace
 
+**Typed web task flow:** `apps/web` now has model selection, source-backed recommendations, continued conversations, and an isolated persistent Next API. Package tests, typecheck, build, and typed-task/source-reuse/reload/reset/undo browser checks passed. Guidance uses seeded scenarios; live Flower/OpenCode gates remain open. [Receipt and boundary](evidence/2026-09-29-typed-web-session-api.md); [test instructions](../../apps/web/README.md#test-the-full-experience).
+
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
+
+**Repeatable React walkthrough:** source `a5624203ac` adds Reset workspace with persistent Undo, product copy without scripted/demo labels, and narrow saved-copy migration. All 19 tests, typecheck, build, and setup/overlap/source-reuse/personal-context browser checks pass. [Receipt and boundary](evidence/2026-09-29-repeatable-web-walkthrough.md); [click-by-click test instructions](../../apps/web/README.md#test-the-full-experience). Live workflow gates remain open.
+
+**Native error-reuse correction:** `d9609a30aa` adds automatic error matching, Inspect / Apply fix / No thanks, exact source/revision rechecks, application receipts, and person -> aggregate summary -> sessions in the desktop. The internally synthetic backend applies a real patch to a disposable workspace and runs its tests; the live producer/Flower boundary remains open. [Verification receipt](evidence/2026-09-29-error-fix-reuse.md).
 
 **React backend handoff:** the compact sidebar uses colored status dots with hover/accessibility labels. Source `1497e7cbbf` preserves incoming main and passes 14 tests, typecheck, build, and browser interaction checks. [Receipt and backend integration boundary](evidence/2026-09-29-compact-web-sidebar.md). The React workspace is ready for teammates to connect its local demo actions to the authoritative backend; live gates remain open.
 
 **React browser workflows:** [`apps/web`](../../apps/web/README.md) now groups each person's total work above their individual sessions, with guided setup/task assignment, overlap choices, source review/reuse, private sessions, and an original Puff logo. Source `0c002da6c9` passes 14 tests, package typecheck, production build, and observed browser workflows; [receipt and 2:26 video details](evidence/2026-09-29-react-web-workflows.md). The interactive state and responses are explicitly local demo examples. Real presence and execution remain unconnected; this does not close the live workflow gates.
 
 **Main web sidebar update:** source `790518a2c9688e9fc1d09f3b6b02a29b965c7a03` groups personal threads and each teammate's recent work under the Stanford Hackathon project in the main browser app. The separate `/puff` overview page was removed. [Verification receipt](evidence/2026-09-29-main-web-sidebar.md). The activity remains demo or simulator data; live workflow gates are unchanged.
+
+**OpenCode activity sidebar:** source `dac982301277871c5371f0e2dda02747bcb7e5ea` adds the coordination API activity panel to the OpenCode shell and classic project sidebar. App typecheck, build, and browser rendering passed. The coordination API was unavailable in the browser check, so credentials and live activity remain unverified; no workflow gate is closed. [Receipt](evidence/2026-09-29-opencode-team-activity-sidebar.md).
 
 **Desktop unblock:** the [startup integration receipt](evidence/2026-09-29-desktop-startup-integration.md) records the retained-host repair and independent checks. Follow [desktop access ownership](desktop-coordination.md) so simultaneous chats do not control the same app or push conflicting changes.
 

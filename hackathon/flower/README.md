@@ -26,6 +26,8 @@ Responses requests through the configured Token Factory endpoint.
 
 ## Guardian mode (default product path)
 
+Published on Flower Hub as [`@fertonzi/puff-guardian`](https://flower.ai/apps/fertonzi/puff-guardian) (v0.1.0, September 29); install with `flwr new @fertonzi/puff-guardian`.
+
 `guardian/` is a third AgentApp, run once per coding agent whenever Jev flags a
 meaningful change in that agent. Input (capped at 6 KB): the agent's latest
 person-assigned task, the events of Jev-flagged bursts (file paths, not diffs),

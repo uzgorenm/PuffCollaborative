@@ -52,3 +52,40 @@ test("synthetic concise copy is limited to the selected scenario and a fresh car
     .toBe("Last report is out of date")
   expect(projectRail({ ...base, simulation, projectId: "other" }).rows).toEqual([])
 })
+
+test("people retain their started sessions and aggregate only fresh source-linked contributor reports", () => {
+  const bob = Coordination.UserID.make("usr_bob")
+  const otherMember = { ...member, userId: bob }
+  const otherThread = { ...thread, id: Coordination.ThreadID.make("thread_other"), createdBy: bob, activitySeq: 4 }
+  const sourceRef = { threadId: otherThread.id, eventId: "result-event", seq: 4 }
+  const otherCard = { ...card, threadId: otherThread.id, sourceActivitySeq: 4, contributors: [userId],
+    progress: "Checked migration links", evidenceRefs: [sourceRef] }
+  const read = projectRail({ ...base, threads: [thread, otherThread], overview: {
+    ...overview, members: [member, otherMember], cards: [card, otherCard],
+    snapshots: [{ thread, runs: [run] }, { thread: otherThread, runs: [] }],
+  } })
+  expect(read.groups.map((group) => group.member.userId)).toEqual([userId, bob])
+  expect(read.groups[0]?.sessions.map((row) => row.thread.id)).toEqual([thread.id])
+  expect(read.groups[0]?.startedTopics).toEqual([card.currentTask])
+  expect(read.groups[0]?.reports).toEqual([{ threadId: otherThread.id, threadTitle: otherThread.title, text: otherCard.progress, sourceRef }])
+  expect(read.groups[1]?.sessions.map((row) => row.thread.id)).toEqual([otherThread.id])
+  expect(read.groups[1]?.reports).toEqual([])
+  expect(read.unknownRows).toEqual([])
+})
+
+test("stale and uncited cards cannot become a person's aggregate work report", () => {
+  const stale = projectRail({ ...base, overview: { ...overview, cards: [{ ...card, sourceActivitySeq: 2,
+    evidenceRefs: [{ threadId: thread.id, eventId: "old", seq: 2 }] }] } })
+  expect(stale.groups[0]?.startedTopics).toEqual([])
+  expect(stale.groups[0]?.reports).toEqual([])
+  const uncited = projectRail(base)
+  expect(uncited.groups[0]?.reports).toEqual([])
+  expect(uncited.groups[0]?.startedTopics).toEqual([card.currentTask])
+})
+
+test("sessions with a creator outside the member roster stay visibly unattributed", () => {
+  const unknown = { ...thread, createdBy: Coordination.UserID.make("usr_departed") }
+  const read = projectRail({ ...base, threads: [unknown] })
+  expect(read.groups[0]?.sessions).toEqual([])
+  expect(read.unknownRows.map((row) => row.thread.id)).toEqual([unknown.id])
+})

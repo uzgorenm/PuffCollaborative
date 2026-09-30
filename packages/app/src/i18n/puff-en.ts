@@ -1,9 +1,12 @@
 import { overviewEnglish } from "@/pages/puff/project-overview/overview-copy"
 import { simulationEnglish } from "@/pages/puff/project-overview/simulation-copy"
+import { fixReuseEnglish } from "@/pages/puff/fix-reuse-copy"
 
 export const puff = {
   ...overviewEnglish,
   ...simulationEnglish,
+  ...fixReuseEnglish,
+  "puff.team.people.demoProject.wf04": "Project list recovery",
   "teamActivity.title": "Team activity",
   "teamActivity.signInHint": "Sign in with a coordination account to see live activity for {{project}}.",
   "teamActivity.signInHintGeneric": "Sign in with a coordination account to see live team activity.",
@@ -72,6 +75,20 @@ export const puff = {
   "puff.team.rail.run.completed": "Finished",
   "puff.team.rail.run.failed": "Failed",
   "puff.team.rail.run.cancelled": "Cancelled",
+  "puff.team.people.startedTopics": "Sessions started here",
+  "puff.team.people.contributorReports": "Source-linked contributor reports",
+  "puff.team.people.reportSources": "Inspect report sources",
+  "puff.team.people.reportSource": "{{title}} · source {{event}}",
+  "puff.team.people.noCurrentReport": "No current work report is attributed to this person.",
+  "puff.team.people.aboutAttribution": "How sessions are grouped",
+  "puff.team.people.attributionHint": "Sessions are grouped by their recorded creator. This does not identify the agent owner. Contributor reports appear only when a current card cites a source event.",
+  "puff.team.people.noStartedSessions": "No shared sessions started by this person.",
+  "puff.team.people.noMatchingSessions": "No sessions under this person match the search.",
+  "puff.team.people.unknownCreatorHint": "The recorded creator is not in the current project member list.",
+  "puff.team.people.demoControls": "Open test controls in project overview",
+  "puff.team.people.demoProject.wf01": "Navigation concepts",
+  "puff.team.people.demoProject.wf02": "Expanded navigation",
+  "puff.team.people.demoProject.wf03": "Project navigation",
   "puff.team.yours": "YOUR SESSIONS",
   "puff.team.shared": "PROJECT WORK",
   "puff.team.overview": "Project overview",
