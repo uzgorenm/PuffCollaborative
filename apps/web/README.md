@@ -76,6 +76,14 @@ Choose **Try demo**, then **Reset workspace** and confirm to restore the source 
 
 The original walkthrough supports project setup/task assignment, reviewing Sam's overlapping frontend work, starting complementary work or an alternative, and inspecting Alice's recorded `EADDRINUSE` finding before adding it as context. Its compact sidebar shows five Session rows before an expandable overflow and a collapsed recent-update view. Custom tasks produce independent illustrative plans; an unrelated server error never inherits the port-conflict finding. Choose **Return to live workspace** to resume the authenticated service.
 
+The latest teammate task flow uses `POST /api/workspace` and atomic filesystem storage under `.puff-workspaces/`. New session → typed frontend task → scope choices → continued conversation survives reload. `lib/session-api.ts`, `session-service.ts` and `session-engine.ts` preserve this separate command boundary. Its seeded conversations and deterministic guidance do not call a model or edit repository files. This local task store has no individual authentication or cross-device sharing and is used only by the demo controller.
+
+## Connected Alice preview
+
+The team's additional `/live` page preserves the narrow Alice source-reuse integration. It reads a registered coordination backend using one server-configured member (`PUFF_BACKEND_MEMBER_PATH`), shows actual Sessions/Run states, and lets that member inspect an exact `EADDRINUSE` source before adding context to a receiving Thread they shared. Its seeded legacy Sessions have trusted sharing grants but no provisioned owner record; creator grouping is labeled "Shared by" and is this preview's UI policy. The default live controller requires verified provisioned ownership and uses per-member cookie connections.
+
+Run `bun hackathon/alice-preview/run.ts` and follow its printed web command; see [the preview instructions](../../hackathon/alice-preview/README.md). Its recorded source uses a real local port-collision/health-check scenario. The teammate's native model requests returned HTTP 401; queued/promoted instructions are not evidence of successful model use. The single-member preview requires individual authentication before any hosted multi-user deployment. Use separate checkouts for concurrent Next.js previews, or stop one before starting another from this checkout.
+
 ## Render the walkthrough video
 
 `scripts/render_walkthrough.py` turns screenshots captured from the running interface into one MP4. It retains the captured application UI, adds a bottom caption band, and overlays an animated mouse cursor and click rings. This is a screenshot-based walkthrough of browser interactions, with cursor animation added during encoding; it is not a continuous screen recording or evidence of live agent execution.

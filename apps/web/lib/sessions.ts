@@ -7,7 +7,8 @@ export type Session = {
   status: "running" | "waiting" | "complete"
   summary: string
   updatedAt: string
-  messages: { role: "user" | "assistant"; text: string }[]
+  modelId?: string
+  messages: { role: "user" | "assistant"; text: string; modelId?: string }[]
 }
 
 // Illustrative conversations for the prototype, not live agent output.

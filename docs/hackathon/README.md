@@ -1,5 +1,7 @@
 # Puff team workspace
 
+**Typed web task flow:** `apps/web` now has model selection, source-backed recommendations, continued conversations, and an isolated persistent Next API. Package tests, typecheck, build, and typed-task/source-reuse/reload/reset/undo browser checks passed. Guidance uses seeded scenarios; live Flower/OpenCode gates remain open. [Receipt and boundary](evidence/2026-09-29-typed-web-session-api.md); [test instructions](../../apps/web/README.md#test-the-full-experience).
+
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
 
 **Combined Next.js product:** `187f1453c2` connects the copied interface to durable owner-bound Session provisioning, the embedded coding runner, exact source review/reuse, native tool approval details, and consented Flower export/result/awareness services. Run `bun run product`; [setup and model configuration](../../apps/web/README.md), [integration evidence and limits](next-product-integration.md). Browser checks used real Sessions with a deterministic local provider. Actual paid model/hosted Flower operation and private Session provisioning remain unverified or unavailable; the live gates below are not declared closed by fixture checks.

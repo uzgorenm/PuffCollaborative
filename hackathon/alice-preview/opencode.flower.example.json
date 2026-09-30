@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "flower-labs/flwrlabs/endeavor-1.0",
+  "provider": {
+    "flower-labs": {
+      "npm": "@ai-sdk/openai",
+      "name": "Flower Labs",
+      "options": {
+        "baseURL": "https://api.flower.ai/v1",
+        "apiKey": "{env:FLOWER_API_KEY}"
+      },
+      "models": {
+        "flwrlabs/endeavor-1.0": {
+          "name": "Endeavor"
+        }
+      }
+    }
+  }
+}

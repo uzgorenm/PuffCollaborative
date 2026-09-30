@@ -281,6 +281,8 @@ async function main() {
     {
       ...environment,
       PUFF_API_URL: backendUrl,
+      PUFF_BACKEND_MEMBER_PATH: "",
+      PUFF_BACKEND_URL: "",
       PUFF_WEB_ORIGIN: `http://127.0.0.1:${webPort}`,
       PUFF_RUNTIME_DIR: join(runtimeDirectory, "web-connection"),
       PUFF_CONNECTION_SCOPE: createHash("sha256").update(runtimeDirectory).digest("hex").slice(0, 16),
