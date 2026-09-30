@@ -258,3 +258,5 @@
 .workflow-option-kicker { margin-bottom: 7px; }
 .workflow-option-cta { padding-top: 4px; }
 @media (max-width: 680px) { .workflow-dock { height: auto; } }
+.workflow-dock-person { min-height: 0; }
+.workflow-shell { overflow: clip; }
