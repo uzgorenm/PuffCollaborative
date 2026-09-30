@@ -270,9 +270,12 @@ def make_report(prepared, analyses, result, run_id):
             raise ValueError("Invalid awareness source")
         if {r["sessionId"] for r in note["evidenceRefs"]} != set(sessions):
             raise ValueError("Awareness must cite source and target evidence")
-        # Conservative backstop; model output is never delivery authorization.
+        # Reject instructions aimed at the receiving agent without rejecting
+        # evidence that states a real constraint with words such as "must".
         if re.search(
-            r"(?i)\b(stop|abandon|switch|must|should|please|instead|implement|replace)\b",
+            r"(?i)(?:^|[.!?]\s*)(?:please\s+)?(?:stop|abandon|switch|implement|replace|use|choose)\b|"
+            r"\b(?:you|your agent|your session|target session|session [a-z0-9_-]+)\s+"
+            r"(?:must|should|need to|needs to|has to|have to)\b",
             note["text"],
         ):
             raise ValueError("Potential work redirection must be a proposal")
