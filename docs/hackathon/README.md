@@ -1,6 +1,6 @@
 # Puff team workspace
 
-**Typed web task flow:** `apps/web` now has model selection, source-backed recommendations, continued conversations, and an isolated persistent Next API. Package tests, typecheck, build, and typed-task/source-reuse/reload/reset/undo browser checks passed. Guidance uses seeded scenarios; live Flower/OpenCode gates remain open. [Plan and boundary](web-session-api-plan.md).
+**Typed web task flow:** `apps/web` now has model selection, source-backed recommendations, continued conversations, and an isolated persistent Next API. Package tests, typecheck, build, and typed-task/source-reuse/reload/reset/undo browser checks passed. Guidance uses seeded scenarios; live Flower/OpenCode gates remain open. [Receipt and boundary](evidence/2026-09-29-typed-web-session-api.md); [test instructions](../../apps/web/README.md#test-the-full-experience).
 
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.
 
