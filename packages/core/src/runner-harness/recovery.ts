@@ -1,7 +1,8 @@
 export * as RunnerRecovery from "./recovery"
 
-import { asc, eq } from "drizzle-orm"
+import { and, asc, desc, eq, isNotNull, isNull, ne, or, sql } from "drizzle-orm"
 import { Effect } from "effect"
+import { isDeepStrictEqual } from "node:util"
 import type { Database } from "../database/database"
 import { SessionInput } from "../session/input"
 import { SessionMessage } from "../session/message"
@@ -16,6 +17,7 @@ import type {
   SessionBinding,
 } from "./contracts"
 import { ExecutionTable } from "./sql"
+import { OutboxTable } from "./report-delivery.sql"
 
 export interface Dependencies {
   readonly db: Database.Interface["db"]
@@ -247,18 +249,91 @@ export function make(input: Dependencies): Recovery {
   })
 
   const hold = Effect.fn("RunnerRecovery.hold")(function* (assessment: Extract<Assessment, { kind: "uncertain" }>) {
-    if (
-      !assessment.execution ||
-      terminal.has(assessment.execution.phase) ||
-      assessment.execution.phase === "recovery_required"
-    )
-      return
-    yield* input.lifecycle.transition({
-      runId: assessment.execution.run.command.runId,
-      expected: assessment.execution.phase,
-      next: "recovery_required",
-      callbacks: [],
-    })
+    const execution = assessment.execution
+    if (!execution || terminal.has(execution.phase)) return false
+    const authorized = yield* input.binding
+      .authorize(execution.run.command)
+      .pipe(Effect.catch(() => Effect.succeed(undefined)))
+    const run = authorized
+      ? yield* input.binding.currentRun(execution.run.command).pipe(Effect.catch(() => Effect.succeed(undefined)))
+      : undefined
+    const trusted =
+      authorized &&
+      run &&
+      authorized.attempt === execution.run.attempt &&
+      authorized.projectId === execution.run.projectId &&
+      authorized.session.id === execution.run.session.id &&
+      authorized.session.projectID === execution.run.projectId &&
+      isDeepStrictEqual(authorized.command, execution.run.command) &&
+      isDeepStrictEqual(authorized.session.location, execution.run.session.location) &&
+      run.id === execution.run.command.runId &&
+      run.threadId === execution.run.command.threadId &&
+      run.attempt === execution.run.attempt &&
+      run.runnerMessageId === execution.run.command.runnerMessageId &&
+      isDeepStrictEqual(run.executionOwner, execution.run.command.executionOwner) &&
+      ["reserved", "running", "waiting_approval", "cancelling", "recovery_required"].includes(run.state)
+    const pending = trusted ? yield* input.reports.pending(execution.run.command.runId) : []
+    // Report reads are capped; the durable state tail can be beyond that batch.
+    const previous = trusted
+      ? yield* input.db
+          .select()
+          .from(OutboxTable)
+          .where(
+            and(
+              eq(OutboxTable.run_id, execution.run.command.runId),
+              isNull(OutboxTable.acknowledged_at),
+              sql`json_extract(${OutboxTable.callback}, '$.kind') = 'state'`,
+            ),
+          )
+          .orderBy(desc(OutboxTable.ordinal))
+          .get()
+          .pipe(Effect.orDie)
+      : undefined
+    const blocked = trusted
+      ? yield* input.db
+          .select({ id: OutboxTable.callback_id })
+          .from(OutboxTable)
+          .where(
+            and(
+              eq(OutboxTable.run_id, execution.run.command.runId),
+              isNull(OutboxTable.acknowledged_at),
+              or(
+                isNotNull(OutboxTable.permanent_failure_at),
+                ne(OutboxTable.worker_id, execution.run.command.executionOwner.workerId),
+                ne(OutboxTable.instance_id, execution.run.command.executionOwner.instanceId),
+              ),
+            ),
+          )
+          .get()
+          .pipe(Effect.orDie)
+      : undefined
+    const expected = blocked
+      ? undefined
+      : previous?.callback.kind === "state"
+        ? previous.callback.nextState
+        : trusted
+          ? run!.state
+          : undefined
+    const callbacks =
+      expected === "reserved" || expected === "running" || expected === "waiting_approval" || expected === "cancelling"
+        ? [
+            {
+              runId: execution.run.command.runId,
+              producerKey: `recovery:hold:${expected}`,
+              callback: { kind: "state" as const, expectedState: expected, nextState: "recovery_required" as const },
+            },
+          ]
+        : []
+    if (execution.phase !== "recovery_required" || callbacks.length > 0)
+      yield* input.lifecycle.transition({
+        runId: execution.run.command.runId,
+        expected: execution.phase,
+        next: "recovery_required",
+        callbacks,
+      })
+    if (trusted && !blocked && (pending.length > 0 || callbacks.length > 0))
+      yield* input.reports.flush(execution.run.command.runId)
+    return Boolean(trusted && !blocked)
   })
 
   const reconcile: Recovery["reconcile"] = Effect.fn("RunnerRecovery.reconcile")(function* (messageId) {
@@ -331,6 +406,18 @@ export function make(input: Dependencies): Recovery {
     }
     if (!assessment.execution || assessment.execution.run.command.runId !== row.runId)
       return yield* Effect.fail({ code: "unavailable", message: "Recovered Run identity changed" } satisfies Failure)
+    if (
+      assessment.kind === "admitted" &&
+      !assessment.unpromoted &&
+      assessment.execution.phase === "recovery_required"
+    ) {
+      const trusted = yield* hold({
+        kind: "uncertain",
+        execution: assessment.execution,
+        reason: "Promoted input remains held",
+      })
+      if (!trusted) return
+    }
     if (assessment.execution.phase === "cancelling") {
       yield* input.cancellations.interrupt({
         runId: row.runId,

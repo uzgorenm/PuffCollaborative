@@ -7,7 +7,9 @@ import { Project } from "@opencode-ai/core/project"
 import { ProjectTable } from "@opencode-ai/core/project/sql"
 import { RunnerRecovery } from "@opencode-ai/core/runner-harness/recovery"
 import { RunnerHarnessRuntime } from "@opencode-ai/core/runner-harness/runtime"
+import { OutboxTable } from "@opencode-ai/core/runner-harness/report-delivery.sql"
 import type {
+  CallbackDraft,
   CallbackIntent,
   LocalExecution,
   RuntimeInspection,
@@ -118,8 +120,11 @@ const fixture = (phase: LocalExecution["phase"]) =>
       reboundRuntime: undefined as LocalExecution["runtime"],
       inspectionRuntime: runtime,
       reportAvailable: true,
+      reportBatchSize: 128,
+      validateReports: false,
       startUnavailable: false,
       pending: [] as CallbackIntent[],
+      drafts: [] as CallbackDraft[],
       starts: [] as string[],
       wakes: 0,
       interrupts: 0,
@@ -128,6 +133,32 @@ const fixture = (phase: LocalExecution["phase"]) =>
       reattachments: [] as string[],
       order: [] as string[],
     }
+    const persistPending = () =>
+      Effect.forEach(
+        state.pending,
+        (item) =>
+          db
+            .insert(OutboxTable)
+            .values({
+              callback_id: item.callbackId,
+              run_id: item.runId,
+              producer_key: item.producerKey,
+              worker_id: workerId,
+              instance_id: runtime.instanceId,
+              ordinal: item.ordinal,
+              callback: item.callback,
+              terminal:
+                item.callback.kind === "state" && ["completed", "failed", "cancelled"].includes(item.callback.nextState)
+                  ? 1
+                  : 0,
+              created_at: 1,
+              next_attempt_at: 1,
+            })
+            .onConflictDoNothing()
+            .run()
+            .pipe(Effect.orDie),
+        { discard: true },
+      )
     const make = (runtimes?: Pick<Runtimes, "inspect" | "wake">) =>
       RunnerRecovery.make({
         db,
@@ -145,6 +176,14 @@ const fixture = (phase: LocalExecution["phase"]) =>
           transition: (request) =>
             Effect.gen(function* () {
               state.transitions.push(`${request.expected}->${request.next}`)
+              state.drafts.push(...request.callbacks)
+              state.pending.push(
+                ...request.callbacks.map((draft, index) => ({
+                  ...draft,
+                  callbackId: `callback_${draft.producerKey}`,
+                  ordinal: state.pending.length + index + 1,
+                })),
+              )
               state.execution = { ...state.execution, phase: request.next }
               yield* db
                 .update(ExecutionTable)
@@ -207,12 +246,33 @@ const fixture = (phase: LocalExecution["phase"]) =>
             }),
         },
         reports: {
-          pending: () => Effect.succeed(state.pending),
+          pending: () => persistPending().pipe(Effect.as(state.pending.slice(0, 128))),
           flush: () =>
             state.reportAvailable
-              ? Effect.sync(() => {
-                  state.flushes.push(...state.pending.map((item) => item.callbackId))
-                  state.pending = []
+              ? Effect.gen(function* () {
+                  yield* persistPending()
+                  const batch = state.pending.slice(0, state.reportBatchSize)
+                  for (const item of batch) {
+                    if (
+                      state.validateReports &&
+                      (item.callback.kind === "state" ? item.callback.expectedState : item.callback.state) !==
+                        state.coordinatorRun.state
+                    )
+                      return yield* Effect.fail({
+                        code: "conflict" as const,
+                        message: "Callback state does not match the coordinator",
+                      })
+                    if (item.callback.kind === "state")
+                      state.coordinatorRun = { ...state.coordinatorRun, state: item.callback.nextState }
+                    state.flushes.push(item.callbackId)
+                    yield* db
+                      .update(OutboxTable)
+                      .set({ acknowledged_at: 1 })
+                      .where(eq(OutboxTable.callback_id, item.callbackId))
+                      .run()
+                      .pipe(Effect.orDie)
+                  }
+                  state.pending = state.pending.slice(batch.length)
                 })
               : Effect.fail({ code: "unavailable" as const, message: "Coordinator is offline" }),
         },
@@ -251,6 +311,203 @@ const fixture = (phase: LocalExecution["phase"]) =>
   })
 
 describe("runner recovery with persisted SQLite records and dependency doubles", () => {
+  it.effect("reports a lost approval wait as held without replaying its promoted input", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("waiting_approval")
+      yield* setup.admit(2)
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "waiting_approval" }
+      yield* setup.make().recover
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.drafts).toHaveLength(1)
+      expect(setup.state.drafts[0]?.callback).toEqual({
+        kind: "state",
+        expectedState: "waiting_approval",
+        nextState: "recovery_required",
+      })
+      expect(setup.state.flushes).toHaveLength(1)
+      expect(setup.state.pending).toHaveLength(0)
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("retries the durable recovery report after an outage without another transition", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("waiting_approval")
+      yield* setup.admit(2)
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "waiting_approval" }
+      setup.state.reattachAvailable = false
+      setup.state.reportAvailable = false
+      yield* setup.make().recover
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.pending).toHaveLength(1)
+      const callbackId = setup.state.pending[0]?.callbackId
+      setup.state.reportAvailable = true
+      yield* setup.make().recover
+      yield* setup.make().recover
+      expect(setup.state.flushes).toEqual([callbackId])
+      expect(setup.state.drafts).toHaveLength(1)
+      expect(setup.state.transitions).toEqual(["waiting_approval->recovery_required"])
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("does not deliver a held recovery report after its coordinator owner changes", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("waiting_approval")
+      yield* setup.admit(2)
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "waiting_approval" }
+      setup.state.reattachAvailable = false
+      setup.state.reportAvailable = false
+      yield* setup.make().recover
+      expect(setup.state.pending).toHaveLength(1)
+      setup.state.reportAvailable = true
+      setup.state.coordinatorRun = {
+        ...setup.state.coordinatorRun,
+        executionOwner: { workerId, instanceId: "replacement_instance" },
+      }
+      yield* setup.make().recover
+      expect(setup.state.flushes).toHaveLength(0)
+      expect(setup.state.pending).toHaveLength(1)
+      expect(setup.state.drafts).toHaveLength(1)
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("repairs an already held Run's stale shared approval state without resuming it", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("recovery_required")
+      yield* setup.admit(2)
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "waiting_approval" }
+      yield* setup.make().recover
+      expect(setup.state.drafts).toHaveLength(1)
+      expect(setup.state.drafts[0]?.callback).toEqual({
+        kind: "state",
+        expectedState: "waiting_approval",
+        nextState: "recovery_required",
+      })
+      expect(setup.state.execution.phase).toBe("recovery_required")
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("orders recovery after a persisted undelivered approval transition", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("waiting_approval")
+      yield* setup.admit(2)
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "running" }
+      setup.state.pending = [
+        {
+          runId,
+          producerKey: "approval:requested",
+          callbackId: "callback_approval_requested",
+          ordinal: 1,
+          callback: { kind: "state", expectedState: "running", nextState: "waiting_approval" },
+        },
+      ]
+      yield* setup.make().recover
+      expect(setup.state.drafts[0]?.callback).toEqual({
+        kind: "state",
+        expectedState: "waiting_approval",
+        nextState: "recovery_required",
+      })
+      expect(setup.state.flushes[0]).toBe("callback_approval_requested")
+      expect(setup.state.flushes).toHaveLength(2)
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  it.effect("reads the durable state tail beyond a bounded 128-report backlog", () =>
+    Effect.gen(function* () {
+      const setup = yield* fixture("waiting_approval")
+      yield* setup.admit(2)
+      setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "running" }
+      setup.state.validateReports = true
+      setup.state.pending = [
+        ...Array.from(
+          { length: 128 },
+          (_, index): CallbackIntent => ({
+            runId,
+            producerKey: `output:${index}`,
+            callbackId: `callback_output_${index}`,
+            ordinal: index + 1,
+            callback: {
+              kind: "activity",
+              state: "running",
+              activity: { kind: "run.output", text: "Actual recorded output" },
+            },
+          }),
+        ),
+        {
+          runId,
+          producerKey: "approval:requested",
+          callbackId: "callback_approval_requested",
+          ordinal: 129,
+          callback: { kind: "state", expectedState: "running", nextState: "waiting_approval" },
+        },
+      ]
+      yield* setup.make().recover
+      expect(setup.state.drafts[0]?.callback).toEqual({
+        kind: "state",
+        expectedState: "waiting_approval",
+        nextState: "recovery_required",
+      })
+      yield* setup.make().recover
+      expect(setup.state.coordinatorRun.state).toBe("recovery_required")
+      expect(setup.state.pending).toHaveLength(0)
+      expect(setup.state.flushes).toHaveLength(130)
+      expect(setup.state.drafts).toHaveLength(1)
+      expect(setup.state.wakes).toBe(0)
+    }),
+  )
+
+  for (const blocked of ["permanent failure", "foreign owner"]) {
+    it.effect(`does not append recovery behind an outbox with ${blocked}`, () =>
+      Effect.gen(function* () {
+        const setup = yield* fixture("waiting_approval")
+        yield* setup.admit(2)
+        setup.state.coordinatorRun = { ...setup.state.coordinatorRun, state: "waiting_approval" }
+        setup.state.pending = [
+          {
+            runId,
+            producerKey: "blocked",
+            callbackId: "callback_blocked",
+            ordinal: 1,
+            callback: {
+              kind: "activity",
+              state: "waiting_approval",
+              activity: { kind: "run.output", text: "Recorded output" },
+            },
+          },
+        ]
+        const db = (yield* Database.Service).db
+        yield* db
+          .insert(OutboxTable)
+          .values({
+            callback_id: "callback_blocked",
+            run_id: runId,
+            producer_key: "blocked",
+            worker_id: workerId,
+            instance_id: blocked === "foreign owner" ? "replacement_instance" : runtime.instanceId,
+            ordinal: 1,
+            callback: {
+              kind: "activity",
+              state: "waiting_approval",
+              activity: { kind: "run.output", text: "Recorded output" },
+            },
+            created_at: 1,
+            next_attempt_at: 1,
+            permanent_failure_at: blocked === "permanent failure" ? 1 : null,
+          })
+          .run()
+        yield* setup.make().recover
+        expect(setup.state.drafts).toHaveLength(0)
+        expect(setup.state.flushes).toHaveLength(0)
+        expect(setup.state.execution.phase).toBe("recovery_required")
+        expect(setup.state.wakes).toBe(0)
+      }),
+    )
+  }
+
   it.effect("resumes a definitely unsubmitted accepted command", () =>
     Effect.gen(function* () {
       const setup = yield* fixture("accepted")
