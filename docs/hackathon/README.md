@@ -1,5 +1,7 @@
 # Puff team workspace
 
+**Alice active-work integration in progress:** Serdar's real connected workspace is gaining an automatic pre-submit check against current shared session evidence. The replacement Flower key was supplied by the user and returned HTTP 200 from the model catalog with Endeavor available; actual native Alice/Serdar execution is being verified. Existing `/live` data remains authoritative backend data; no seeded assistant output will replace native execution.
+
 **Typed web task flow:** `apps/web` now has model selection, source-backed recommendations, continued conversations, and an isolated persistent Next API. Package tests, typecheck, build, and typed-task/source-reuse/reload/reset/undo browser checks passed. Guidance uses seeded scenarios; live Flower/OpenCode gates remain open. [Receipt and boundary](evidence/2026-09-29-typed-web-session-api.md); [test instructions](../../apps/web/README.md#test-the-full-experience).
 
 This is the team's shared task board. **Start with the [progress checklist](progress-checklist.md)** to see what is evidenced and what blocks the next working flow.

@@ -4,10 +4,13 @@ import { chmod, mkdir, mkdtemp, realpath } from "node:fs/promises"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
-import { provisionNativeConfig } from "./native-config"
+import { boundedReceiverConfig, provisionNativeConfig } from "./native-config"
+import { nativeWorkCard } from "./native-work-card"
+import { nativeProviderStatus } from "./native-provider-status"
 
 const repository = resolve(import.meta.dir, "../..")
 const checkOnly = process.argv.includes("--check-only")
+const nativeScenario = process.env.PUFF_PREVIEW_NATIVE_SCENARIO === "1"
 const port = Number(process.env.PUFF_PREVIEW_SERVER_PORT ?? 4478)
 if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error("Invalid preview server port")
 const probe = createServer()
@@ -97,7 +100,10 @@ const people = [
   { username: "outsider", auth: { kind: "member", userId: "usr_outsider" } },
   { username: "worker", auth: { kind: "runner", workerId: "wrk_alice_preview", instanceId: "alice-preview" } },
   { username: "stale-worker", auth: { kind: "runner", workerId: "wrk_alice_preview", instanceId: "retired" } },
-  { username: "analysis", auth: { kind: "analysis", serviceId: "human-recorded-fixture" } },
+  {
+    username: "analysis",
+    auth: { kind: "analysis", serviceId: nativeScenario ? "native-run-projection" : "human-recorded-fixture" },
+  },
 ].map((person) => ({ ...person, password: randomUUID() }))
 const identityPath = join(directory, "identities.json")
 const admissionPath = join(directory, "admissions.json")
@@ -132,9 +138,35 @@ await Bun.write(
 await Promise.all([identityPath, admissionPath, credentialsPath, runnerPath].map((path) => chmod(path, 0o600)))
 
 const configPath = process.env.PUFF_MODEL_CONFIG_PATH
-const config = configPath ? await Bun.file(configPath).json() : undefined
+let config = configPath ? await Bun.file(configPath).json() : undefined
 if (configPath && (!config?.model || typeof config.model !== "string" || !config.model.includes("/")))
   throw new Error("PUFF_MODEL_CONFIG_PATH must name an OpenCode JSON config with an explicit provider/model")
+if (nativeScenario && !config)
+  throw new Error("The native two-user scenario requires an explicit real model configuration")
+if (nativeScenario) {
+  config = boundedReceiverConfig(config)
+  const rules = [
+    { action: "*", resource: "*", effect: "allow" },
+    { action: "bash", resource: "*", effect: "deny" },
+    { action: "external_directory", resource: "*", effect: "deny" },
+    { action: "webfetch", resource: "*", effect: "deny" },
+    { action: "websearch", resource: "*", effect: "deny" },
+    { action: "edit", resource: "*", effect: "ask" },
+  ]
+  const agent = {
+    description: "Alice's native source task with owner approval for source edits",
+    mode: "primary",
+    steps: 4,
+  }
+  if (config.providers && !config.provider) {
+    config.agents = { ...config.agents, "alice-preview": { ...agent, permissions: rules } }
+  } else {
+    config.agent = {
+      ...config.agent,
+      "alice-preview": { ...agent, permission: Object.fromEntries(rules.map((rule) => [rule.action, rule.effect])) },
+    }
+  }
+}
 // The native Session runner reads Config.Service from files, while the legacy
 // CLI reads OPENCODE_CONFIG_CONTENT. Provision both through their existing loaders.
 const nativeConfig = await provisionNativeConfig(directory, config, configPath)
@@ -188,11 +220,25 @@ const stop = () => {
 process.once("SIGINT", stop)
 process.once("SIGTERM", stop)
 
-type Event = { id: string; threadId: string; seq: number; kind: string; payload: Record<string, unknown> }
+type Event = {
+  id: string
+  threadId: string
+  seq: number
+  kind: string
+  runId?: string
+  instructionId?: string
+  payload: Record<string, unknown>
+}
 type Snapshot = {
-  thread: { id: string; activitySeq: number }
+  thread: { id: string; activitySeq: number; createdBy: string }
+  instructions: { id: string; text: string; runId: string }[]
   runs: { id: string; state: string }[]
-  workCard?: { version: number; evidenceRefs: { threadId: string; eventId: string; seq: number }[] }
+  workCard?: {
+    version: number
+    sourceActivitySeq: number
+    summaryJobId: string
+    evidenceRefs: { threadId: string; eventId: string; seq: number }[]
+  }
 }
 async function request<T>(route: string, username: string, method = "GET", body?: unknown) {
   const person = people.find((item) => item.username === username)!
@@ -253,7 +299,7 @@ try {
   ])
     sqlite
       .query(
-        "INSERT INTO session (id, project_id, workspace_id, slug, directory, title, version, model, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO session (id, project_id, workspace_id, slug, directory, title, version, model, agent, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
       .run(
         session.id,
@@ -264,6 +310,7 @@ try {
         session.title,
         "alice-fixture",
         JSON.stringify(model),
+        nativeScenario ? (session.id === "ses_alice_preview" ? "alice-preview" : "serdar-bounded") : null,
         now,
         now,
       )
@@ -286,7 +333,7 @@ try {
   const sourceThread = requireOK(
     await request<{ id: string }>(`/api/coordination/v1/projects/${projectId}/threads`, "alice", "POST", {
       sessionId: "ses_alice_preview",
-      title: "Server startup · EADDRINUSE fixed",
+      title: nativeScenario ? "Improve server startup diagnostics" : "Server startup · EADDRINUSE fixed",
       requestId: randomUUID(),
     }),
     "Share Alice thread",
@@ -299,7 +346,30 @@ try {
     }),
     "Share Serdar thread",
   )
-  const sourceBody = `Recorded finding from the isolated Alice scenario.\n\nThe server failed to start with EADDRINUSE because the requested loopback port ${capture.occupiedPort} was already held by another process. I left that process running and started this server on a free port using PORT=0. The actual server listened on ${capture.recoveryPort}; GET /health returned HTTP ${capture.recoveryHttpStatus} with {"ok":true}.\n\nTo reuse: confirm your error is EADDRINUSE, choose an available PORT, then point your client at the new address and check /health. Changing ports addresses this collision; it does not establish that another server error has the same cause.\n\nMeasured ${measuredAt}. Human-authored fixture finding backed by real process/network measurements. No model produced this history.`
+  async function refreshNativeCard(threadId: string) {
+    const snapshot = requireOK(
+      await request<Snapshot>(`/api/coordination/v1/threads/${threadId}`, "serdar"),
+      "Read native projection snapshot",
+    )
+    const replay = requireOK(
+      await request<{ events: Event[] }>(
+        `/api/coordination/v1/threads/${threadId}/events?after=-1&limit=256`,
+        "serdar",
+      ),
+      "Read native projection events",
+    )
+    const update = nativeWorkCard(snapshot, replay.events)
+    if (!update) return
+    const result = await request(`/api/coordination/v1/threads/${threadId}/work-card`, "analysis", "PUT", update)
+    if (result.status !== 200 && result.status !== 409)
+      throw new Error(`Native WorkCard projection failed: HTTP ${result.status}`)
+  }
+  const aliceTask =
+    "Improve server.ts startup diagnostics for EADDRINUSE. First read the file and explain the safe behavior you propose before editing. Then edit server.ts to catch a port collision and give an actionable available-port suggestion without terminating another process. Your edit requires owner approval; wait at that actual tool boundary. Work only in this workspace, and do not run shell commands or access the web."
+  const serdarTask = `I need clearer server.ts startup diagnostics for EADDRINUSE. Explain a safe implementation plan from the current source included below, without using tools, modifying files, or terminating processes. I want to check current related work before duplicating changes. Do not claim to have inspected or executed a file through tools.\n\nCurrent server.ts, provided from this isolated workspace:\n${fixtureServer}`
+  const sourceBody = nativeScenario
+    ? aliceTask
+    : `Recorded finding from the isolated Alice scenario.\n\nThe server failed to start with EADDRINUSE because the requested loopback port ${capture.occupiedPort} was already held by another process. I left that process running and started this server on a free port using PORT=0. The actual server listened on ${capture.recoveryPort}; GET /health returned HTTP ${capture.recoveryHttpStatus} with {"ok":true}.\n\nTo reuse: confirm your error is EADDRINUSE, choose an available PORT, then point your client at the new address and check /health. Changing ports addresses this collision; it does not establish that another server error has the same cause.\n\nMeasured ${measuredAt}. Human-authored fixture finding backed by real process/network measurements. No model produced this history.`
   requireOK(
     await request(`/api/coordination/v1/threads/${sourceThread.id}/comments`, "alice", "POST", {
       requestId: "alice-measured-finding",
@@ -310,7 +380,9 @@ try {
   requireOK(
     await request(`/api/coordination/v1/threads/${targetThread.id}/comments`, "serdar", "POST", {
       requestId: "serdar-task",
-      body: "I am starting the app server and seeing EADDRINUSE. Find a related solved server-startup issue and let me review the exact source before I reuse it. Isolated scenario input, authored by the preview launcher.",
+      body: nativeScenario
+        ? serdarTask
+        : "I am starting the app server and seeing EADDRINUSE. Find a related solved server-startup issue and let me review the exact source before I reuse it. Isolated scenario input, authored by the preview launcher.",
     }),
     "Record Serdar task",
   )
@@ -331,14 +403,16 @@ try {
     expectedVersion: 0,
     sourceActivitySeq: sourceSnapshot.thread.activitySeq,
     card: {
-      currentTask: "Fix server startup EADDRINUSE",
-      progress:
-        "Measured a port collision and verified healthy startup on an available port. Recorded human finding; no model execution.",
+      currentTask: nativeScenario ? aliceTask : "Fix server startup EADDRINUSE",
+      progress: nativeScenario
+        ? "Alice's source instruction is ready to enter the actual native queue. No model result is claimed."
+        : "Measured a port collision and verified healthy startup on an available port. Recorded human finding; no model execution.",
       blockers: [],
-      status: "done",
-      summaryJobId: "human-recorded-alice-measurement",
-      recentVerifiedOutcome:
-        "Actual process: EADDRINUSE on occupied port; alternate port returned HTTP 200 from /health.",
+      status: nativeScenario ? "queued" : "done",
+      summaryJobId: nativeScenario ? "native-source-queued" : "human-recorded-alice-measurement",
+      recentVerifiedOutcome: nativeScenario
+        ? null
+        : "Actual process: EADDRINUSE on occupied port; alternate port returned HTTP 200 from /health.",
       contributors: ["usr_alice"],
       evidenceRefs: [{ threadId: sourceThread.id, eventId: finding.id, seq: finding.seq }],
       generatedAt: measuredAt,
@@ -370,6 +444,21 @@ try {
     ...cardBody,
     card: { ...cardBody.card, progress: "Changed stale request" },
   })
+  let aliceInitialRunId: string | undefined
+  if (nativeScenario) {
+    const sourceTask = requireOK(
+      await request<{ run: { id: string } }>(
+        `/api/coordination/v1/threads/${sourceThread.id}/instructions`,
+        "alice",
+        "POST",
+        { requestId: "alice-native-source-task", text: aliceTask },
+      ),
+      "Submit Alice's actual native task",
+    )
+    aliceInitialRunId = sourceTask.run.id
+    await request(`/api/coordination/v1/runner/threads/${sourceThread.id}/reserve`, "worker", "POST")
+    await refreshNativeCard(sourceThread.id)
+  }
   const targetReplay = requireOK(
     await request<{ events: Event[] }>(
       `/api/coordination/v1/threads/${targetThread.id}/events?after=-1&limit=256`,
@@ -402,7 +491,9 @@ try {
   )
   const instructionBody = {
     requestId: "serdar-initial-task",
-    text: "I am starting the app server and seeing EADDRINUSE. Inspect server.ts and explain a safe next step. Do not modify files or terminate other processes.",
+    text: nativeScenario
+      ? serdarTask
+      : "I am starting the app server and seeing EADDRINUSE. Inspect server.ts and explain a safe next step. Do not modify files or terminate other processes.",
   }
   const first = requireOK(
     await request<{ run: { id: string } }>(
@@ -472,6 +563,10 @@ try {
       )
     }
   }
+  if (nativeScenario) {
+    await refreshNativeCard(sourceThread.id)
+    await refreshNativeCard(targetThread.id)
+  }
   const persisted = new Database(env.OPENCODE_DB, { readonly: true })
   const actualExecution = persisted
     .query<
@@ -491,10 +586,8 @@ try {
     .get()
   persisted.close()
   const assistantData = assistant ? JSON.parse(assistant.data) : undefined
-  const providerHttpStatus =
-    typeof assistantData?.error?.message === "string"
-      ? Number(/HTTP (\d{3})\b/.exec(assistantData.error.message)?.[1]) || undefined
-      : undefined
+  const providerStatus = nativeProviderStatus(Boolean(config), assistantData?.error)
+  const { providerHttpStatus, providerErrorCode } = providerStatus
   const runState = afterReserve.runs.find((run) => run.id === first.run.id)?.state
   const modelOutcome = !assistant
     ? "not_observed"
@@ -515,6 +608,7 @@ try {
     sessionMessages,
     modelOutcome,
     providerHttpStatus,
+    providerErrorCode,
     assistantMessageId: assistant?.id,
     assistantSeq: assistant?.seq,
     message: config
@@ -540,13 +634,11 @@ try {
         projectId,
         sourceThreadId: sourceThread.id,
         targetThreadId: targetThread.id,
+        nativeScenario,
+        aliceInitialRunId,
         credentialsPath,
         capturePath: join(directory, "capture.json"),
-        runnerAvailability: config
-          ? [401, 403].includes(providerHttpStatus ?? 0)
-            ? "provider_auth_failed"
-            : "configured"
-          : "model_configuration_missing",
+        runnerAvailability: providerStatus.runnerAvailability,
         runnerDiagnostics: runnerAvailability,
       },
       null,
@@ -599,6 +691,12 @@ try {
             request(`/api/coordination/v1/runner/threads/${threadId}/reserve`, "worker", "POST"),
           ),
         )
+          .then(async () => {
+            if (nativeScenario) {
+              await refreshNativeCard(sourceThread.id)
+              await refreshNativeCard(targetThread.id)
+            }
+          })
           .catch(() => console.error("Real runner reserve request failed; inspect the persisted backend state."))
           .finally(() => {
             busy = false

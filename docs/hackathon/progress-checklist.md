@@ -1,5 +1,7 @@
 # Puff progress and verification
 
+**Alice active-work integration in progress:** connect automatic overlap checking before instruction admission, backed by exact current shared-session evidence, and exercise the real native Alice/Serdar flow. The user-supplied replacement Flower key passed the model catalog check with HTTP 200; successful native provider turns remain under verification. No live gate is closed by the work in progress.
+
 **Typed React task flow:** source `6d56bc12a0` passes 51 web tests, typecheck, build, and the New session → scope choices → continued chat → saved reload browser flow. It uses an isolated persistent local API with deterministic seeded guidance; live gates remain open. [Receipt](evidence/2026-09-29-typed-web-session-api.md).
 
 **Connected Alice browser slice:** Next.js `/live` now reads actual coordination projects, people, Sessions and Runs; exact source inspection and owner-requested context reuse preserve the receiving task. Thirty-five local tests, typecheck, build and browser checks pass. The original task and reused context were promoted into the real native Session, but Flower rejected both model requests with HTTP 401. [Evidence and handoff](evidence/2026-09-29-alice-connected-product.md). Successful model use, guardian analysis and live gates remain open pending valid model access.

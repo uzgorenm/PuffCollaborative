@@ -17,9 +17,14 @@ export type LiveThread = {
   executions: { id: string; status: string; detail?: string }[]
 }
 export type LiveFinding = {
+  kind?: "solved-error"
   sourceThreadId: string; eventId: string; seq: number; ownerName: string; threadTitle: string
   title: string; problem: string; solution: string; cardVersion: number; sourceActivitySeq: number
   targetActivitySeq: number; targetInstructionId: string
 }
-export type LiveSource = { finding: LiveFinding; thread: LiveThreadSummary; event: LiveEvent; messages: LiveMessage[] }
-export type LiveReceipt = { requestId: string; status: string; executionId: string; instructionId: string; detail?: string }
+export type LiveWorkMatch = Omit<LiveFinding, "kind"> & {
+  kind: "active-work"; workStatus: "active" | "blocked"; summary: string; originalTask: string; sourceInstructionId: string
+  sourceRunId: string; runState: "running" | "waiting_approval"
+}
+export type LiveSource = { finding: LiveFinding | LiveWorkMatch; thread: LiveThreadSummary; event: LiveEvent; messages: LiveMessage[] }
+export type LiveReceipt = { requestId: string; status: string; executionId: string; instructionId: string; detail?: string; overlaps?: LiveWorkMatch[] }

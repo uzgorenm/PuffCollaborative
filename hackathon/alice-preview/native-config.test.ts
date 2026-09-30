@@ -11,7 +11,7 @@ import { Location } from "../../packages/core/src/location"
 import { Policy } from "../../packages/core/src/policy"
 import { Project } from "../../packages/core/src/project"
 import { AbsolutePath } from "../../packages/core/src/schema"
-import { provisionNativeConfig } from "./native-config"
+import { boundedReceiverConfig, provisionNativeConfig } from "./native-config"
 
 test("configured provider is visible to the native Config service without an inference request", async () => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "puff-native-config-test-")))
@@ -28,7 +28,11 @@ test("configured provider is visible to the native Config service without an inf
         },
       },
     }
-    const native = await provisionNativeConfig(directory, config, join(directory, "original.json"))
+    const native = await provisionNativeConfig(
+      directory,
+      boundedReceiverConfig(config),
+      join(directory, "original.json"),
+    )
     expect((await stat(native.path)).mode & 0o777).toBe(0o600)
     expect((await stat(native.directory)).mode & 0o777).toBe(0o700)
     const location = Layer.succeed(
@@ -56,6 +60,11 @@ test("configured provider is visible to the native Config service without an inf
     expect(provider.api).toMatchObject({ type: "aisdk", package: "@ai-sdk/openai", url: "https://api.flower.ai/v1" })
     expect(provider.request?.headers?.Authorization).toBe(`Bearer ${fixtureKey}`)
     expect(provider.models["flwrlabs/endeavor-1.0"].capabilities?.tools).toBe(true)
+    expect(provider.models["flwrlabs/endeavor-1.0"].request?.body?.max_output_tokens).toBe(1024)
+    expect(documents[0].info.agents?.["serdar-bounded"].steps).toBe(1)
+    expect(documents[0].info.agents?.["serdar-bounded"].permissions).toEqual([
+      { action: "*", resource: "*", effect: "deny" },
+    ])
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

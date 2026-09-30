@@ -1,18 +1,46 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import type { LiveFinding, LiveReceipt, LiveSource, LiveThread, LiveWorkspace } from "../lib/connected-types"
+import type { LiveFinding, LiveReceipt, LiveSource, LiveThread, LiveWorkMatch, LiveWorkspace } from "../lib/connected-types"
+import { MessageContent } from "./message-content"
 import "./connected-workspace.css"
 
 const statusLabels = { running: "Running", waiting: "Waiting", complete: "Reported complete", blocked: "Blocked", unknown: "No active run" }
 const pendingMessagesKey = "puff-live-pending-messages-v1"
+type PendingMessage = { requestId: string; text: string; activeWorkContext?: LiveWorkMatch; allowOverlap?: true }
+type WorkReview = { targetId: string; pending: PendingMessage; matches: LiveWorkMatch[] }
+type SourceFinding = LiveFinding | LiveWorkMatch
+
+function isActiveWork(finding: SourceFinding): finding is LiveWorkMatch {
+  return "kind" in finding && finding.kind === "active-work"
+}
+
+function sameWork(left: LiveWorkMatch, right: LiveWorkMatch) {
+  return left.sourceThreadId === right.sourceThreadId && left.eventId === right.eventId && left.seq === right.seq
+    && left.cardVersion === right.cardVersion && left.sourceActivitySeq === right.sourceActivitySeq
+    && left.sourceInstructionId === right.sourceInstructionId && left.targetActivitySeq === right.targetActivitySeq
+    && left.targetInstructionId === right.targetInstructionId && left.sourceRunId === right.sourceRunId && left.runState === right.runState
+}
+
+function storedWork(value: unknown): value is LiveWorkMatch {
+  if (!value || typeof value !== "object") return false
+  const item = value as Record<string, unknown>
+  return item.kind === "active-work" && (item.workStatus === "active" || item.workStatus === "blocked")
+    && (item.runState === "running" || item.runState === "waiting_approval")
+    && ["sourceThreadId", "eventId", "ownerName", "threadTitle", "title", "problem", "solution", "summary", "originalTask", "sourceInstructionId", "targetInstructionId", "sourceRunId"].every(key => typeof item[key] === "string")
+    && ["seq", "cardVersion", "sourceActivitySeq", "targetActivitySeq"].every(key => typeof item[key] === "number")
+}
+
+class RequestError extends Error {
+  constructor(message: string, readonly status: number) { super(message) }
+}
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init })
   const body: unknown = await response.json()
   if (!response.ok) {
     const failure = body && typeof body === "object" ? body as Record<string, unknown> : {}
-    throw new Error(typeof failure.error === "string" ? failure.error : typeof failure.detail === "string" ? failure.detail : `Request failed (${response.status}).`)
+    throw new RequestError(typeof failure.error === "string" ? failure.error : typeof failure.detail === "string" ? failure.detail : `Request failed (${response.status}).`, response.status)
   }
   return body as T
 }
@@ -44,7 +72,11 @@ export function ConnectedWorkspace() {
   const [findings, setFindings] = useState<LiveFinding[] | null>(null)
   const [findingError, setFindingError] = useState<string | null>(null)
   const [findingLoading, setFindingLoading] = useState(false)
-  const [inspection, setInspection] = useState<{ targetId: string; finding: LiveFinding } | null>(null)
+  const [draftWork, setDraftWork] = useState<{ targetId: string; text: string; matches: LiveWorkMatch[] } | null>(null)
+  const [workReview, setWorkReview] = useState<WorkReview | null>(null)
+  const [workLoading, setWorkLoading] = useState(false)
+  const [workError, setWorkError] = useState<string | null>(null)
+  const [inspection, setInspection] = useState<{ targetId: string; finding: SourceFinding; prompt?: string } | null>(null)
   const [source, setSource] = useState<LiveSource | null>(null)
   const [sourceError, setSourceError] = useState<string | null>(null)
   const [sourceLoading, setSourceLoading] = useState(false)
@@ -55,7 +87,9 @@ export function ConnectedWorkspace() {
   const sourceGeneration = useRef(0)
   const findingController = useRef<AbortController | null>(null)
   const sourceController = useRef<AbortController | null>(null)
-  const messageRequests = useRef<Record<string, { requestId: string; text: string }>>({})
+  const draftWorkController = useRef<AbortController | null>(null)
+  const submitCheckController = useRef<AbortController | null>(null)
+  const messageRequests = useRef<Record<string, PendingMessage>>({})
   const messageLocks = useRef(new Set<string>())
   const reuseLocks = useRef(new Set<string>())
   const lastErrors = useRef<Record<string, string>>({})
@@ -69,6 +103,9 @@ export function ConnectedWorkspace() {
   const reusePending = reusing || reuseLocks.current.has(reuseKey)
   const connected = Boolean(workspace && !workspaceError)
   const pendingMessage = selected ? messageRequests.current[selected] : undefined
+  const relatedWork = workReview?.targetId === selected ? workReview.matches : draftWork?.targetId === selected && draftWork.text === draft.trim() ? draftWork.matches : []
+  const reviewPrompt = workReview?.targetId === selected ? workReview.pending.text : draftWork?.text ?? ""
+  const activeSource = source && isActiveWork(source.finding) ? source.finding : null
   const canWrite = Boolean(workspace && active && active.thread.ownerId === workspace.viewer.id)
   const myThreadId = workspace?.threads.find(item => item.id === workspace.defaultThreadId && item.ownerId === workspace.viewer.id)?.id
     ?? workspace?.threads.find(item => item.ownerId === workspace.viewer.id)?.id
@@ -76,6 +113,8 @@ export function ConnectedWorkspace() {
     ? "Connect a coding model to run this session. Your messages and source context are saved in your session."
     : workspace?.runnerAvailability === "provider_auth_failed"
       ? "Your coding model rejected its credential. Update the provider key to run this session."
+    : workspace?.runnerAvailability === "provider_credit_limit_reached"
+      ? "Flower’s credit limit was reached. Increase the key’s credit limit to run this session."
     : workspace?.runnerAvailability && ["configured", "model_configured"].includes(workspace.runnerAvailability)
       ? "Coding model configured. Run status shows whether it can execute."
       : workspace?.runnerAvailability && ["ready", "available"].includes(workspace.runnerAvailability)
@@ -86,9 +125,9 @@ export function ConnectedWorkspace() {
     try {
       const saved: unknown = JSON.parse(sessionStorage.getItem(pendingMessagesKey) ?? "{}")
       if (!saved || typeof saved !== "object" || Array.isArray(saved)) return
-      messageRequests.current = Object.fromEntries(Object.entries(saved).filter((entry): entry is [string, { requestId: string; text: string }] => {
+      messageRequests.current = Object.fromEntries(Object.entries(saved).filter((entry): entry is [string, PendingMessage] => {
         const value: unknown = entry[1]
-        return Boolean(value && typeof value === "object" && "requestId" in value && typeof value.requestId === "string" && "text" in value && typeof value.text === "string")
+        return Boolean(value && typeof value === "object" && "requestId" in value && typeof value.requestId === "string" && "text" in value && typeof value.text === "string" && (!("activeWorkContext" in value) || storedWork(value.activeWorkContext)) && (!("allowOverlap" in value) || value.allowOverlap === true))
       }))
     } catch { /* The backend remains authoritative when browser storage is unavailable. */ }
   }, [])
@@ -147,9 +186,38 @@ export function ConnectedWorkspace() {
     return () => window.removeEventListener("keydown", keyboard)
   }, [inspection])
 
-  useEffect(() => () => { findingController.current?.abort(); sourceController.current?.abort() }, [])
+  useEffect(() => {
+    const text = draft.trim()
+    setDraftWork(null); setWorkError(null); setWorkLoading(false)
+    if (!selected || !text || !connected || !canWrite || pendingMessage || workReview || sending) return
+    const targetId = selected
+    const controller = new AbortController()
+    draftWorkController.current = controller
+    let ignore = false
+    let busy = false
+    async function load() {
+      if (busy) return
+      busy = true
+      setWorkLoading(true)
+      try {
+        const matches = await request<LiveWorkMatch[]>(`/api/live/threads/${encodeURIComponent(targetId)}/active-work?q=${encodeURIComponent(text)}`, { signal: controller.signal })
+        if (!ignore && currentSelection.current === targetId) { setDraftWork({ targetId, text, matches }); setWorkError(null) }
+      } catch (error) {
+        if (!ignore && !controller.signal.aborted && currentSelection.current === targetId) setWorkError(readableError(error))
+      } finally {
+        busy = false
+        if (!ignore && currentSelection.current === targetId) setWorkLoading(false)
+      }
+    }
+    const timer = setTimeout(() => { void load() }, 450)
+    const poll = setInterval(() => { void load() }, 3000)
+    return () => { ignore = true; controller.abort(); clearTimeout(timer); clearInterval(poll) }
+  }, [draft, selected, connected, canWrite, pendingMessage, workReview, sending])
+
+  useEffect(() => () => { findingController.current?.abort(); sourceController.current?.abort(); draftWorkController.current?.abort(); submitCheckController.current?.abort() }, [])
 
   function closeSource(restoreFocus = true) {
+    if (inspection && isActiveWork(inspection.finding)) submitCheckController.current?.abort()
     sourceGeneration.current += 1
     sourceController.current?.abort()
     setInspection(null); setSource(null); setSourceError(null); setSourceLoading(false); setReusing(false)
@@ -160,9 +228,11 @@ export function ConnectedWorkspace() {
     currentSelection.current = id
     findingGeneration.current += 1
     findingController.current?.abort()
+    draftWorkController.current?.abort(); submitCheckController.current?.abort()
     closeSource(false)
     setSelected(id); setThread(null); setThreadLoading(Boolean(id)); setThreadError(null); setMessageError(null)
     setFindings(null); setFindingError(null); setFindingLoading(false); setSending(Boolean(id && messageLocks.current.has(id)))
+    setDraftWork(null); setWorkReview(null); setWorkError(null); setWorkLoading(false)
     if (id && messageRequests.current[id]) setDrafts(previous => ({ ...previous, [id]: previous[id] || messageRequests.current[id].text }))
     setSidebarOpen(false)
   }
@@ -184,19 +254,15 @@ export function ConnectedWorkspace() {
     }
   }
 
-  async function sendMessage(textOverride?: string) {
-    const targetId = selected
-    const text = (textOverride ?? draft).trim()
-    if (!targetId || !text || !connected || !canWrite || messageLocks.current.has(targetId)) return
-    const saved = messageRequests.current[targetId]
-    if (saved && saved.text !== text) {
-      setDrafts(previous => ({ ...previous, [targetId]: saved.text }))
-      setMessageError("Confirm your previous message before submitting a different one. Retry sends that same message.")
-      return
-    }
-    const pending = saved ?? { requestId: crypto.randomUUID(), text }
+  function persistMessages() {
+    try { sessionStorage.setItem(pendingMessagesKey, JSON.stringify(messageRequests.current)) } catch { /* A transport retry still keeps the captured request in memory. */ }
+  }
+
+  async function admitMessage(targetId: string, pending: PendingMessage) {
+    if (currentSelection.current !== targetId || messageLocks.current.has(targetId)) return
+    const text = pending.text
     messageRequests.current[targetId] = pending
-    try { sessionStorage.setItem(pendingMessagesKey, JSON.stringify(messageRequests.current)) } catch { /* A transport retry still keeps the in-memory request identity. */ }
+    persistMessages()
     messageLocks.current.add(targetId)
     lastErrors.current[targetId] = text
     setSending(true); setMessageError(null)
@@ -205,13 +271,23 @@ export function ConnectedWorkspace() {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pending),
       })
       delete messageRequests.current[targetId]
-      try { sessionStorage.setItem(pendingMessagesKey, JSON.stringify(messageRequests.current)) } catch { /* No local data is used to invent backend progress. */ }
+      persistMessages()
       if (currentSelection.current !== targetId) return
+      setWorkReview(null); setDraftWork(null)
+      if (inspection && isActiveWork(inspection.finding)) closeSource()
       setReceipts(previous => ({ ...previous, [targetId]: result }))
       setDrafts(previous => previous[targetId]?.trim() === text ? { ...previous, [targetId]: "" } : previous)
       setRefresh(previous => previous + 1)
       void checkFindings(targetId, text)
     } catch (error) {
+      if (error instanceof RequestError && error.status === 409) {
+        delete messageRequests.current[targetId]
+        persistMessages()
+        if (currentSelection.current === targetId) {
+          setWorkReview(null); setDraftWork(null); closeSource()
+          setDrafts(previous => ({ ...previous, [targetId]: text }))
+        }
+      }
       if (currentSelection.current === targetId) setMessageError(readableError(error))
     } finally {
       messageLocks.current.delete(targetId)
@@ -219,7 +295,61 @@ export function ConnectedWorkspace() {
     }
   }
 
-  async function inspectFinding(finding: LiveFinding) {
+  async function sendMessage(textOverride?: string, reviewedContext?: LiveWorkMatch) {
+    const targetId = selected
+    const text = (textOverride ?? draft).trim()
+    if (!targetId || !text || !connected || !canWrite || messageLocks.current.has(targetId)) return
+    const saved = messageRequests.current[targetId]
+    if (saved) {
+      if (saved.text !== text) {
+        setDrafts(previous => ({ ...previous, [targetId]: saved.text }))
+        setMessageError("Confirm your previous message before submitting a different one. Retry sends that same message and source choice.")
+        return
+      }
+      await admitMessage(targetId, saved)
+      return
+    }
+    const pending = workReview?.targetId === targetId && workReview.pending.text === text ? workReview.pending : { requestId: crypto.randomUUID(), text }
+    const controller = new AbortController()
+    const reviewedGeneration = sourceGeneration.current
+    submitCheckController.current?.abort()
+    submitCheckController.current = controller
+    messageLocks.current.add(targetId)
+    setSending(true); setMessageError(null); setWorkError(null)
+    let ready: PendingMessage | null = null
+    try {
+      const matches = await request<LiveWorkMatch[]>(`/api/live/threads/${encodeURIComponent(targetId)}/active-work?q=${encodeURIComponent(text)}`, { signal: controller.signal })
+      if (currentSelection.current !== targetId || controller.signal.aborted || (reviewedContext && reviewedGeneration !== sourceGeneration.current)) return
+      if (reviewedContext && matches.some(match => sameWork(match, reviewedContext))) {
+        ready = { requestId: pending.requestId, text, activeWorkContext: reviewedContext }
+      } else if (matches.length) {
+        setWorkReview({ targetId, pending: { requestId: pending.requestId, text }, matches })
+        setDrafts(previous => ({ ...previous, [targetId]: text }))
+        if (reviewedContext) { closeSource(); setMessageError("The related work changed. Inspect its latest source before sending with context.") }
+      } else if (reviewedContext) {
+        closeSource(); setWorkReview(null)
+        setMessageError("This source is no longer active for your request. Review the request and send it again.")
+      } else ready = pending
+    } catch (error) {
+      if (!controller.signal.aborted && currentSelection.current === targetId) setMessageError(`Could not check related work. Your message has not been sent. ${readableError(error)}`)
+    } finally {
+      messageLocks.current.delete(targetId)
+      if (currentSelection.current === targetId) setSending(false)
+    }
+    if (ready && !controller.signal.aborted) await admitMessage(targetId, ready)
+  }
+
+  async function continueIndependently() {
+    if (!workReview || !canWrite || !connected || messageRequests.current[workReview.targetId]) return
+    await admitMessage(workReview.targetId, { ...workReview.pending, allowOverlap: true })
+  }
+
+  function editReviewedRequest() {
+    if (!workReview || messageRequests.current[workReview.targetId] || messageLocks.current.has(workReview.targetId)) return
+    setWorkReview(null); setMessageError(null); closeSource()
+  }
+
+  async function inspectFinding(finding: SourceFinding, prompt?: string) {
     if (!selected) return
     const targetId = selected
     if (!inspection && document.activeElement instanceof HTMLElement) inspectionTrigger.current = document.activeElement
@@ -227,11 +357,16 @@ export function ConnectedWorkspace() {
     sourceController.current?.abort()
     const controller = new AbortController()
     sourceController.current = controller
-    setInspection({ targetId, finding }); setSource(null); setSourceError(null); setSourceLoading(true); setReusing(false)
+    setInspection({ targetId, finding, prompt }); setSource(null); setSourceError(null); setSourceLoading(true); setReusing(false)
     try {
       const params = new URLSearchParams({ eventId: finding.eventId, seq: String(finding.seq), targetThreadId: targetId, targetActivitySeq: String(finding.targetActivitySeq), targetInstructionId: finding.targetInstructionId })
+      if (isActiveWork(finding)) {
+        params.set("kind", "active-work"); params.set("sourceInstructionId", finding.sourceInstructionId); params.set("q", prompt ?? "")
+      }
       const result = await request<LiveSource>(`/api/live/threads/${encodeURIComponent(finding.sourceThreadId)}/source?${params}`, { signal: controller.signal })
       if (result.event.id !== finding.eventId || result.event.seq !== finding.seq || result.thread.id !== finding.sourceThreadId || result.finding.eventId !== finding.eventId || result.finding.seq !== finding.seq || result.finding.sourceThreadId !== finding.sourceThreadId) throw new Error("The returned source does not match the selected finding. Refresh the findings before continuing.")
+      if (isActiveWork(result.finding) !== isActiveWork(finding)) throw new Error("The source type changed. Check the latest related work before continuing.")
+      if (isActiveWork(finding) && (!isActiveWork(result.finding) || result.finding.sourceInstructionId !== finding.sourceInstructionId)) throw new Error("The recorded work changed. Check its latest source before continuing.")
       if (generation === sourceGeneration.current && currentSelection.current === targetId) setSource(result)
     } catch (error) {
       if (!controller.signal.aborted && generation === sourceGeneration.current && currentSelection.current === targetId) setSourceError(readableError(error))
@@ -241,7 +376,7 @@ export function ConnectedWorkspace() {
   }
 
   async function reuseFinding() {
-    if (!inspection || !source || !connected || !canWrite || currentSelection.current !== inspection.targetId || reuseReceipt || reuseLocks.current.has(reuseKey)) return
+    if (!inspection || !source || isActiveWork(source.finding) || !connected || !canWrite || currentSelection.current !== inspection.targetId || reuseReceipt || reuseLocks.current.has(reuseKey)) return
     const targetId = inspection.targetId
     const finding = source.finding
     const key = reuseKey
@@ -300,13 +435,24 @@ export function ConnectedWorkspace() {
         })}</div></div>}
         {selected && !active && <div className="connected-empty">{threadLoading ? <><span className="connected-spinner" /><p>Loading this session…</p></> : <><h1>Session unavailable</h1><p>{threadError ?? "This session could not be loaded."}</p><button className="workflow-primary-button" onClick={() => setRefresh(previous => previous + 1)}>Retry</button></>}</div>}
         {active && <div className="connected-thread"><header className="connected-heading"><div><div className="eyebrow">SESSION</div><h1>{active.thread.title}</h1><div className="message-meta"><span className={`avatar ${owner?.color ?? "green"}`}>{owner?.initials ?? "P"}</span><span>{owner?.name ?? active.thread.ownerId}</span><span className={`status-dot ${active.thread.status}`} /><span>{statusLabels[active.thread.status]}</span></div></div></header>{threadError && <div className="connected-error" role="alert">Could not refresh this session. {threadError}</div>}<div className="connected-original-task"><strong>Original task</strong><p>{active.thread.originalTask || "No original task is recorded for this session."}</p></div>{active.instructions.length > 0 && <details className="connected-instructions"><summary>Session instructions · {active.instructions.length}</summary>{active.instructions.map((instruction, index) => <p key={index}>{instruction}</p>)}</details>}{canWrite && runnerLabel && <div className="connected-receipt">{runnerLabel}</div>}<div className="connected-executions" aria-label="Run status">{active.executions.map(execution => <div className="connected-execution" key={execution.id}><span>Run: {execution.status.replaceAll("_", " ")}</span>{execution.detail && <small>{execution.detail}</small>}</div>)}</div>
-          {active.messages.map(message => <article className={`message ${message.role}`} key={message.id}><div className="message-label">{message.role === "assistant" && <img className="workflow-message-logo" src="/puff-logo.png" alt="" />}<span>{message.author}</span><span className="connected-message-time">{time(message.createdAt)}</span></div><div className="message-body">{message.text}</div></article>)}
+          {active.messages.map(message => <article className={`message ${message.role}`} key={message.id}><div className="message-label">{message.role === "assistant" && <img className="workflow-message-logo" src="/puff-logo.png" alt="" />}<span>{message.author}</span><span className="connected-message-time">{time(message.createdAt)}</span></div><div className="message-body">{message.role === "assistant" ? <MessageContent text={message.text} /> : message.text}</div></article>)}
           {!active.messages.length && <p className="connected-person-summary">No conversation messages have been returned yet.</p>}
           <details className="connected-events"><summary>Session activity · {active.events.length} events</summary>{active.events.map(event => <article className="connected-event" key={event.id}><strong>{event.author} · {event.kind} · {time(event.createdAt)}</strong><p>{event.text}</p></article>)}</details>
           {!canWrite && <div className="connected-receipt connected-read-only">Shared session · read only here. Open your session to use this finding.{myThreadId && <button className="connected-find-button" onClick={() => selectThread(myThreadId)}>Open my session</button>}</div>}
-          {canWrite && <div className="connected-composer composer-wrap"><div className="composer"><div className="composer-context">{workspace?.project.name} / {owner?.name ?? "Session"}</div><textarea value={draft} rows={3} aria-label="Server error message" placeholder="Describe the server error in this session…" disabled={sending || Boolean(pendingMessage)} onChange={event => { const text = event.target.value; setDrafts(previous => ({ ...previous, [active.thread.id]: text })) }} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void sendMessage() } }} /><div className="composer-toolbar"><span className="composer-options">Queue a message in this session</span><div className="connected-message-actions"><button className="connected-find-button" disabled={!connected || findingLoading || (!draft.trim() && !lastErrors.current[active.thread.id])} onClick={() => { void checkFindings(active.thread.id, draft.trim() || lastErrors.current[active.thread.id]) }}>{findingLoading ? "Checking findings…" : "Check related findings"}</button><button className="workflow-submit-session" disabled={!connected || sending || !draft.trim()} onClick={() => { void sendMessage(pendingMessage?.text) }}>{sending ? "Submitting…" : pendingMessage ? "Retry message" : "Send error"}<span aria-hidden="true">↑</span></button></div></div></div></div>}
-          {pendingMessage && !sending && <div className="connected-receipt">Your previous message still needs confirmation. Retry it before starting a different message.</div>}
-          {messageError && <div className="connected-error" role="alert">{messageError} Retry confirms the same message.</div>}
+          {canWrite && relatedWork.length > 0 && <section className="connected-overlap" aria-label="Work already in progress" aria-live="polite">
+            {workReview && <p className="connected-overlap-intro">{workspace?.viewer.name}, your message has not been sent. Review the related work before continuing.</p>}
+            {relatedWork.map(match => <article key={`${match.sourceThreadId}:${match.eventId}:${match.seq}`}>
+              <span className="connected-overlap-status"><i className={`status-dot ${match.runState === "running" ? "running" : "waiting"}`} />{match.runState === "waiting_approval" ? "Waiting for approval" : "Running"}</span>
+              <h3>{match.ownerName} is already working on this</h3>
+              <p>{match.threadTitle}</p><p className="connected-overlap-summary">{match.summary || match.originalTask}</p>
+              <button className="workflow-primary-button" disabled={sending || Boolean(pendingMessage)} onClick={() => { void inspectFinding(match, reviewPrompt) }}>Inspect {match.ownerName}&apos;s work</button>
+            </article>)}
+            {workReview && <div className="connected-overlap-actions"><button disabled={sending || Boolean(pendingMessage)} onClick={() => { void continueIndependently() }}>Continue independently</button><button disabled={sending || Boolean(pendingMessage)} onClick={editReviewedRequest}>Edit request</button></div>}
+          </section>}
+          {canWrite && <div className="connected-composer composer-wrap"><div className="composer"><div className="composer-context">{workspace?.project.name} / {owner?.name ?? workspace?.viewer.name}</div><textarea value={draft} rows={3} aria-label={`Message for ${workspace?.viewer.name ?? "your"} session`} placeholder="Ask about a task or describe the server error…" disabled={sending || Boolean(pendingMessage) || Boolean(workReview)} onChange={event => { const text = event.target.value; setDrafts(previous => ({ ...previous, [active.thread.id]: text })) }} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void sendMessage() } }} /><div className="composer-toolbar"><span className="composer-options">{workLoading ? "Checking work in progress…" : "Related work is checked before sending"}</span><div className="connected-message-actions"><button className="connected-find-button" disabled={!connected || findingLoading || sending || (!draft.trim() && !lastErrors.current[active.thread.id])} onClick={() => { void checkFindings(active.thread.id, draft.trim() || lastErrors.current[active.thread.id]) }}>{findingLoading ? "Checking findings…" : "Check related findings"}</button><button className="workflow-submit-session" disabled={!connected || sending || !draft.trim() || (Boolean(workReview) && !pendingMessage)} onClick={() => { void sendMessage(pendingMessage?.text) }}>{sending ? "Checking / sending…" : pendingMessage ? "Retry message" : "Send"}<span aria-hidden="true">↑</span></button></div></div></div></div>}
+          {workError && <p className="connected-person-summary">Could not preview work in progress. Sending will check again. {workError}</p>}
+          {pendingMessage && !sending && <div className="connected-receipt">Your previous message still needs confirmation. Retry keeps the same message and source choice.</div>}
+          {messageError && <div className="connected-error" role="alert">{messageError}{pendingMessage && " Retry confirms the same message and source choice."}</div>}
           {receipt && <div className="connected-receipt" role="status">Session status: {receipt.status.replaceAll("_", " ")}{receipt.detail && <p>{receipt.detail}</p>}</div>}
           {executionFailed && <div className="connected-error" role="alert">A run failed. Review its details above.{canWrite && retryText && <button disabled={sending || !connected} onClick={() => { void sendMessage(retryText) }}>Queue last message again</button>}</div>}
           {findingError && <div className="connected-error" role="alert">Could not check shared findings. {findingError}</div>}
@@ -319,6 +465,23 @@ export function ConnectedWorkspace() {
         return <article className="workflow-dock-person" key={member.id}><header><span className={`avatar ${member.color}`}>{member.initials}</span><strong>{member.name}</strong><span>{owned.length} sessions</span></header><p className="workflow-dock-total" title={totalWork}>{totalWork || "No shared work returned."}</p><div className="workflow-dock-sessions">{owned.map(item => <button className={selected === item.id ? "selected" : ""} key={item.id} aria-label={`Open project summary ${item.title}`} title={statusLabels[item.status]} onClick={() => selectThread(item.id)}><span><i className={`status-dot ${item.status}`} />{item.title}</span><p title={item.summary || item.originalTask}>{item.summary || item.originalTask}</p></button>)}</div></article>
       })}</div>}</section>}
     </main>
-    {inspection && <div className="modal-backdrop" onClick={() => closeSource()}><section className="modal connected-source-dialog" role="dialog" aria-modal="true" aria-labelledby="connected-source-title" onClick={event => event.stopPropagation()}><div className="modal-header"><h2 id="connected-source-title">{inspection.finding.ownerName}&apos;s source solution</h2><button ref={closeSourceButton} className="modal-close" aria-label="Close source inspection" onClick={() => closeSource()}>×</button></div><p>{inspection.finding.threadTitle}</p>{sourceLoading && <p><span className="connected-spinner" /> Loading the exact source event…</p>}{sourceError && <div className="connected-error" role="alert">{sourceError}<button onClick={() => { void inspectFinding(inspection.finding) }}>Retry source</button></div>}{source && <><div className="connected-source-meta">{source.event.author} · source event {source.event.seq} · {time(source.event.createdAt)}<br />Original task: {source.thread.originalTask}</div><div className="connected-source-solution"><h3>{source.finding.title}</h3></div><div className="connected-source-body"><article><strong>{source.event.author} · {time(source.event.createdAt)}</strong><p>{source.event.text}</p></article>{source.messages.filter((message, index, messages) => message.text.trim() !== source.event.text.trim() && messages.findIndex(item => item.text.trim() === message.text.trim()) === index).map(message => <article key={message.id}><strong>{message.author} · {time(message.createdAt)}</strong><p>{message.text}</p></article>)}</div><p>Add this attributed context to your existing session. Your original task and conversation stay in place.</p>{reuseReceipt && <div className="connected-receipt" role="status">Session status: {reuseReceipt.status.replaceAll("_", " ")}{reuseReceipt.detail && <p>{reuseReceipt.detail}</p>}</div>}<div className="connected-source-actions"><button className="workflow-primary-button" disabled={!connected || !canWrite || reusePending || Boolean(reuseReceipt)} onClick={() => { void reuseFinding() }}>{reusePending ? "Adding source context…" : reuseReceipt ? "Source context submitted" : "Add fix to this session"}</button><button onClick={() => closeSource()}>Back to my session</button></div></>}</section></div>}
+    {inspection && <div className="modal-backdrop" onClick={() => closeSource()}><section className="modal connected-source-dialog" role="dialog" aria-modal="true" aria-labelledby="connected-source-title" onClick={event => event.stopPropagation()}>
+      <div className="modal-header"><h2 id="connected-source-title">{inspection.finding.ownerName}&apos;s {isActiveWork(inspection.finding) ? "current work" : "source solution"}</h2><button ref={closeSourceButton} className="modal-close" aria-label="Close source inspection" onClick={() => closeSource()}>×</button></div>
+      <p>{inspection.finding.threadTitle}</p>
+      {sourceLoading && <p><span className="connected-spinner" /> Loading the exact source event…</p>}
+      {sourceError && <div className="connected-error" role="alert">{sourceError}<button onClick={() => { void inspectFinding(inspection.finding, inspection.prompt) }}>Retry source</button></div>}
+      {source && <>
+        <div className="connected-source-meta">{source.event.author} · source event {source.event.seq} · {time(source.event.createdAt)}<br />Original task: {source.thread.originalTask}{activeSource && <><br />Current run: {activeSource.runState === "waiting_approval" ? "Waiting for approval" : "Running"}</>}</div>
+        <div className="connected-source-solution"><h3>{source.finding.title}</h3></div>
+        <div className="connected-source-body"><article><strong>{source.event.author} · {time(source.event.createdAt)}</strong><div className="connected-source-text"><MessageContent text={source.event.text} /></div></article>{source.messages.filter((message, index, messages) => message.text.trim() !== source.event.text.trim() && messages.findIndex(item => item.text.trim() === message.text.trim()) === index).map(message => <article key={message.id}><strong>{message.author} · {time(message.createdAt)}</strong><div className="connected-source-text"><MessageContent text={message.text} /></div></article>)}</div>
+        <p>{activeSource ? "Send your request with this attributed source context in one message." : "Add this attributed context to your existing session."} Your original task and conversation stay in place.</p>
+        {activeSource && messageError && <div className="connected-error" role="alert">{messageError}{pendingMessage && " Retry keeps the same request and source choice."}</div>}
+        {!activeSource && reuseReceipt && <div className="connected-receipt" role="status">Session status: {reuseReceipt.status.replaceAll("_", " ")}{reuseReceipt.detail && <p>{reuseReceipt.detail}</p>}</div>}
+        <div className="connected-source-actions">
+          {activeSource ? <button className="workflow-primary-button" disabled={!connected || !canWrite || sending || !inspection.prompt || Boolean(pendingMessage && !pendingMessage.activeWorkContext)} onClick={() => { void sendMessage(pendingMessage?.text ?? inspection.prompt, activeSource) }}>{sending ? "Checking / sending…" : pendingMessage ? "Retry same request" : "Send with this context"}</button> : <button className="workflow-primary-button" disabled={!connected || !canWrite || reusePending || Boolean(reuseReceipt)} onClick={() => { void reuseFinding() }}>{reusePending ? "Adding source context…" : reuseReceipt ? "Source context submitted" : "Add fix to this session"}</button>}
+          <button onClick={() => closeSource()}>Back to {workspace?.viewer.name ?? "my"} session</button>
+        </div>
+      </>}
+    </section></div>}
   </div>
 }

@@ -54,6 +54,16 @@
 .connected-composer { margin: 26px 0 16px; }
 .connected-composer .composer { border-color: #4a5540; }
 .connected-composer .composer-options { color: #859675; font-size: 9px; }
+.connected-overlap { margin: 24px 0 16px; border: 1px solid #63724f; border-radius: 9px; background: #2d3626; padding: 17px 18px; }
+.connected-overlap article + article { margin-top: 17px; padding-top: 16px; border-top: 1px solid #47523a; }
+.connected-overlap-intro { margin: 0 0 15px; color: #bacdaa; font-size: 11px; line-height: 1.8; }
+.connected-overlap-status { display: flex; align-items: center; gap: 7px; color: #a5bb91; font-size: 9px; }
+.connected-overlap h3 { margin: 8px 0; color: #d3e2c5; font-size: 14px; font-weight: 500; }
+.connected-overlap article p { margin: 4px 0 9px; color: #a6b797; font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; }
+.connected-overlap-summary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; max-height: 5.4em; overflow: hidden; }
+.connected-overlap article > button { margin-top: 5px; }
+.connected-overlap-actions { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; padding-top: 13px; border-top: 1px solid #47523a; }
+.connected-overlap-actions button { color: #bbcdaa; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
 .connected-message-actions { display: flex; align-items: center; gap: 10px; }
 .connected-find-button { color: #b1c2a0; padding: 6px 0; font-size: 10px; }
 .connected-receipt { padding: 11px 13px; border: 1px solid #435339; border-radius: 6px; color: #b6c9a3; font-size: 11px; line-height: 1.8; background: #273020; margin: 13px 0; }
@@ -72,6 +82,7 @@
 .connected-source-body article { padding: 13px 0; border-bottom: 1px solid #3a4431; }
 .connected-source-body strong { color: #b6c5a6; font-size: 10px; font-weight: 500; }
 .connected-source-body p { margin: 6px 0 0; color: #a3b192; font-size: 11px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.connected-source-text { margin-top: 6px; color: #a3b192; font-size: 11px; line-height: 1.9; }
 .connected-source-solution { border: 1px solid #455638; padding: 14px; margin: 15px 0; border-radius: 7px; background: #27311f; }
 .connected-source-solution h3 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: #c0d5ad; }
 .connected-source-solution p { margin: 0; color: #a1b88a; font-size: 11px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
