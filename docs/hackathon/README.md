@@ -12,6 +12,8 @@ This is the team's shared task board. **Start with the [progress checklist](prog
 
 **Main web sidebar update:** source `790518a2c9688e9fc1d09f3b6b02a29b965c7a03` groups personal threads and each teammate's recent work under the Stanford Hackathon project in the main browser app. The separate `/puff` overview page was removed. [Verification receipt](evidence/2026-09-29-main-web-sidebar.md). The activity remains demo or simulator data; live workflow gates are unchanged.
 
+**OpenCode activity sidebar:** source `dac982301277871c5371f0e2dda02747bcb7e5ea` adds the coordination API activity panel to the OpenCode shell and classic project sidebar. App typecheck, build, and browser rendering passed. The coordination API was unavailable in the browser check, so credentials and live activity remain unverified; no workflow gate is closed. [Receipt](evidence/2026-09-29-opencode-team-activity-sidebar.md).
+
 **Desktop unblock:** the [startup integration receipt](evidence/2026-09-29-desktop-startup-integration.md) records the retained-host repair and independent checks. Follow [desktop access ownership](desktop-coordination.md) so simultaneous chats do not control the same app or push conflicting changes.
 
 **Current development:** [chat assignments and handoffs](next-development.md) track the ongoing frontend work, isolated Project overview scope and backend integration. The [backend quality receipt](evidence/2026-09-29-backend-quality.md) records verified activity-revision and exact-comment-retry fixes at `dec2fb31c0`. These checks do not close live-awareness gates.
