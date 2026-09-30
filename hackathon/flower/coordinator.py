@@ -7,6 +7,7 @@ This module never delivers context, approves proposals or blocks a coding agent.
 import argparse
 import hashlib
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -83,7 +84,8 @@ def execute(prepared, directory, timeout=300):
     auth_failed = any(e.get("errorCode") == "authentication-failed" for e in events)
     error = "Chain deadline exceeded" if timed_out else "Flower chain failed"
     if auth_failed:
-        error = "SuperGrid authentication failed; refresh flwr login supergrid"
+        federation = os.environ.get("PUFF_FLOWER_FEDERATION", "supergrid")
+        error = f"Flower federation authentication failed for {federation}; check its local connection"
     return {
         "state": "failed",
         "error": error,

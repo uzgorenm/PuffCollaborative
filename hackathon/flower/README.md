@@ -19,6 +19,11 @@ guardian runs completed on SuperGrid, including on `flower-endeavor-v1.0`
 or real OpenCode sessions yet. See [verification.md](verification.md) for the
 earlier local evidence.
 
+All three task apps now default to the live Nebius Token Factory model ID
+`MiniMaxAI/MiniMax-M3`. The two-session chain still makes three Flower runs;
+guardian mode makes one run per triggered session. Local runs route Flower's
+Responses requests through the configured Token Factory endpoint.
+
 ## Guardian mode (default product path)
 
 `guardian/` is a third AgentApp, run once per coding agent whenever Jev flags a
@@ -33,7 +38,7 @@ is only a proposal and always waits for owner approval.
 
 ```text
 OpenCode A/B events -> server -> worker.py -> Jev (reporter, per burst)
-  -> guardian:<thread> on SuperGrid (Endeavor, gpt-5.6-sol fallback)
+  -> guardian:<thread> on the selected Flower federation (MiniMax M3)
   -> PUT work-card (shared board, model recorded)
   -> finding: delivered as a note via POST /threads/:id/instructions (autoSend)
   -> proposal: pending until approve.py sends it
@@ -51,11 +56,28 @@ copy worker.example.json worker.json   # fill serverUrl, projectId, thread IDs
 Secrets live only in the git-ignored `.env`: `TYPESAFE_API_KEY` (Jev),
 `PUFF_ANALYSIS_USER`/`PUFF_ANALYSIS_PASSWORD` (card writes), and
 `PUFF_MEMBER_USER`/`PUFF_MEMBER_PASSWORD` (reads and note delivery; the server
-grants the analysis identity only work-card updates). Settings: `autoSend`
+grants the analysis identity only work-card updates), plus the local model
+provider settings. Settings: `autoSend`
 delivers findings without approval; `guardianStub` returns a deterministic
 finding without calling a model; `guardianModel` picks the primary model.
 Guardian notes and the agent's run of them never re-trigger a guardian, and the
 same finding is delivered once. `"mode": "chain"` keeps the older chain below.
+
+For a local model-backed run, expose only `MINIMAX_BASE_URL` and
+`MINIMAX_API_KEY` from the ignored `.env` to the SuperLink process, then set
+`FLWR_MODEL_API_ENDPOINT` to `${MINIMAX_BASE_URL}/responses` and
+`FLWR_MODEL_API_KEY` to the API key. Set `FLWR_HOME` to an ignored local
+directory such as `.runtime/flwr-home`, start `flower-superlink --insecure`,
+and add this connection to `$FLWR_HOME/config.toml`:
+
+```toml
+[superlink.local-agent]
+address = "127.0.0.1:8000"
+insecure = true
+```
+
+Set `FLWR_HOME` and `PUFF_FLOWER_FEDERATION=local-agent` for the smoke script
+or worker. The default remains `supergrid` for existing remote workflows.
 
 ## Setup and checks
 
@@ -80,9 +102,11 @@ and Flower bundle metadata. The original starter checkout is not a dependency.
 
 The code follows the official [first-AgentApp tutorial](https://flower.ai/docs/agent/tutorials/write-your-first-agentapp.html)
 and [application event output sequence](https://flower.ai/docs/agent/how-to-guides/use-openai-sdk.html#publish-agentapp-generated-text).
-Runtime model credentials are injected by Flower; they are never copied from
-the host or placed in manifests. Both apps make one model call, with no tools,
-45-second SDK timeouts, no SDK retries and bounded output tokens.
+AgentApps use Flower-injected runtime credentials; the provider key stays in
+the local SuperLink process and is never copied into an app bundle. Each
+session/coordination task makes one model call without tools, with no SDK
+retries and bounded output tokens. The local SuperLink forwards those
+Responses requests to the selected model provider.
 
 ## Handoff and output channel
 
@@ -104,10 +128,9 @@ The host validates session results against exactly their input events. The
 coordination app sees only those validated results and selected session metadata,
 not the full history. The final report's citations must be a subset of the
 handoff citations. Runtime `events.jsonl` records the explicit handoff and source
-run IDs so a reviewer can inspect exactly what crossed between the apps. Both
-apps use the `openai/gpt-5.6-sol` model name shown in Flower's first-AgentApp
-guide; the execution, credentials and result transport still run through
-Flower.
+run IDs so a reviewer can inspect exactly what crossed between the apps. All
+task apps use `MiniMaxAI/MiniMax-M3`; execution and result transport still run
+through Flower.
 
 ## Activity/Jev handoff
 

@@ -47,7 +47,7 @@ No markdown and no extra keys.
 """
 
 
-ALLOWED_MODELS = {"flower-endeavor-v1.0", "openai/gpt-5.6-sol"}
+ALLOWED_MODELS = {"MiniMaxAI/MiniMax-M3"}
 CONSTRAINT = re.compile(r"constraint|must|requires?|needs?", re.IGNORECASE)
 
 
