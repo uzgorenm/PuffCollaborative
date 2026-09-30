@@ -1,6 +1,6 @@
 # Puff team workspace
 
-**Alice active-work integration in progress:** Serdar's real connected workspace is gaining an automatic pre-submit check against current shared session evidence. The replacement Flower key was supplied by the user and returned HTTP 200 from the model catalog with Endeavor available; actual native Alice/Serdar execution is being verified. Existing `/live` data remains authoritative backend data; no seeded assistant output will replace native execution.
+**Real Alice overlap verified:** `/live` pauses Serdar's matching request before admission and shows Alice's actual Flower Endeavor output and pending edit approval. The replacement key returned HTTP 200 and native tool responses. Serdar's model run later hit the key's 100-credit cap; the receiving-context model test is pending spending approval. Merged web tests (94), Alice tests (13 / 181 assertions), build and typechecks pass. [Exact receipt and limits](evidence/2026-09-29-alice-real-overlap.md). The narrow matcher does not close automatic Flower-awareness or full product gates.
 
 **Typed web task flow:** `apps/web` now has model selection, source-backed recommendations, continued conversations, and an isolated persistent Next API. Package tests, typecheck, build, and typed-task/source-reuse/reload/reset/undo browser checks passed. Guidance uses seeded scenarios; live Flower/OpenCode gates remain open. [Receipt and boundary](evidence/2026-09-29-typed-web-session-api.md); [test instructions](../../apps/web/README.md#test-the-full-experience).
 
