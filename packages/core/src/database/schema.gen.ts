@@ -18,17 +18,17 @@ export default {
         );
       `)
       yield* tx.run(`
-        CREATE TABLE \`coordination_flower_delivery\` (
+        CREATE TABLE \`coordination_analysis_delivery\` (
           \`report_id\` text NOT NULL,
           \`note_id\` text NOT NULL,
           \`message_id\` text NOT NULL,
           \`owner_id\` text NOT NULL,
           \`created_at\` integer NOT NULL,
-          CONSTRAINT \`coordination_flower_delivery_pk\` PRIMARY KEY(\`report_id\`, \`note_id\`)
+          CONSTRAINT \`coordination_analysis_delivery_pk\` PRIMARY KEY(\`report_id\`, \`note_id\`)
         );
       `)
       yield* tx.run(`
-        CREATE TABLE \`coordination_flower_result\` (
+        CREATE TABLE \`coordination_analysis_result\` (
           \`report_id\` text PRIMARY KEY,
           \`project_id\` text NOT NULL,
           \`request_id\` text NOT NULL,
@@ -510,10 +510,10 @@ export default {
         );
       `)
       yield* tx.run(
-        `CREATE UNIQUE INDEX \`coordination_flower_delivery_message_idx\` ON \`coordination_flower_delivery\` (\`message_id\`);`,
+        `CREATE UNIQUE INDEX \`coordination_analysis_delivery_message_idx\` ON \`coordination_analysis_delivery\` (\`message_id\`);`,
       )
       yield* tx.run(
-        `CREATE UNIQUE INDEX \`coordination_flower_result_request_idx\` ON \`coordination_flower_result\` (\`project_id\`,\`request_id\`);`,
+        `CREATE UNIQUE INDEX \`coordination_analysis_result_request_idx\` ON \`coordination_analysis_result\` (\`project_id\`,\`request_id\`);`,
       )
       yield* tx.run(
         `CREATE UNIQUE INDEX \`coordination_person_focus_request_idx\` ON \`coordination_person_focus_revision\` (\`project_id\`,\`user_id\`,\`request_id\`);`,

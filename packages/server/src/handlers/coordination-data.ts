@@ -18,7 +18,7 @@ import { CoordinationRuntime } from "../coordination-runtime"
 import type { CoordinationServices } from "../coordination-runtime"
 import { CoordinationProvisioning } from "@opencode-ai/core/coordination/provisioning/index"
 import { Database } from "@opencode-ai/core/database/database"
-import { CoordinationFlowerExport } from "@opencode-ai/core/coordination/flower/export"
+import { CoordinationAnalysisExport } from "@opencode-ai/core/coordination/analysis/export"
 import { CoordinationCooperation } from "@opencode-ai/core/coordination/cooperation/index"
 
 type AuthContext = Parameters<CoordinationContracts.Access["authorize"]>[0]
@@ -59,22 +59,22 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
       })
 
     return handlers
-      .handle("coordination.flowerAwarenessReceipt", (ctx) =>
+      .handle("coordination.analysisAwarenessReceipt", (ctx) =>
         use((services, principal) =>
-          services.flowerResults.receipt(principal, ctx.params.threadId, ctx.params.reportId, ctx.params.noteId),
+          services.analysisResults.receipt(principal, ctx.params.threadId, ctx.params.reportId, ctx.params.noteId),
         ),
       )
-      .handle("coordination.flowerResultRegister", (ctx) =>
+      .handle("coordination.analysisResultRegister", (ctx) =>
         use((services, principal) =>
           CoordinationCooperation.withStableConsent(
-            services.flowerResults.register(principal, ctx.params.projectId, ctx.payload),
+            services.analysisResults.register(principal, ctx.params.projectId, ctx.payload),
           ),
         ),
       )
-      .handle("coordination.flowerAwarenessDeliver", (ctx) =>
+      .handle("coordination.analysisAwarenessDeliver", (ctx) =>
         use((services, principal) =>
           CoordinationCooperation.withStableConsent(
-            services.flowerResults.deliver(principal, ctx.params.threadId, ctx.payload),
+            services.analysisResults.deliver(principal, ctx.params.threadId, ctx.payload),
           ),
         ),
       )
@@ -93,13 +93,13 @@ export const CoordinationDataHandler = HttpApiBuilder.group(Api, "server.coordin
           })
         }),
       )
-      .handle("coordination.flowerExport", (ctx) =>
+      .handle("coordination.analysisExport", (ctx) =>
         use((services, auth) =>
           CoordinationCooperation.withStableConsent(
             Effect.gen(function* () {
               const ids = [ctx.payload.sourceThreadId, ctx.payload.targetThreadId]
               const before = yield* Effect.forEach(ids, (id) => services.cooperation.get(auth, id))
-              const captured = yield* CoordinationFlowerExport.captureSelected({
+              const captured = yield* CoordinationAnalysisExport.captureSelected({
                 auth,
                 projectId: ctx.params.projectId,
                 ...ctx.payload,

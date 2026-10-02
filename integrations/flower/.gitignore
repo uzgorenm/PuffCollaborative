@@ -1,6 +1,0 @@
-.venv/
-__pycache__/
-.ruff_cache/
-*.fab
-.runtime/
-worker.json

@@ -312,7 +312,7 @@ export const CooperationSettings = Schema.Struct({
 }).annotate({ identifier: "Coordination.CooperationSettings" })
 export interface CooperationSettings extends Schema.Schema.Type<typeof CooperationSettings> {}
 
-export const FlowerAwarenessCandidate = Schema.Struct({
+export const AnalysisAwarenessCandidate = Schema.Struct({
   noteId: Schema.String,
   sourceThreadId: ThreadID,
   targetThreadId: ThreadID,
@@ -323,10 +323,10 @@ export const FlowerAwarenessCandidate = Schema.Struct({
   evidenceRefs: Schema.Array(Schema.Struct({ threadId: ThreadID, eventId: Schema.String, seq: Schema.Int })),
   candidateState: Schema.Literal("pending"),
   deliveryState: Schema.Literal("not_attempted"),
-}).annotate({ identifier: "Coordination.FlowerAwarenessCandidate" })
-export interface FlowerAwarenessCandidate extends Schema.Schema.Type<typeof FlowerAwarenessCandidate> {}
+}).annotate({ identifier: "Coordination.AnalysisAwarenessCandidate" })
+export interface AnalysisAwarenessCandidate extends Schema.Schema.Type<typeof AnalysisAwarenessCandidate> {}
 
-export const FlowerResultContent = Schema.Struct({
+export const AnalysisResultContent = Schema.Struct({
   requestId: Schema.String,
   reportId: Schema.String,
   sourceThreadId: ThreadID,
@@ -334,9 +334,9 @@ export const FlowerResultContent = Schema.Struct({
   sourceActivitySeq: Schema.Int,
   targetActivitySeq: Schema.Int,
   cooperationVersions: Schema.Record(Schema.String, Schema.Int),
-  awarenessNoteCandidates: Schema.Array(FlowerAwarenessCandidate),
-}).annotate({ identifier: "Coordination.FlowerResultContent" })
-export interface FlowerResultContent extends Schema.Schema.Type<typeof FlowerResultContent> {}
+  awarenessNoteCandidates: Schema.Array(AnalysisAwarenessCandidate),
+}).annotate({ identifier: "Coordination.AnalysisResultContent" })
+export interface AnalysisResultContent extends Schema.Schema.Type<typeof AnalysisResultContent> {}
 export const ProvisionedSession = Schema.Struct({
   thread: Thread,
   sessionId: Thread.fields.sessionId,

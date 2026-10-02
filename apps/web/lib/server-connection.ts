@@ -337,7 +337,7 @@ function permittedPath(request: Request) {
     [new RegExp(`^/projects/${id}/(?:contributions|activity|work-cards|events)$`), ["GET"]],
     [new RegExp(`^/projects/${id}/threads$`), ["GET", "POST"]],
     [new RegExp(`^/projects/${id}/sessions$`), ["POST"]],
-    [new RegExp(`^/projects/${id}/flower/export$`), ["POST"]],
+    [new RegExp(`^/projects/${id}/analysis/export$`), ["POST"]],
     [new RegExp(`^/threads/${id}$`), ["GET"]],
     [new RegExp(`^/threads/${id}/cooperation$`), ["GET", "PUT"]],
     [new RegExp(`^/threads/${id}/comments$`), ["GET", "POST"]],

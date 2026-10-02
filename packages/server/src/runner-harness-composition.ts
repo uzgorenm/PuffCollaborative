@@ -1,7 +1,7 @@
 import { Effect, Deferred, Redacted } from "effect"
 import { eq, inArray } from "drizzle-orm"
 import { EventV2 } from "@opencode-ai/core/event"
-import { trustedPrompt } from "@opencode-ai/core/coordination/flower/results"
+import { trustedPrompt } from "@opencode-ai/core/coordination/analysis/results"
 import { Git } from "@opencode-ai/core/git"
 import { AppProcess } from "@opencode-ai/core/process"
 import { ProjectV2 } from "@opencode-ai/core/project"

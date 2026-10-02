@@ -113,18 +113,18 @@ import type {
   ProjectCopiesRefreshInput,
   ProjectCopiesRefreshOutput,
   ServerCoordinationStatusOutput,
-  ServerCoordinationDataFlowerAwarenessReceiptInput,
-  ServerCoordinationDataFlowerAwarenessReceiptOutput,
-  ServerCoordinationDataFlowerResultRegisterInput,
-  ServerCoordinationDataFlowerResultRegisterOutput,
-  ServerCoordinationDataFlowerAwarenessDeliverInput,
-  ServerCoordinationDataFlowerAwarenessDeliverOutput,
+  ServerCoordinationDataAnalysisAwarenessReceiptInput,
+  ServerCoordinationDataAnalysisAwarenessReceiptOutput,
+  ServerCoordinationDataAnalysisResultRegisterInput,
+  ServerCoordinationDataAnalysisResultRegisterOutput,
+  ServerCoordinationDataAnalysisAwarenessDeliverInput,
+  ServerCoordinationDataAnalysisAwarenessDeliverOutput,
   ServerCoordinationDataCooperationGetInput,
   ServerCoordinationDataCooperationGetOutput,
   ServerCoordinationDataCooperationPutInput,
   ServerCoordinationDataCooperationPutOutput,
-  ServerCoordinationDataFlowerExportInput,
-  ServerCoordinationDataFlowerExportOutput,
+  ServerCoordinationDataAnalysisExportInput,
+  ServerCoordinationDataAnalysisExportOutput,
   ServerCoordinationDataMeOutput,
   ServerCoordinationDataProvisioningListOutput,
   ServerCoordinationDataSessionProvisionInput,
@@ -1073,25 +1073,28 @@ export function make(options: ClientOptions) {
         ),
     },
     "server.coordination.data": {
-      flowerAwarenessReceipt: (
-        input: ServerCoordinationDataFlowerAwarenessReceiptInput,
+      analysisAwarenessReceipt: (
+        input: ServerCoordinationDataAnalysisAwarenessReceiptInput,
         requestOptions?: RequestOptions,
       ) =>
-        request<ServerCoordinationDataFlowerAwarenessReceiptOutput>(
+        request<ServerCoordinationDataAnalysisAwarenessReceiptOutput>(
           {
             method: "GET",
-            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/flower/awareness/${encodeURIComponent(input.reportId)}/${encodeURIComponent(input.noteId)}`,
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/analysis/awareness/${encodeURIComponent(input.reportId)}/${encodeURIComponent(input.noteId)}`,
             successStatus: 200,
             declaredStatuses: [400, 401, 403, 404, 409, 503],
             empty: false,
           },
           requestOptions,
         ),
-      flowerResultRegister: (input: ServerCoordinationDataFlowerResultRegisterInput, requestOptions?: RequestOptions) =>
-        request<ServerCoordinationDataFlowerResultRegisterOutput>(
+      analysisResultRegister: (
+        input: ServerCoordinationDataAnalysisResultRegisterInput,
+        requestOptions?: RequestOptions,
+      ) =>
+        request<ServerCoordinationDataAnalysisResultRegisterOutput>(
           {
             method: "POST",
-            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/flower/results`,
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/analysis/results`,
             body: {
               requestId: input["requestId"],
               reportId: input["reportId"],
@@ -1108,14 +1111,14 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      flowerAwarenessDeliver: (
-        input: ServerCoordinationDataFlowerAwarenessDeliverInput,
+      analysisAwarenessDeliver: (
+        input: ServerCoordinationDataAnalysisAwarenessDeliverInput,
         requestOptions?: RequestOptions,
       ) =>
-        request<ServerCoordinationDataFlowerAwarenessDeliverOutput>(
+        request<ServerCoordinationDataAnalysisAwarenessDeliverOutput>(
           {
             method: "POST",
-            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/flower/awareness`,
+            path: `/api/coordination/v1/threads/${encodeURIComponent(input.threadId)}/analysis/awareness`,
             body: { reportId: input["reportId"], noteId: input["noteId"], messageId: input["messageId"] },
             successStatus: 200,
             declaredStatuses: [400, 401, 403, 404, 409, 503],
@@ -1154,11 +1157,11 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      flowerExport: (input: ServerCoordinationDataFlowerExportInput, requestOptions?: RequestOptions) =>
-        request<ServerCoordinationDataFlowerExportOutput>(
+      analysisExport: (input: ServerCoordinationDataAnalysisExportInput, requestOptions?: RequestOptions) =>
+        request<ServerCoordinationDataAnalysisExportOutput>(
           {
             method: "POST",
-            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/flower/export`,
+            path: `/api/coordination/v1/projects/${encodeURIComponent(input.projectId)}/analysis/export`,
             body: {
               requestId: input["requestId"],
               sourceThreadId: input["sourceThreadId"],

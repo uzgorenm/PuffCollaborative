@@ -24,4 +24,4 @@ The durable runner ledger tracks admission, activity receipts, approvals, and ca
 
 This embedded mode is intended for trusted local workers. Location/worktree separation and permission checks are not an operating-system sandbox. Tool processes can inherit host environment, and public multi-tenant hosting is not established by this implementation.
 
-The retained native integration checks in `packages/server/test/runner-harness.integration.test.ts` run the real embedded runtime with a deterministic local HTTP model. They exercise workspace isolation, permissions, cancellation, callback recovery, continuation, and informational note promotion. They do not establish hosted model or Flower acceptance. See [process checks](coordination-e2e.md).
+The retained native integration checks in `packages/server/test/runner-harness.integration.test.ts` run the real embedded runtime with a deterministic local HTTP model. They exercise workspace isolation, permissions, cancellation, callback recovery, continuation, and informational note promotion. They do not establish hosted model acceptance. See [process checks](coordination-e2e.md).

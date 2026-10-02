@@ -1,4 +1,4 @@
-export * as CoordinationFlowerExport from "./export"
+export * as CoordinationAnalysisExport from "./export"
 
 import { Effect } from "effect"
 import type { Coordination } from "@opencode-ai/schema/coordination"
@@ -64,7 +64,7 @@ const safeTools = new Set([
   "grep",
 ])
 
-// Builds the exact request/snapshot accepted by integrations/flower/coordinator.py.
+// Builds the exact request/snapshot consumed by the OpenCode analysis agent in script/runtime/analysis.ts.
 // Only separately consented owner instructions and redacted runner output can add bounded text.
 export const captureSelected = (input: Input) =>
   Effect.gen(function* () {

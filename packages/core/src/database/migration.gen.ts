@@ -55,5 +55,6 @@ export const migrations = (
     import("./migration/20260929233322_coordination_provisioning"),
     import("./migration/20260929234437_cooperation"),
     import("./migration/20260929234925_flower_results"),
+    import("./migration/20261002045007_analysis_results"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]

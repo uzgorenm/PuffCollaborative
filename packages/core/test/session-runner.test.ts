@@ -1953,7 +1953,7 @@ describe("SessionRunnerLLM", () => {
           location: { directory: AbsolutePath.make("/project") },
         },
         source: { sessionID: otherSessionID, eventID: "evt_nav_742", revision: 7 },
-        reportID: "flower_report_nav_742",
+        reportID: "analysis_report_nav_742",
         authorID: "agent_a",
         finding: "Restoring focus to the expanded navigation trigger is required after the panel closes.",
       }
@@ -1976,7 +1976,7 @@ describe("SessionRunnerLLM", () => {
       expect(requests).toHaveLength(2)
       expect(userTexts(requests[1]!)).toHaveLength(2)
       expect(userTexts(requests[1]!).at(-1)).toContain("evt_nav_742")
-      expect(userTexts(requests[1]!).at(-1)).toContain("flower_report_nav_742")
+      expect(userTexts(requests[1]!).at(-1)).toContain("analysis_report_nav_742")
       expect(userTexts(requests[1]!).at(-1)).toContain("Restoring focus to the expanded navigation trigger")
       expect((yield* session.context(sessionID)).filter((message) => message.type === "user")).toHaveLength(2)
       yield* SessionAwareness.admit(note)
@@ -1997,7 +1997,7 @@ describe("SessionRunnerLLM", () => {
           location: { directory: AbsolutePath.make("/project") },
         },
         source: { sessionID: otherSessionID, eventID: "evt_binding", revision: 3 },
-        reportID: "flower_report_binding",
+        reportID: "analysis_report_binding",
         authorID: "agent_a",
         finding: "The focus check needs the trigger element ID.",
       }
@@ -2058,7 +2058,7 @@ describe("SessionRunnerLLM", () => {
         sourceThreadID: sourceThread.id,
         targetThreadID: targetThread.id,
         source: { eventID: event.id, eventSeq: event.seq, activitySeq: sourceThread.activitySeq },
-        reportID: "flower_report_742",
+        reportID: "analysis_report_742",
         messageID: SessionMessage.ID.make("msg_verified_awareness_742"),
         finding: "Focus must return to the expanded-navigation trigger when the panel closes.",
       }
@@ -2108,7 +2108,7 @@ describe("SessionRunnerLLM", () => {
       expect(userTexts(requests[1]!).at(-1)).toContain("evt_focus_742")
       expect(userTexts(requests[1]!).at(-1)).toContain("Source revision: 3")
       expect(userTexts(requests[1]!).at(-1)).toContain("expanded-navigation trigger")
-      expect(userTexts(requests[1]!).at(-1)).toContain("flower_report_742")
+      expect(userTexts(requests[1]!).at(-1)).toContain("analysis_report_742")
       expect((yield* delivery.deliver(input)).admittedSeq).toBe(admitted.admittedSeq)
       expect((yield* delivery.deliver({ ...input, finding: "A different finding" }).pipe(Effect.flip)).code).toBe(
         "conflict",
@@ -2152,7 +2152,7 @@ describe("SessionRunnerLLM", () => {
         sourceThreadID: sourceThread.id,
         targetThreadID: targetThread.id,
         source: { eventID: event.id, eventSeq: event.seq, activitySeq: sourceThread.activitySeq },
-        reportID: "flower_report_denial",
+        reportID: "analysis_report_denial",
         messageID: SessionMessage.ID.make("msg_awareness_denial"),
         finding: "Keep focus on the expanded-navigation trigger.",
       }

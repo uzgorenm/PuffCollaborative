@@ -5,8 +5,8 @@
 - For Codex chats, this branch instruction takes priority over the direct `main` workflow in the older planning docs. Keep the no-PR policy unless the user changes it.
 - Use `main` or `origin/main` for integration diffs. Never force-push or reset away another person's work.
 
-- The supported team workspace is `apps/web`; `script/runtime` launches it with the retained OpenCode backend. Flower lives in `integrations/flower`.
-- Verify collaboration boundaries through the existing server and runner integration tests. Record the tested commit and distinguish fixture model checks from hosted model/Flower execution.
+- The supported team workspace is `apps/web`; `script/runtime` launches it with the retained OpenCode backend. Cross-thread analysis runs as the OpenCode `puff-analyst` agent driven by `script/runtime/analysis.ts`.
+- Verify collaboration boundaries through the existing server and runner integration tests. Record the tested commit and distinguish fixture model checks from hosted model execution.
 
 ## Codex Branch Workflow
 

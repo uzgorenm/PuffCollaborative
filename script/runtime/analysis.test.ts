@@ -2,10 +2,10 @@ import { test, expect } from "bun:test"
 import { mkdtemp, rm, readdir, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { flowerCycle } from "./flower"
+import { analysisCycle } from "./analysis"
 
-test("revocation during Flower analysis prevents result publication and admission", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "puff-flower-cycle-"))
+test("revocation during analysis prevents result publication and admission", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "puff-analysis-cycle-"))
   let revoked = false
   const mutations: string[] = []
   let calls = 0
@@ -29,7 +29,7 @@ test("revocation during Flower analysis prevents result publication and admissio
     return {}
   }
   try {
-    await flowerCycle({
+    await analysisCycle({
       projectId: "p",
       stateDirectory: directory,
       api,
@@ -48,7 +48,7 @@ test("revocation during Flower analysis prevents result publication and admissio
     })
     expect(calls).toBe(1)
     expect(mutations).toEqual([])
-    await flowerCycle({
+    await analysisCycle({
       projectId: "p",
       stateDirectory: directory,
       api,
@@ -62,8 +62,8 @@ test("revocation during Flower analysis prevents result publication and admissio
   }
 })
 
-test("exact completed report retries neither resubmit Flower nor redirect work", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "puff-flower-retry-"))
+test("exact completed report retries neither rerun analysis nor redirect work", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "puff-analysis-retry-"))
   const writes: { path: string; body: unknown; credential?: string }[] = []
   let calls = 0
   const api = async (path: string, body?: unknown, credential?: string) => {
@@ -95,11 +95,11 @@ test("exact completed report retries neither resubmit Flower nor redirect work",
   }
   try {
     const options = { projectId: "p", stateDirectory: directory, api, analyze }
-    await flowerCycle(options)
-    await flowerCycle(options)
+    await analysisCycle(options)
+    await analysisCycle(options)
     expect(calls).toBe(2)
     expect(writes.length).toBe(2)
-    expect(writes.every((write) => write.path.endsWith("/flower/results") && write.credential === "analysis")).toBe(
+    expect(writes.every((write) => write.path.endsWith("/analysis/results") && write.credential === "analysis")).toBe(
       true,
     )
   } finally {
@@ -108,7 +108,7 @@ test("exact completed report retries neither resubmit Flower nor redirect work",
 })
 
 test("current consent is rechecked before the first hosted submission", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "puff-flower-preflight-"))
+  const directory = await mkdtemp(join(tmpdir(), "puff-analysis-preflight-"))
   let policyReads = 0
   let analyses = 0
   const api = async (path: string) => {
@@ -128,7 +128,7 @@ test("current consent is rechecked before the first hosted submission", async ()
     return {}
   }
   try {
-    await flowerCycle({
+    await analysisCycle({
       projectId: "p",
       stateDirectory: directory,
       api,
@@ -144,7 +144,7 @@ test("current consent is rechecked before the first hosted submission", async ()
 })
 
 test("a lost awareness response reconciles its durable receipt", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "puff-flower-receipt-"))
+  const directory = await mkdtemp(join(tmpdir(), "puff-analysis-receipt-"))
   let admitted: { messageID: string; admittedSeq: number } | undefined
   let submissions = 0
   const api = async (path: string, body?: unknown) => {
@@ -160,11 +160,11 @@ test("a lost awareness response reconciles its durable receipt", async () => {
         awarenessMode: "notify",
       }
     if (path.endsWith("/export")) return { request: body }
-    if (path.includes("/flower/awareness/") && !body) {
+    if (path.includes("/analysis/awareness/") && !body) {
       if (!admitted) throw new Error("not_found")
       return admitted
     }
-    if (path.endsWith("/flower/awareness")) {
+    if (path.endsWith("/analysis/awareness")) {
       submissions++
       admitted = { messageID: (body as { messageId: string }).messageId, admittedSeq: 5 }
       throw new Error("Lost response")
@@ -196,8 +196,8 @@ test("a lost awareness response reconciles its durable receipt", async () => {
         proposalCandidates: [],
       }),
     }
-    await flowerCycle(options)
-    await flowerCycle(options)
+    await analysisCycle(options)
+    await analysisCycle(options)
     expect(submissions).toBe(1)
     expect(count).toBe(2)
   } finally {
@@ -206,7 +206,7 @@ test("a lost awareness response reconciles its durable receipt", async () => {
 })
 
 test("uncertain historical admission is reconciled after activity and consent change without replay", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "puff-flower-history-"))
+  const directory = await mkdtemp(join(tmpdir(), "puff-analysis-history-"))
   let changed = false
   let admitted: { messageID: string; admittedSeq: number } | undefined
   let analyses = 0
@@ -226,12 +226,12 @@ test("uncertain historical admission is reconciled after activity and consent ch
         awarenessMode: "notify",
       }
     if (path.endsWith("/export")) return { request: body }
-    if (path.includes("/flower/awareness/") && !body) {
+    if (path.includes("/analysis/awareness/") && !body) {
       receiptReads++
       if (!changed) throw new Error("Receipt service unavailable")
       return admitted
     }
-    if (path.endsWith("/flower/awareness")) {
+    if (path.endsWith("/analysis/awareness")) {
       admissions++
       admitted = { messageID: (body as { messageId: string }).messageId, admittedSeq: 5 }
       throw new Error("Lost response")
@@ -269,12 +269,12 @@ test("uncertain historical admission is reconciled after activity and consent ch
         }
       },
     }
-    await flowerCycle(options)
-    const files = (await readdir(join(directory, "flower-jobs"))).filter((file) => /^[a-f0-9]{64}\.json$/.test(file))
+    await analysisCycle(options)
+    const files = (await readdir(join(directory, "analysis-jobs"))).filter((file) => /^[a-f0-9]{64}\.json$/.test(file))
     const jobs = await Promise.all(
       files.map(async (file) => ({
         file,
-        job: JSON.parse(await readFile(join(directory, "flower-jobs", file), "utf8")),
+        job: JSON.parse(await readFile(join(directory, "analysis-jobs", file), "utf8")),
       })),
     )
     const pending = jobs.find(({ job }) => job.deliveries?.[0]?.state === "outcome_unknown")!
@@ -282,11 +282,11 @@ test("uncertain historical admission is reconciled after activity and consent ch
     changed = true
     ownerChanged = true
     receiptReads = 0
-    await flowerCycle(options)
+    await analysisCycle(options)
     expect(receiptReads).toBe(0)
     ownerChanged = false
-    await flowerCycle(options)
-    const reconciled = JSON.parse(await readFile(join(directory, "flower-jobs", pending.file), "utf8"))
+    await analysisCycle(options)
+    const reconciled = JSON.parse(await readFile(join(directory, "analysis-jobs", pending.file), "utf8"))
     expect(reconciled.state).toBe("applied")
     expect(reconciled.deliveries[0].admittedSeq).toBe(5)
     expect(reconciled.deliveries[0].state).toBeUndefined()
@@ -303,7 +303,7 @@ test("foreign, negative or unsafe receipts cannot become confirmed admission", a
     { admittedSeq: -1 },
     { admittedSeq: Number.MAX_SAFE_INTEGER + 1 },
   ]) {
-    const directory = await mkdtemp(join(tmpdir(), "puff-flower-wrong-receipt-"))
+    const directory = await mkdtemp(join(tmpdir(), "puff-analysis-wrong-receipt-"))
     const api = async (path: string, body?: unknown) => {
       if (path.endsWith("/threads")) return [{ id: "a" }, { id: "b" }]
       if (path.endsWith("/cooperation"))
@@ -317,8 +317,8 @@ test("foreign, negative or unsafe receipts cannot become confirmed admission", a
           awarenessMode: "notify",
         }
       if (path.endsWith("/export")) return { request: body }
-      if (path.includes("/flower/awareness/")) throw new Error("No matching receipt")
-      if (path.endsWith("/flower/awareness"))
+      if (path.includes("/analysis/awareness/")) throw new Error("No matching receipt")
+      if (path.endsWith("/analysis/awareness"))
         return {
           messageID: invalid.messageID ?? (body as { messageId: string }).messageId,
           admittedSeq: invalid.admittedSeq,
@@ -327,7 +327,7 @@ test("foreign, negative or unsafe receipts cannot become confirmed admission", a
     }
     try {
       let count = 0
-      await flowerCycle({
+      await analysisCycle({
         projectId: "p",
         stateDirectory: directory,
         api,
@@ -350,9 +350,9 @@ test("foreign, negative or unsafe receipts cannot become confirmed admission", a
           proposalCandidates: [],
         }),
       })
-      const files = (await readdir(join(directory, "flower-jobs"))).filter((file) => /^[a-f0-9]{64}\.json$/.test(file))
+      const files = (await readdir(join(directory, "analysis-jobs"))).filter((file) => /^[a-f0-9]{64}\.json$/.test(file))
       const jobs = await Promise.all(
-        files.map(async (file) => JSON.parse(await readFile(join(directory, "flower-jobs", file), "utf8"))),
+        files.map(async (file) => JSON.parse(await readFile(join(directory, "analysis-jobs", file), "utf8"))),
       )
       const deliveries = jobs.flatMap((job) => job.deliveries)
       expect(deliveries.length).toBe(1)

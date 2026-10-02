@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 import { createHash } from "node:crypto"
 import { initializeSettings, runtimeEnvironment } from "./config"
 import { acquireRuntimeLock } from "./lock"
-import { flowerCycle, runFlower } from "./flower"
+import { analysisCycle, analystAgent, runAnalysis } from "./analysis"
 import { atomicPrivateFile, atomicPrivateJson } from "./private-json"
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
@@ -16,7 +16,6 @@ await mkdir(runtimePath, { recursive: true, mode: 0o700 })
 const runtimeDirectory = await realpath(runtimePath)
 const executable = process.execPath
 const children: ChildProcess[] = []
-const groups = new Set<ChildProcess>()
 let stopped = false
 let releaseLock: (() => Promise<void>) | undefined
 
@@ -74,19 +73,9 @@ async function waitFor(url: string, running: ChildProcess, headers?: Record<stri
 
 async function terminate(running: ChildProcess) {
   if (running.exitCode !== null || running.signalCode !== null) return
-  if (groups.has(running) && running.pid) {
-    try {
-      process.kill(-running.pid, "SIGTERM")
-    } catch {}
-  } else running.kill("SIGTERM")
+  running.kill("SIGTERM")
   await Promise.race([new Promise<void>((done) => running.once("exit", () => done())), Bun.sleep(5000)])
-  if (running.exitCode === null && running.signalCode === null) {
-    if (groups.has(running) && running.pid) {
-      try {
-        process.kill(-running.pid, "SIGKILL")
-      } catch {}
-    } else running.kill("SIGKILL")
-  }
+  if (running.exitCode === null && running.signalCode === null) running.kill("SIGKILL")
 }
 
 async function stop(code = 0) {
@@ -167,6 +156,12 @@ async function main() {
     await atomicPrivateFile(globalProvider, providerBytes)
     await chmod(globalProvider, 0o600)
   }
+  // The background analyst is an ordinary OpenCode agent loaded from the global config directory.
+  await mkdir(join(environment.XDG_CONFIG_HOME, "opencode/agents"), { recursive: true, mode: 0o700 })
+  await atomicPrivateFile(
+    join(environment.XDG_CONFIG_HOME, `opencode/agents/${analystAgent}.md`),
+    await readFile(join(repository, "script/runtime/puff-analyst.md")),
+  )
   const normal = child(
     "bootstrap",
     executable,
@@ -202,9 +197,9 @@ async function main() {
       auth: { kind: "runner", workerId: settings.workerId, instanceId: settings.instanceId },
     }))(),
     (async () => ({
-      username: "flower",
+      username: "analysis",
       passwordHash: await Bun.password.hash(settings.analysisPassword),
-      auth: { kind: "analysis", serviceId: "product-flower" },
+      auth: { kind: "analysis", serviceId: "product-analysis" },
     }))(),
   ])
   await privateJson("identities.json", { identities })
@@ -308,16 +303,17 @@ async function main() {
       ? "Coding model configured. New sessions use isolated worktrees."
       : "Configure PUFF_MODEL_PROVIDER, PUFF_MODEL_ID and PUFF_PROVIDER_CONFIG to enable coding-agent execution.",
   )
-  const flowerPython = process.env.PUFF_FLOWER_PYTHON
-  if (flowerPython) {
-    const flowerApi = async (path: string, body?: unknown, credential?: string, method?: "GET" | "POST" | "PUT") => {
+  if (model) {
+    const analysisDirectory = join(runtimeDirectory, "analysis")
+    await mkdir(analysisDirectory, { recursive: true, mode: 0o700 })
+    const analysisApi = async (path: string, body?: unknown, credential?: string, method?: "GET" | "POST" | "PUT") => {
       if (stopped) throw new Error("Runtime is stopping")
       const member =
         credential && credential !== "analysis"
           ? settings.members.find((member) => member.userId === credential)
           : undefined
       if (credential && credential !== "analysis" && !member) throw new Error("Unknown Session owner")
-      const auth = credential === "analysis" ? { username: "flower", password: settings.analysisPassword } : member
+      const auth = credential === "analysis" ? { username: "analysis", password: settings.analysisPassword } : member
       const headers = auth
         ? {
             "Content-Type": "application/json",
@@ -328,35 +324,26 @@ async function main() {
     }
     void (async () => {
       while (!stopped) {
-        await flowerCycle({
+        await analysisCycle({
           projectId,
           stateDirectory: runtimeDirectory,
-          api: flowerApi,
+          api: analysisApi,
           analyze: (envelope) => {
             if (stopped) throw new Error("Runtime is stopping")
-            return runFlower(
-              flowerPython,
-              join(repository, "integrations/flower/product_export.py"),
-              join(runtimeDirectory, "flower-chain"),
+            return runAnalysis({
+              backendUrl,
+              authorization: runtimeAuth,
+              model,
+              directory: analysisDirectory,
               envelope,
-              (running) => {
-                if (stopped && running.pid) {
-                  try {
-                    process.kill(-running.pid, "SIGKILL")
-                  } catch {}
-                } else {
-                  children.push(running)
-                  groups.add(running)
-                }
-              },
-            )
+            })
           },
         }).catch(() => undefined)
         await Bun.sleep(15000)
       }
     })()
     console.log(
-      "Flower background analysis enabled for explicitly selected Sessions; hosted run results are recorded separately from delivery.",
+      "Background analysis runs through the OpenCode puff-analyst agent for Sessions whose owners enabled it.",
     )
   }
   const workerHeaders = {

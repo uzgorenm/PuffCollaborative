@@ -320,9 +320,9 @@ describe("shared project access with mocked event, queue, project admission and 
             "runner",
           ),
         )
-        yield* access.authorize({ kind: "analysis", serviceId: "flower" }, projectId, thread.id, "update_work_card")
+        yield* access.authorize({ kind: "analysis", serviceId: "analysis" }, projectId, thread.id, "update_work_card")
         yield* assertForbidden(
-          access.authorize({ kind: "analysis", serviceId: "flower" }, projectId, thread.id, "read"),
+          access.authorize({ kind: "analysis", serviceId: "analysis" }, projectId, thread.id, "read"),
         )
 
         const spoofed = {

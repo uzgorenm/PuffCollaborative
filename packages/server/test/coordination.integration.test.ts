@@ -564,7 +564,7 @@ test("two members share queued turns, replay, approval, activity, and stale-card
       analysisEnabled: true,
       awarenessMode: "notify",
     }
-    const exportPath = `/api/coordination/v1/projects/${projectId}/flower/export`
+    const exportPath = `/api/coordination/v1/projects/${projectId}/analysis/export`
     const selectedExport = { requestId: "selected-export", sourceThreadId: threads[0], targetThreadId: threads[1] }
     expect((await request(exportPath, "alice", "POST", selectedExport)).response.status).toBe(403)
     expect((await request(cooperationPath, "bob", "PUT", consent)).response.status).toBe(403)
@@ -617,7 +617,7 @@ test("two members share queued turns, replay, approval, activity, and stale-card
       cooperationVersions: exported.data!.cooperationVersions,
       awarenessNoteCandidates: [note],
     }
-    const resultPath = `/api/coordination/v1/projects/${projectId}/flower/results`
+    const resultPath = `/api/coordination/v1/projects/${projectId}/analysis/results`
     expect((await request(resultPath, "alice", "POST", report)).response.status).toBe(403)
     const registered = await request(resultPath, "analysis", "POST", report)
     expect(registered.response.status).toBe(200)
@@ -651,7 +651,7 @@ test("two members share queued turns, replay, approval, activity, and stale-card
         })
       ).response.status,
     ).toBe(400)
-    const awarenessPath = `/api/coordination/v1/threads/${threads[1]}/flower/awareness`
+    const awarenessPath = `/api/coordination/v1/threads/${threads[1]}/analysis/awareness`
     const delivery = { reportId: report.reportId, noteId: note.noteId, messageId: "msg_awareness_selected_export" }
     expect((await request(awarenessPath, "alice", "POST", delivery)).response.status).toBe(403)
     expect((await request(awarenessPath, "bob", "POST", delivery)).response.status).toBe(503)

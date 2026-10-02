@@ -3,7 +3,7 @@ import type { CoordinationActivity } from "@opencode-ai/core/coordination/activi
 import { Context } from "effect"
 import type { CoordinationProvisioning } from "@opencode-ai/core/coordination/provisioning/index"
 import type { CoordinationCooperation } from "@opencode-ai/core/coordination/cooperation/index"
-import type { CoordinationFlowerResults } from "@opencode-ai/core/coordination/flower/results"
+import type { CoordinationAnalysisResults } from "@opencode-ai/core/coordination/analysis/results"
 
 export interface CoordinationServices {
   readonly access: CoordinationContracts.Access
@@ -20,7 +20,7 @@ export interface CoordinationServices {
   readonly provisioning?: CoordinationProvisioning.Interface
   readonly cooperation: CoordinationCooperation.Interface
   readonly sessionBinding: CoordinationContracts.SessionBinding
-  readonly flowerResults: ReturnType<typeof CoordinationFlowerResults.make>
+  readonly analysisResults: ReturnType<typeof CoordinationAnalysisResults.make>
 }
 
 export interface CoordinationRuntimeValue {

@@ -43,7 +43,11 @@ async function roster(home: string, projectId: string, sessionIds: ReadonlyArray
   const selectionsPath = path.join(home, "selections.json")
   const people = [
     { username: "alice", password: "alice-fixture-secret", auth: { kind: "member", userId: "usr_r13_alice" } },
-    { username: "analysis", password: "analysis-fixture-secret", auth: { kind: "analysis", serviceId: "r13-flower" } },
+    {
+      username: "analysis",
+      password: "analysis-fixture-secret",
+      auth: { kind: "analysis", serviceId: "r13-analysis" },
+    },
     {
       username: "worker",
       password: "worker-fixture-secret",
@@ -1093,7 +1097,7 @@ test("a typed coordinator callback outage drains persisted output after a runner
   )
 }, 90_000)
 
-test("a registered informational Flower note is admitted while active and promoted at the next safe boundary", async () => {
+test("a registered informational analysis note is admitted while active and promoted at the next safe boundary", async () => {
   await Effect.runPromise(
     Effect.scoped(
       withCliFixture(({ home, llm, opencode }) =>
@@ -1268,7 +1272,7 @@ test("a registered informational Flower note is admitted while active and promot
             alice<{
               provenance: Array<{ threadId: string; eventId: string; eventSeq: number; threadActivitySeq: number }>
               cooperationVersions: Record<string, number>
-            }>(`/api/coordination/v1/projects/${prepared.projectId}/flower/export`, "POST", {
+            }>(`/api/coordination/v1/projects/${prepared.projectId}/analysis/export`, "POST", {
               requestId: "active-awareness-export",
               sourceThreadId,
               targetThreadId,
@@ -1281,7 +1285,7 @@ test("a registered informational Flower note is admitted while active and promot
           const reportId = "report-active-awareness"
           const noteId = "active-awareness-export:awareness"
           const registered = yield* Effect.promise(() =>
-            analysis(`/api/coordination/v1/projects/${prepared.projectId}/flower/results`, "POST", {
+            analysis(`/api/coordination/v1/projects/${prepared.projectId}/analysis/results`, "POST", {
               requestId: "active-awareness-export",
               reportId,
               sourceThreadId,
@@ -1313,7 +1317,7 @@ test("a registered informational Flower note is admitted while active and promot
           const delivery = { reportId, noteId, messageId: "msg_active_awareness" }
           const admitted = yield* Effect.promise(() =>
             alice<{ admittedSeq: number; promotedSeq?: number; activeObserved: boolean }>(
-              `/api/coordination/v1/threads/${targetThreadId}/flower/awareness`,
+              `/api/coordination/v1/threads/${targetThreadId}/analysis/awareness`,
               "POST",
               delivery,
             ),
@@ -1324,7 +1328,7 @@ test("a registered informational Flower note is admitted while active and promot
           expect(admitted.data.promotedSeq).toBeUndefined()
           expect(
             (yield* Effect.promise(() =>
-              alice(`/api/coordination/v1/threads/${targetThreadId}/flower/awareness`, "POST", delivery),
+              alice(`/api/coordination/v1/threads/${targetThreadId}/analysis/awareness`, "POST", delivery),
             )).status,
           ).toBe(200)
           yield* llm.text("Awareness acknowledged; the current task continues")
@@ -1339,7 +1343,7 @@ test("a registered informational Flower note is admitted while active and promot
           )
           const promoted = yield* Effect.promise(() =>
             alice<{ admittedSeq: number; promotedSeq?: number }>(
-              `/api/coordination/v1/threads/${targetThreadId}/flower/awareness/${encodeURIComponent(reportId)}/${encodeURIComponent(noteId)}`,
+              `/api/coordination/v1/threads/${targetThreadId}/analysis/awareness/${encodeURIComponent(reportId)}/${encodeURIComponent(noteId)}`,
             ),
           )
           expect(promoted.status).toBe(200)
@@ -1360,7 +1364,7 @@ test("a registered informational Flower note is admitted while active and promot
             replay.data.events.filter((event) => event.kind === "run.output").map((event) => event.payload.text),
           ).toContain("Awareness acknowledged; the current task continues")
           console.log(
-            "FLOWER_AWARENESS_PROMOTION_TRACE",
+            "ANALYSIS_AWARENESS_PROMOTION_TRACE",
             JSON.stringify({
               admittedSeq: admitted.data.admittedSeq,
               promotedSeq: promoted.data.promotedSeq,

@@ -1,4 +1,4 @@
-export * as CoordinationFlowerResults from "./results"
+export * as CoordinationAnalysisResults from "./results"
 
 import { and, eq } from "drizzle-orm"
 import { isDeepStrictEqual } from "node:util"
@@ -16,7 +16,7 @@ import type { CoordinationContracts } from "../contracts"
 import type { CoordinationCooperation } from "../cooperation"
 import { CoordinationProvisioning } from "../provisioning"
 import { CoordinationAwarenessDelivery } from "../awareness/delivery"
-import { FlowerDeliveryTable, FlowerResultTable } from "./results.sql"
+import { AnalysisDeliveryTable, AnalysisResultTable } from "./results.sql"
 import { evidenceEligible } from "./export"
 
 const forbidden: CoordinationContracts.Failure = {
@@ -25,11 +25,11 @@ const forbidden: CoordinationContracts.Failure = {
 }
 const conflict: CoordinationContracts.Failure = {
   code: "conflict",
-  message: "Flower result or selected source changed",
+  message: "Analysis result or selected source changed",
 }
 const invalid: CoordinationContracts.Failure = {
   code: "invalid",
-  message: "Invalid bounded informational Flower result",
+  message: "Invalid bounded informational analysis result",
 }
 const stableId = (value: string) => /^[A-Za-z0-9_:-]{1,160}$/.test(value)
 const informational = (text: string) =>
@@ -45,15 +45,15 @@ export const trustedPrompt = (db: Database.Interface["db"], run: AuthorizedRun, 
   Effect.gen(function* () {
     const receipt = yield* db
       .select()
-      .from(FlowerDeliveryTable)
-      .where(eq(FlowerDeliveryTable.message_id, messageID))
+      .from(AnalysisDeliveryTable)
+      .where(eq(AnalysisDeliveryTable.message_id, messageID))
       .get()
       .pipe(Effect.orDie)
     if (!receipt) return false
     const report = yield* db
       .select()
-      .from(FlowerResultTable)
-      .where(eq(FlowerResultTable.report_id, receipt.report_id))
+      .from(AnalysisResultTable)
+      .where(eq(AnalysisResultTable.report_id, receipt.report_id))
       .get()
       .pipe(Effect.orDie)
     const note = report?.content.awarenessNoteCandidates.find((item) => item.noteId === receipt.note_id)
@@ -67,7 +67,7 @@ export const trustedPrompt = (db: Database.Interface["db"], run: AuthorizedRun, 
       return false
     const access = CoordinationAccess.make(db)
     const threads = yield* Effect.forEach([note.sourceThreadId, note.targetThreadId], (id) =>
-      access.getThread({ kind: "analysis", serviceId: "flower-attribution" }, id, "update_work_card"),
+      access.getThread({ kind: "analysis", serviceId: "analysis-attribution" }, id, "update_work_card"),
     )
     const [source, target] = threads
     if (
@@ -107,8 +107,8 @@ export function make(deps: {
 }) {
   const db = deps.database.db
   const read = (reportId: string) =>
-    db.select().from(FlowerResultTable).where(eq(FlowerResultTable.report_id, reportId)).get().pipe(Effect.orDie)
-  const validate = (projectId: Coordination.ProjectID, content: Coordination.FlowerResultContent) =>
+    db.select().from(AnalysisResultTable).where(eq(AnalysisResultTable.report_id, reportId)).get().pipe(Effect.orDie)
+  const validate = (projectId: Coordination.ProjectID, content: Coordination.AnalysisResultContent) =>
     Effect.gen(function* () {
       if (
         !stableId(content.reportId) ||
@@ -123,7 +123,7 @@ export function make(deps: {
       )
         return yield* Effect.fail(invalid)
       const threads = yield* Effect.forEach([content.sourceThreadId, content.targetThreadId], (id) =>
-        deps.access.getThread({ kind: "analysis", serviceId: "flower-validation" }, id, "update_work_card"),
+        deps.access.getThread({ kind: "analysis", serviceId: "analysis-validation" }, id, "update_work_card"),
       )
       if (threads.some((thread) => thread.projectId !== projectId) || threads[0].sessionId === threads[1].sessionId)
         return yield* Effect.fail(forbidden)
@@ -202,7 +202,7 @@ export function make(deps: {
       }
       return { threads, settings }
     })
-  const receipt = (content: Coordination.FlowerResultContent) => ({
+  const receipt = (content: Coordination.AnalysisResultContent) => ({
     reportId: content.reportId,
     requestId: content.requestId,
     registered: true as const,
@@ -249,8 +249,8 @@ export function make(deps: {
           return yield* Effect.fail({ code: "not_found" as const, message: "Awareness receipt was not found" })
         const reservation = yield* db
           .select()
-          .from(FlowerDeliveryTable)
-          .where(and(eq(FlowerDeliveryTable.report_id, reportId), eq(FlowerDeliveryTable.note_id, noteId)))
+          .from(AnalysisDeliveryTable)
+          .where(and(eq(AnalysisDeliveryTable.report_id, reportId), eq(AnalysisDeliveryTable.note_id, noteId)))
           .get()
           .pipe(Effect.orDie)
         if (!reservation || reservation.owner_id !== principal.userId)
@@ -274,7 +274,7 @@ export function make(deps: {
     register: (
       principal: Coordination.AuthContext,
       projectId: Coordination.ProjectID,
-      content: Coordination.FlowerResultContent,
+      content: Coordination.AnalysisResultContent,
     ) =>
       Effect.gen(function* () {
         if (principal.kind !== "analysis") return yield* Effect.fail(forbidden)
@@ -289,7 +289,7 @@ export function make(deps: {
         yield* validate(projectId, content)
         if (prior) return receipt(prior.content)
         const inserted = yield* db
-          .insert(FlowerResultTable)
+          .insert(AnalysisResultTable)
           .values({
             report_id: content.reportId,
             project_id: projectId,
@@ -340,7 +340,7 @@ export function make(deps: {
           .sort((left, right) => right.seq - left.seq)[0]
         if (!source) return yield* Effect.fail(invalid)
         yield* db
-          .insert(FlowerDeliveryTable)
+          .insert(AnalysisDeliveryTable)
           .values({
             report_id: request.reportId,
             note_id: request.noteId,
@@ -353,9 +353,9 @@ export function make(deps: {
           .pipe(Effect.orDie)
         const reservation = yield* db
           .select()
-          .from(FlowerDeliveryTable)
+          .from(AnalysisDeliveryTable)
           .where(
-            and(eq(FlowerDeliveryTable.report_id, request.reportId), eq(FlowerDeliveryTable.note_id, request.noteId)),
+            and(eq(AnalysisDeliveryTable.report_id, request.reportId), eq(AnalysisDeliveryTable.note_id, request.noteId)),
           )
           .get()
           .pipe(Effect.orDie)

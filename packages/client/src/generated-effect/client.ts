@@ -686,18 +686,18 @@ const Endpoint18_0 = (raw: RawClient["server.coordination"]) => () =>
 
 const adaptGroup18 = (raw: RawClient["server.coordination"]) => ({ status: Endpoint18_0(raw) })
 
-type Endpoint19_0Request = Parameters<RawClient["server.coordination.data"]["coordination.flowerAwarenessReceipt"]>[0]
+type Endpoint19_0Request = Parameters<RawClient["server.coordination.data"]["coordination.analysisAwarenessReceipt"]>[0]
 type Endpoint19_0Input = {
   readonly threadId: Endpoint19_0Request["params"]["threadId"]
   readonly reportId: Endpoint19_0Request["params"]["reportId"]
   readonly noteId: Endpoint19_0Request["params"]["noteId"]
 }
 const Endpoint19_0 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_0Input) =>
-  raw["coordination.flowerAwarenessReceipt"]({
+  raw["coordination.analysisAwarenessReceipt"]({
     params: { threadId: input["threadId"], reportId: input["reportId"], noteId: input["noteId"] },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint19_1Request = Parameters<RawClient["server.coordination.data"]["coordination.flowerResultRegister"]>[0]
+type Endpoint19_1Request = Parameters<RawClient["server.coordination.data"]["coordination.analysisResultRegister"]>[0]
 type Endpoint19_1Input = {
   readonly projectId: Endpoint19_1Request["params"]["projectId"]
   readonly requestId: Endpoint19_1Request["payload"]["requestId"]
@@ -710,7 +710,7 @@ type Endpoint19_1Input = {
   readonly awarenessNoteCandidates: Endpoint19_1Request["payload"]["awarenessNoteCandidates"]
 }
 const Endpoint19_1 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_1Input) =>
-  raw["coordination.flowerResultRegister"]({
+  raw["coordination.analysisResultRegister"]({
     params: { projectId: input["projectId"] },
     payload: {
       requestId: input["requestId"],
@@ -724,7 +724,7 @@ const Endpoint19_1 = (raw: RawClient["server.coordination.data"]) => (input: End
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint19_2Request = Parameters<RawClient["server.coordination.data"]["coordination.flowerAwarenessDeliver"]>[0]
+type Endpoint19_2Request = Parameters<RawClient["server.coordination.data"]["coordination.analysisAwarenessDeliver"]>[0]
 type Endpoint19_2Input = {
   readonly threadId: Endpoint19_2Request["params"]["threadId"]
   readonly reportId: Endpoint19_2Request["payload"]["reportId"]
@@ -732,7 +732,7 @@ type Endpoint19_2Input = {
   readonly messageId: Endpoint19_2Request["payload"]["messageId"]
 }
 const Endpoint19_2 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_2Input) =>
-  raw["coordination.flowerAwarenessDeliver"]({
+  raw["coordination.analysisAwarenessDeliver"]({
     params: { threadId: input["threadId"] },
     payload: { reportId: input["reportId"], noteId: input["noteId"], messageId: input["messageId"] },
   }).pipe(Effect.mapError(mapClientError))
@@ -767,7 +767,7 @@ const Endpoint19_4 = (raw: RawClient["server.coordination.data"]) => (input: End
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint19_5Request = Parameters<RawClient["server.coordination.data"]["coordination.flowerExport"]>[0]
+type Endpoint19_5Request = Parameters<RawClient["server.coordination.data"]["coordination.analysisExport"]>[0]
 type Endpoint19_5Input = {
   readonly projectId: Endpoint19_5Request["params"]["projectId"]
   readonly requestId: Endpoint19_5Request["payload"]["requestId"]
@@ -775,7 +775,7 @@ type Endpoint19_5Input = {
   readonly targetThreadId: Endpoint19_5Request["payload"]["targetThreadId"]
 }
 const Endpoint19_5 = (raw: RawClient["server.coordination.data"]) => (input: Endpoint19_5Input) =>
-  raw["coordination.flowerExport"]({
+  raw["coordination.analysisExport"]({
     params: { projectId: input["projectId"] },
     payload: {
       requestId: input["requestId"],
@@ -1086,12 +1086,12 @@ const Endpoint19_36 = (raw: RawClient["server.coordination.data"]) => (input: En
   raw["coordination.activityList"]({ params: { projectId: input["projectId"] } }).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup19 = (raw: RawClient["server.coordination.data"]) => ({
-  flowerAwarenessReceipt: Endpoint19_0(raw),
-  flowerResultRegister: Endpoint19_1(raw),
-  flowerAwarenessDeliver: Endpoint19_2(raw),
+  analysisAwarenessReceipt: Endpoint19_0(raw),
+  analysisResultRegister: Endpoint19_1(raw),
+  analysisAwarenessDeliver: Endpoint19_2(raw),
   cooperationGet: Endpoint19_3(raw),
   cooperationPut: Endpoint19_4(raw),
-  flowerExport: Endpoint19_5(raw),
+  analysisExport: Endpoint19_5(raw),
   me: Endpoint19_6(raw),
   provisioningList: Endpoint19_7(raw),
   sessionProvision: Endpoint19_8(raw),

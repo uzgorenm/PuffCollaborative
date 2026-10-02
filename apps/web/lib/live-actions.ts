@@ -244,7 +244,7 @@ export function cooperationWrite(input: CooperationInput) {
     throw new Error(
       "Use a feature topic of up to 80 letters, numbers, spaces, underscores or hyphens; do not include secrets",
     )
-  if (input.analysisEnabled && !featureTopic) throw new Error("Choose a feature topic before enabling Flower analysis")
+  if (input.analysisEnabled && !featureTopic) throw new Error("Choose a feature topic before enabling analysis")
   return {
     ...input,
     featureTopic,

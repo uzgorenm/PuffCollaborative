@@ -264,7 +264,7 @@ test("launcher credentials never authenticate a fresh browser", async () => {
   }
 })
 
-test("member proxy admits only the agreed cooperation controls and Flower export method", async () => {
+test("member proxy admits only the agreed cooperation controls and analysis export method", async () => {
   const service = await backend((req, res) => {
     if (req.url?.endsWith("/me")) {
       res.end('{"userId":"usr_alice"}')
@@ -293,7 +293,7 @@ test("member proxy admits only the agreed cooperation controls and Flower export
         },
       ],
       [
-        "/api/coordination/projects/project-a/flower/export",
+        "/api/coordination/projects/project-a/analysis/export",
         "POST",
         { requestId: "export-1", sourceThreadId: "thread-a", targetThreadId: "thread-b" },
       ],
@@ -305,7 +305,7 @@ test("member proxy admits only the agreed cooperation controls and Flower export
     assert.equal(
       (
         await proxyCoordination(
-          request("/api/coordination/projects/project-a/flower/export", "GET", undefined, cookie),
+          request("/api/coordination/projects/project-a/analysis/export", "GET", undefined, cookie),
           { secret },
         )
       ).status,
@@ -313,7 +313,7 @@ test("member proxy admits only the agreed cooperation controls and Flower export
     )
     assert.equal(
       (
-        await proxyCoordination(request("/api/coordination/projects/project-a/flower/runner", "POST", {}, cookie), {
+        await proxyCoordination(request("/api/coordination/projects/project-a/analysis/runner", "POST", {}, cookie), {
           secret,
         })
       ).status,

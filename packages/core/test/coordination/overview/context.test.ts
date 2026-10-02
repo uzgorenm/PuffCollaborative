@@ -31,7 +31,7 @@ const content: ProjectContext.BriefContent = {
     { userId: alice, label: "Frontend" },
     { userId: ben, label: "Review" },
   ],
-  tools: ["OpenCode", "Flower"],
+  tools: ["OpenCode", "Git"],
   sharingDefault: "private",
   suggestedAwarenessMode: "review-each-note",
 }

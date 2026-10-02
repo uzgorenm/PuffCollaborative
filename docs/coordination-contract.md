@@ -28,10 +28,10 @@ Content events and thread revision updates commit together. Work cards cite curr
 
 Project briefs and self-authored focus use versioned writes. Event replay and subscriptions remain project-authorized, including after membership revocation. UI reads discard results returned for a different authenticated account.
 
-## Flower consent and results
+## Analysis consent and results
 
-Thread sharing does not grant hosted analysis consent. Owner-selected metadata analysis and bounded instruction/output text are separate permissions. Export captures current source/target selections, Session owners, worker bindings, exact source references, and revisions.
+Thread sharing does not grant analysis consent. Owner-selected metadata analysis and bounded instruction/output text are separate permissions. Export captures current source/target selections, Session owners, worker bindings, exact source references, and revisions.
 
 The analysis identity registers validated candidates. The backend rechecks selection and source currentness before work-card writes or awareness admission. Informational note registration, durable Session admission, transcript promotion, and model use have distinct receipts. Task redirection remains approval-required.
 
-The UI uses authenticated member proxy routes. Runner callbacks and analysis result registration stay on their scoped backend ports. See [Flower setup](../integrations/flower/README.md) and [runner behavior](runner-contract.md).
+The UI uses authenticated member proxy routes. Runner callbacks and analysis result registration stay on their scoped backend ports. The launcher's `script/runtime/analysis.ts` runs each consented source/target pair through a tool-less OpenCode `puff-analyst` Session and registers the result with the `analysis` identity. See [runner behavior](runner-contract.md).

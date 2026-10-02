@@ -10,7 +10,7 @@ import { CoordinationEvents } from "@opencode-ai/core/coordination/events/events
 import { CoordinationProjects } from "@opencode-ai/core/coordination/projects/index"
 import { CoordinationProvisioning } from "@opencode-ai/core/coordination/provisioning/index"
 import { CoordinationCooperation } from "@opencode-ai/core/coordination/cooperation/index"
-import { CoordinationFlowerResults } from "@opencode-ai/core/coordination/flower/results"
+import { CoordinationAnalysisResults } from "@opencode-ai/core/coordination/analysis/results"
 import { CoordinationQueue } from "@opencode-ai/core/coordination/queue/queue"
 import { ProjectContext } from "@opencode-ai/core/coordination/overview/context"
 import { RunnerAdapter } from "@opencode-ai/core/coordination/runner/adapter"
@@ -196,7 +196,7 @@ export const coordinationLayer = <R = never>(ports: CoordinationPorts<R> = {}) =
       const snapshot = CoordinationSnapshot.make({ database, access, queue, runner, workCards, events })
       const cooperation = CoordinationCooperation.make({ db: database.db, access })
       const sharedSessions = yield* SessionV2.Service
-      const flowerResults = CoordinationFlowerResults.make({
+      const analysisResults = CoordinationAnalysisResults.make({
         database,
         sessions: sharedSessions,
         access,
@@ -267,7 +267,7 @@ export const coordinationLayer = <R = never>(ports: CoordinationPorts<R> = {}) =
           provisioning,
           cooperation,
           sessionBinding: binding,
-          flowerResults,
+          analysisResults,
         },
       })
     }),

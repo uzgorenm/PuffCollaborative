@@ -110,20 +110,20 @@ const activityView = Schema.Struct({
   ),
 })
 
-const flowerEvidence = Schema.Struct({
+const analysisEvidence = Schema.Struct({
   workerId: Coordination.WorkerID,
   sessionId: Coordination.Thread.fields.sessionId,
   eventId: Schema.String,
   revision: Schema.Int,
 })
-const flowerExport = Schema.Struct({
+const analysisExport = Schema.Struct({
   request: Schema.Struct({
     requestId: Schema.String,
     projectId: Coordination.ProjectID,
     targetWorkerId: Coordination.WorkerID,
     targetSessionId: Coordination.Thread.fields.sessionId,
     question: Schema.String,
-    evidenceRefs: Schema.Array(flowerEvidence),
+    evidenceRefs: Schema.Array(analysisEvidence),
     createdAt: Schema.String,
   }),
   snapshot: Schema.Struct({
@@ -212,8 +212,8 @@ export const CoordinationGroup = HttpApiGroup.make("server.coordination").add(
 export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data")
   .add(
     HttpApiEndpoint.get(
-      "coordination.flowerAwarenessReceipt",
-      "/api/coordination/v1/threads/:threadId/flower/awareness/:reportId/:noteId",
+      "coordination.analysisAwarenessReceipt",
+      "/api/coordination/v1/threads/:threadId/analysis/awareness/:reportId/:noteId",
       {
         params: { threadId: Coordination.ThreadID, reportId: Schema.String, noteId: Schema.String },
         success: Schema.Struct({
@@ -229,11 +229,11 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
   )
   .add(
     HttpApiEndpoint.post(
-      "coordination.flowerResultRegister",
-      "/api/coordination/v1/projects/:projectId/flower/results",
+      "coordination.analysisResultRegister",
+      "/api/coordination/v1/projects/:projectId/analysis/results",
       {
         params: { projectId: Coordination.ProjectID },
-        payload: Coordination.FlowerResultContent,
+        payload: Coordination.AnalysisResultContent,
         success: Schema.Struct({ reportId: Schema.String, requestId: Schema.String, registered: Schema.Literal(true) }),
         error: errors,
       },
@@ -241,8 +241,8 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
   )
   .add(
     HttpApiEndpoint.post(
-      "coordination.flowerAwarenessDeliver",
-      "/api/coordination/v1/threads/:threadId/flower/awareness",
+      "coordination.analysisAwarenessDeliver",
+      "/api/coordination/v1/threads/:threadId/analysis/awareness",
       {
         params: { threadId: Coordination.ThreadID },
         payload: Schema.Struct({ reportId: Schema.String, noteId: Schema.String, messageId: SessionMessage.ID }),
@@ -277,14 +277,14 @@ export const CoordinationDataGroup = HttpApiGroup.make("server.coordination.data
     }),
   )
   .add(
-    HttpApiEndpoint.post("coordination.flowerExport", "/api/coordination/v1/projects/:projectId/flower/export", {
+    HttpApiEndpoint.post("coordination.analysisExport", "/api/coordination/v1/projects/:projectId/analysis/export", {
       params: { projectId: Coordination.ProjectID },
       payload: Schema.Struct({
         requestId: Schema.String,
         sourceThreadId: Coordination.ThreadID,
         targetThreadId: Coordination.ThreadID,
       }),
-      success: flowerExport,
+      success: analysisExport,
       error: errors,
     }),
   )

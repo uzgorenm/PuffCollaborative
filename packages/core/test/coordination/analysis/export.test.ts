@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import { Coordination } from "@opencode-ai/schema/coordination"
-import { captureSelected } from "../../../src/coordination/flower/export"
+import { captureSelected } from "../../../src/coordination/analysis/export"
 
-const projectId = Coordination.ProjectID.make("prj_flower_export")
+const projectId = Coordination.ProjectID.make("prj_analysis_export")
 const ownerId = Coordination.UserID.make("usr_owner")
 const workerId = Coordination.WorkerID.make("worker_one")
 const sourceId = Coordination.ThreadID.make("thr_source")
@@ -146,7 +146,7 @@ function fixture(
   }
 }
 
-describe("trusted Flower selected-activity export", () => {
+describe("trusted analysis selected-activity export", () => {
   test("separate explicit text consent exports only bounded owner instructions and safe runner output", async () => {
     const additionalEvents: Coordination.Event[] = [
       {
@@ -207,7 +207,7 @@ describe("trusted Flower selected-activity export", () => {
     ])
   })
 
-  test("safe metadata uses strict Flower activity and status fields", async () => {
+  test("safe metadata uses strict analysis activity and status fields", async () => {
     const capture = await Effect.runPromise(captureSelected(fixture()))
     expect(capture.snapshot.events[0].content).toEqual({ toolName: "Read", toolStatus: "completed" })
     expect(capture.snapshot.events[1].content).toEqual({ transition: "progress" })

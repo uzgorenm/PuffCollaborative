@@ -747,7 +747,7 @@ export function LiveWorkspaceView() {
     const text = draft.trim(),
       draftAtStart = draftKey
     const task = related
-      ? `${choice === "complementary" ? "Review compatibility and edge cases as a complementary task" : "Explore an independent alternative approach"} for: ${text}\n\nPossibly related shared session: ${related.id} (${related.title}). This relationship is a suggestion from shared task text, not a Flower verdict. Preserve the original session and its approach.`
+      ? `${choice === "complementary" ? "Review compatibility and edge cases as a complementary task" : "Explore an independent alternative approach"} for: ${text}\n\nPossibly related shared session: ${related.id} (${related.title}). This relationship is a suggestion from shared task text, not an analysis verdict. Preserve the original session and its approach.`
       : text
     const title =
       sessionTitle.trim() || `${choice === "independent" ? "" : `${choice}: `}${text.split("\n")[0]}`.slice(0, 120)
@@ -2089,7 +2089,7 @@ export function LiveWorkspaceView() {
                               {activeCooperation.awarenessMode}
                             </p>
                             <small>
-                              Selection does not establish that Flower is configured or running. Findings are
+                              Selection does not establish that the analysis agent is configured or running. Findings are
                               informational; work redirection requires your approval.
                             </small>
                             {canInstruct &&
@@ -2145,8 +2145,8 @@ export function LiveWorkspaceView() {
                                 }
                               />
                               <span>
-                                Allow Flower metadata analysis of this selected Session. Only bounded, redacted selected
-                                event metadata is sent to the configured hosted Flower service. Instruction and output
+                                Allow analysis of this selected Session. Only bounded, redacted selected event metadata is
+                                sent to the configured OpenCode analysis agent and its model provider. Instruction and output
                                 text require the separate permission below.
                               </span>
                             </label>
@@ -2164,7 +2164,7 @@ export function LiveWorkspaceView() {
                               />
                               <span>
                                 Also permit bounded, redacted owner instruction and runner output text to be sent to the
-                                configured hosted Flower service for source-grounded reuse. Leave this off for
+                                configured OpenCode analysis agent for source-grounded reuse. Leave this off for
                                 metadata-only analysis.
                               </span>
                             </label>
@@ -2185,7 +2185,7 @@ export function LiveWorkspaceView() {
                                 redirection or tool use.
                               </span>
                             </label>
-                            <small>Analysis starts only when the Flower runtime is configured. Default: off.</small>
+                            <small>Analysis starts only when a coding model is configured. Default: off.</small>
                             <div>
                               <button className="workflow-primary-button" disabled={readOnly}>
                                 Save cooperation

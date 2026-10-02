@@ -52,7 +52,7 @@ test("reviewed context carries the exact source identity without claiming execut
   const text = reviewedContextText("prj_one", "thr_target", source)
   assert.match(text, /thr_source.*evt_focus.*0/)
   assert.match(text, /Keyboard focus must remain visible/)
-  assert.doesNotMatch(text, /not selected|already applied|Flower verified/)
+  assert.doesNotMatch(text, /not selected|already applied|analysis verified/)
   assert.throws(() => reviewedContextText("prj_other", "thr_target", source))
   assert.throws(() => reviewedContextText("prj_one", "thr_source", source))
 })
@@ -189,7 +189,7 @@ test("cooperation writes retain the reviewed version and normalize opt-out to no
   assert.equal(action.body.requestId, "policy-one")
 })
 
-test("Flower text consent defaults off, depends on analysis and survives a retry exactly", async () => {
+test("Analysis text consent defaults off, depends on analysis and survives a retry exactly", async () => {
   const { cooperationWrite } = await import("./live-actions.ts")
   const settings = {
     expectedVersion: 7,

@@ -3,7 +3,7 @@ import type { Coordination } from "@opencode-ai/schema/coordination"
 import type { TeamThread } from "@/pages/puff/team-api"
 import { canOfferDecisionRetry, selectContext } from "./model"
 
-// Synthetic UI fixtures: these do not represent a live Flower or OpenCode receipt.
+// Synthetic UI fixtures: these do not represent a live OpenCode receipt.
 const thread = (id: string, sessionId: string, workerId = "worker-one") => ({
   id, projectId: "project-one", sessionId, workerId, title: id,
   createdBy: "serdar", createdAt: "2026-09-29T20:00:00Z", activitySeq: 12,

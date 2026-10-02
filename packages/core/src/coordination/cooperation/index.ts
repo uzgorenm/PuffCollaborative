@@ -6,7 +6,7 @@ import { Effect, Semaphore } from "effect"
 import type { Coordination } from "@opencode-ai/schema/coordination"
 import type { Database } from "../../database/database"
 import type { CoordinationContracts } from "../contracts"
-import type { CoordinationFlowerExport } from "../flower/export"
+import type { CoordinationAnalysisExport } from "../analysis/export"
 import { CoordinationProvisioning } from "../provisioning"
 import { CooperationRevisionTable } from "./sql"
 
@@ -22,7 +22,7 @@ export interface Interface {
     readonly expectedVersion: number
     readonly content: Coordination.CooperationContent
   }) => Effect.Effect<Coordination.CooperationSettings, CoordinationContracts.Failure>
-  readonly selection: CoordinationFlowerExport.Selection
+  readonly selection: CoordinationAnalysisExport.Selection
 }
 
 const forbidden: CoordinationContracts.Failure = { code: "forbidden", message: "Session owner consent is required" }

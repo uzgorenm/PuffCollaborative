@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto"
-import { spawn } from "node:child_process"
 import { mkdir, readFile, readdir } from "node:fs/promises"
 import { join } from "node:path"
 import { atomicPrivateJson } from "./private-json"
@@ -21,8 +20,11 @@ type Note = {
   sourceActivitySeq: number
   targetThreadId: string
   targetActivitySeq: number
+  featureTopic?: string
   text: string
   evidenceRefs: { threadId: string; eventId: string; seq: number }[]
+  candidateState?: "pending"
+  deliveryState?: "not_attempted"
 }
 type Mapped = {
   state: "mapped"
@@ -96,7 +98,7 @@ async function reconcile(directory: string, policies: Policy[], api: Api) {
       if (!note || !captured?.ownerId || current?.ownerId !== captured.ownerId) continue
       const messageID = `msg_${digest([job.id, note.noteId]).slice(0, 26)}`
       const receipt = (await api(
-        `/threads/${encodeURIComponent(note.targetThreadId)}/flower/awareness/${encodeURIComponent(job.result.coordinationRunId)}/${encodeURIComponent(note.noteId)}`,
+        `/threads/${encodeURIComponent(note.targetThreadId)}/analysis/awareness/${encodeURIComponent(job.result.coordinationRunId)}/${encodeURIComponent(note.noteId)}`,
         undefined,
         captured.ownerId,
       ).catch(() => undefined)) as { messageID?: string; admittedSeq?: number } | undefined
@@ -113,13 +115,13 @@ async function reconcile(directory: string, policies: Policy[], api: Api) {
 }
 
 /** One serialized background cycle; coding execution never awaits this work. */
-export async function flowerCycle(options: {
+export async function analysisCycle(options: {
   projectId: string
   stateDirectory: string
   api: Api
   analyze: (envelope: unknown) => Promise<Mapped>
 }) {
-  const directory = join(options.stateDirectory, "flower-jobs")
+  const directory = join(options.stateDirectory, "analysis-jobs")
   await mkdir(directory, { recursive: true, mode: 0o700 })
   const threads = (await options.api(`/projects/${encodeURIComponent(options.projectId)}/threads`)) as Thread[]
   const policies = await Promise.all(
@@ -149,8 +151,8 @@ export async function flowerCycle(options: {
       if (job && ["applied", "stale", "failed"].includes(job.state)) continue
       if (!job) {
         const captured = (await options
-          .api(`/projects/${encodeURIComponent(options.projectId)}/flower/export`, {
-            requestId: `flower-${id}`,
+          .api(`/projects/${encodeURIComponent(options.projectId)}/analysis/export`, {
+            requestId: `analysis-${id}`,
             sourceThreadId: source.threadId,
             targetThreadId: target.threadId,
           })
@@ -181,7 +183,7 @@ export async function flowerCycle(options: {
         if (!job.result) {
           job.result = await options.analyze(job.export)
           if (job.result.state !== "mapped" || !job.result.coordinationRunId)
-            throw new Error("Flower returned no validated mapped report")
+            throw new Error("Analysis returned no validated mapped report")
           job.state = "analyzed"
           await save(file, job)
         }
@@ -207,7 +209,7 @@ export async function flowerCycle(options: {
         // The server independently authenticates and validates the result and
         // current consent before any safe-boundary admission is permitted.
         await options.api(
-          `/projects/${encodeURIComponent(options.projectId)}/flower/results`,
+          `/projects/${encodeURIComponent(options.projectId)}/analysis/results`,
           {
             requestId: `result-${id}`,
             reportId: result.coordinationRunId,
@@ -252,7 +254,7 @@ export async function flowerCycle(options: {
         if (target.awarenessMode === "notify")
           for (const note of result.awarenessNoteCandidates) {
             if (note.targetThreadId !== target.threadId || !target.ownerId) continue
-            const path = `/threads/${encodeURIComponent(target.threadId)}/flower/awareness`
+            const path = `/threads/${encodeURIComponent(target.threadId)}/analysis/awareness`
             const messageId = `msg_${digest([id, note.noteId]).slice(0, 26)}`
             const readReceipt = () =>
               options
@@ -296,66 +298,242 @@ export async function flowerCycle(options: {
         job.state = pendingDelivery ? "analyzed" : "applied"
         await save(file, job)
       } catch (error) {
-        job.error = error instanceof Error ? error.message : "Flower processing failed"
+        job.error = error instanceof Error ? error.message : "Analysis processing failed"
         job.state = job.result ? "analyzed" : "failed"
         await save(file, job)
       }
     }
 }
 
-export async function runFlower(
-  python: string,
-  script: string,
-  directory: string,
-  envelope: unknown,
-  track?: (process: ReturnType<typeof spawn>) => void,
-): Promise<Mapped> {
-  return new Promise((resolve, reject) => {
-    const process = spawn(python, [script, "--state-dir", directory], {
-      stdio: ["pipe", "pipe", "ignore"],
-      detached: true,
-    })
-    track?.(process)
-    let output = ""
-    let settled = false
-    const fail = (error: Error) => {
-      if (!settled) {
-        settled = true
-        reject(error)
+export const analystAgent = "puff-analyst"
+
+type Envelope = {
+  request: { requestId: string; targetSessionId: string }
+  snapshot: {
+    events: { eventId: string; sessionId: string; kind: string; occurredAt: string; content: Record<string, unknown> }[]
+  }
+  provenance: { threadId: string; eventId: string; eventSeq: number }[]
+  bindings: {
+    threadId: string
+    sessionId: string
+    title: string
+    featureTopic: string
+    relationship: string
+    activitySeq: number
+    expectedVersion: number
+    deterministicStatus: string
+    contributors: string[]
+  }[]
+}
+type Summary = {
+  currentTask: string
+  progress: string
+  blockers: string[]
+  recentOutcome: string | null
+  evidence: string[]
+}
+type Reply = {
+  type: string
+  content?: { type: string; text?: string }[]
+  error?: unknown
+  time?: { completed?: unknown }
+}
+
+/** Runs one tool-less OpenCode analyst Session over a server-authorized export and maps its answer to backend shapes. */
+export async function runAnalysis(options: {
+  backendUrl: string
+  authorization: string
+  model: { providerID: string; id: string }
+  directory: string
+  envelope: unknown
+}): Promise<Mapped> {
+  const envelope = options.envelope as Envelope
+  const target = envelope.bindings.find((binding) => binding.sessionId === envelope.request.targetSessionId)
+  const source = envelope.bindings.find((binding) => binding.sessionId !== envelope.request.targetSessionId)
+  if (envelope.bindings.length !== 2 || !target || !source)
+    throw new Error("Expected one source and one target binding")
+  const selected = [source, target].map((binding, index) => ({
+    binding,
+    refs: envelope.snapshot.events
+      .filter((event) => event.sessionId === binding.sessionId)
+      .map((event, position) => {
+        const captured = envelope.provenance.find(
+          (item) => item.eventId === event.eventId && item.threadId === binding.threadId,
+        )
+        if (!captured) throw new Error("Exported event has no captured provenance")
+        return {
+          key: `${index === 0 ? "S" : "T"}${position + 1}`,
+          event,
+          ref: { threadId: binding.threadId, eventId: event.eventId, seq: captured.eventSeq },
+        }
+      }),
+  }))
+  if (selected.some((item) => !item.refs.length)) throw new Error("Selected session has no exported evidence")
+  const reply = await ask(
+    options,
+    JSON.stringify({
+      schemaVersion: 1,
+      sessions: selected.map((item, index) => ({
+        role: index === 0 ? "source" : "target",
+        title: item.binding.title,
+        featureTopic: item.binding.featureTopic,
+        relationship: item.binding.relationship,
+        status: item.binding.deterministicStatus,
+        events: item.refs.map((ref) => ({
+          ref: ref.key,
+          kind: ref.event.kind,
+          occurredAt: ref.event.occurredAt,
+          content: ref.event.content,
+        })),
+      })),
+    }),
+  )
+  const answer = parseAnswer(reply.text)
+  const latest = selected.map((item) => item.refs.at(-1)!.ref)
+  const generatedAt = new Date().toISOString()
+  // The server rejects directive or credential-like notes; drop them here so the
+  // rest of a valid report can still be registered.
+  const note = answer.note !== null && informational(answer.note) ? answer.note.trim() : undefined
+  return {
+    state: "mapped",
+    requestId: envelope.request.requestId,
+    coordinationRunId: reply.sessionID,
+    workCardUpdates: selected.map((item, index) => {
+      const summary = index === 0 ? answer.source : answer.target
+      const cited = item.refs.filter((ref) => summary.evidence.includes(ref.key)).map((ref) => ref.ref)
+      return {
+        threadId: item.binding.threadId,
+        expectedVersion: item.binding.expectedVersion,
+        sourceActivitySeq: item.binding.activitySeq,
+        card: {
+          currentTask: summary.currentTask,
+          progress: summary.progress,
+          blockers: summary.blockers,
+          status: item.binding.deterministicStatus,
+          summaryJobId: envelope.request.requestId,
+          recentVerifiedOutcome: summary.recentOutcome,
+          contributors: item.binding.contributors,
+          evidenceRefs: cited.length ? cited.slice(-32) : [latest[index]],
+          generatedAt,
+        },
       }
+    }),
+    awarenessNoteCandidates: note
+      ? [
+          {
+            noteId: `note_${digest([reply.sessionID, note]).slice(0, 24)}`,
+            sourceThreadId: source.threadId,
+            sourceActivitySeq: source.activitySeq,
+            targetThreadId: target.threadId,
+            targetActivitySeq: target.activitySeq,
+            featureTopic: source.featureTopic,
+            text: note,
+            // The server accepts only the latest eligible source event as source evidence.
+            evidenceRefs: latest,
+            candidateState: "pending",
+            deliveryState: "not_attempted",
+          },
+        ]
+      : [],
+    proposalCandidates: [],
+  }
+}
+
+async function ask(options: Parameters<typeof runAnalysis>[0], text: string) {
+  const call = async (path: string, body?: unknown) => {
+    const response = await fetch(`${options.backendUrl}/api${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { "Content-Type": "application/json", Authorization: options.authorization },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!response.ok) throw new Error(`OpenCode analysis returned HTTP ${response.status} for ${path}`)
+    return response.json()
+  }
+  // A newly opened Location loads its model and agent catalogs asynchronously; a
+  // drain started before they load fails as if the model were unavailable.
+  const location = `location[directory]=${encodeURIComponent(options.directory)}`
+  const ready = Date.now() + 60_000
+  while (true) {
+    const models = (await call(`/model?${location}`)) as { data: { id: string; providerID: string }[] }
+    const agents = (await call(`/agent?${location}`)) as { data: { id: string }[] }
+    if (
+      models.data.some((model) => model.providerID === options.model.providerID && model.id === options.model.id) &&
+      agents.data.some((agent) => agent.id === analystAgent)
+    )
+      break
+    if (Date.now() > ready) throw new Error("OpenCode analysis model or agent is unavailable")
+    await Bun.sleep(1000)
+  }
+  const created = (await call("/session", {
+    agent: analystAgent,
+    model: options.model,
+    location: { directory: options.directory },
+  })) as { data: { id: string } }
+  const sessionID = created.data.id
+  await call(`/session/${encodeURIComponent(sessionID)}/prompt`, { prompt: { text } })
+  const deadline = Date.now() + 300_000
+  // A drain that fails before its first provider turn (for example an unavailable
+  // model) records no assistant message, so a Session idle without a reply fails.
+  const idleLimit = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    await Bun.sleep(1000)
+    const active = (await call("/session/active")) as { data: Record<string, unknown> }
+    if (sessionID in active.data) continue
+    const context = (await call(`/session/${encodeURIComponent(sessionID)}/context`)) as { data: Reply[] }
+    const reply = context.data.findLast((message) => message.type === "assistant")
+    if (!reply && Date.now() > idleLimit)
+      throw new Error("OpenCode analysis agent stopped without a reply; check the configured model")
+    if (!reply) continue
+    if (reply.error !== undefined) throw new Error("OpenCode analysis agent failed")
+    if (!reply.time?.completed) continue
+    return {
+      sessionID,
+      text: (reply.content ?? [])
+        .filter((part) => part.type === "text")
+        .map((part) => part.text ?? "")
+        .join(""),
     }
-    const timeout = setTimeout(() => {
-      if (process.pid) {
-        try {
-          globalThis.process.kill(-process.pid, "SIGKILL")
-        } catch {}
-      }
-      fail(new Error("Flower chain exceeded its local deadline; inspect the private journal before retrying"))
-    }, 330_000)
-    process.on("error", (error) => {
-      clearTimeout(timeout)
-      fail(error)
-    })
-    process.stdout.on("data", (chunk) => {
-      output += String(chunk)
-      if (Buffer.byteLength(output) > 1_000_000) {
-        process.kill("SIGKILL")
-        fail(new Error("Flower result exceeded bound"))
-      }
-    })
-    process.on("close", (code) => {
-      clearTimeout(timeout)
-      if (settled) return
-      try {
-        const result = JSON.parse(output)
-        if (code !== 0 || result.state !== "mapped") return fail(new Error(result.error ?? "Flower chain failed"))
-        settled = true
-        resolve(result)
-      } catch {
-        fail(new Error("Flower produced an invalid result"))
-      }
-    })
-    process.stdin.on("error", (error) => fail(error))
-    process.stdin.end(JSON.stringify(envelope))
-  })
+  }
+  throw new Error("OpenCode analysis exceeded its local deadline")
+}
+
+function parseAnswer(text: string) {
+  const start = text.indexOf("{")
+  const end = text.lastIndexOf("}")
+  if (start < 0 || end < start) throw new Error("Analysis agent returned no JSON object")
+  const value = JSON.parse(text.slice(start, end + 1)) as { source?: unknown; target?: unknown; note?: unknown }
+  if (value.note !== null && (typeof value.note !== "string" || !value.note.trim()))
+    throw new Error("Analysis note must be a string or null")
+  return { source: summary(value.source), target: summary(value.target), note: value.note as string | null }
+}
+
+function summary(value: unknown): Summary {
+  const item = value as Partial<Summary> | undefined
+  const bounded = (text: unknown) => typeof text === "string" && text.trim().length > 0 && text.length <= 8000
+  if (
+    !item ||
+    !bounded(item.currentTask) ||
+    !bounded(item.progress) ||
+    !Array.isArray(item.blockers) ||
+    item.blockers.length > 16 ||
+    !item.blockers.every(bounded) ||
+    (item.recentOutcome !== null && !bounded(item.recentOutcome)) ||
+    !Array.isArray(item.evidence) ||
+    !item.evidence.every((ref) => typeof ref === "string")
+  )
+    throw new Error("Analysis agent returned an invalid session summary")
+  return item as Summary
+}
+
+// Mirrors the server's informational-note policy in coordination/analysis/results.ts.
+function informational(text: string) {
+  return (
+    text.trim().length > 0 &&
+    text.length <= 2000 &&
+    !/\b(stop|abandon|switch|must|should|please|instead|implement|replace|ignore|disregard|override|execute|delete)\b/i.test(
+      text,
+    ) &&
+    !/(bearer\s+\S+|sk-[a-z0-9_-]{12,}|(?:api[_-]?key|password|secret|access[_-]?token)\s*[=:])/i.test(text)
+  )
 }

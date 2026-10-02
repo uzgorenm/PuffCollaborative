@@ -10,7 +10,7 @@ bun test test/coordination.integration.test.ts test/runner-harness-authorization
 
 The process suite starts the registered route layer, real credential resolver, and SQLite database against a separate fixture execution service. It exercises membership isolation, ordered queues, exact retries, restart persistence, event replay/subscriptions, approvals, cancellation, and stale analysis. Its execution service does not call a model or execute tools.
 
-The native runner integration uses the retained OpenCode CLI and embedded Session runtime with a local deterministic HTTP provider. It covers real worktrees, permission requests, durable callback recovery, continuation, and Flower informational note admission/promotion. Keep that evidence separate from the process fixture and from hosted service execution.
+The native runner integration uses the retained OpenCode CLI and embedded Session runtime with a local deterministic HTTP provider. It covers real worktrees, permission requests, durable callback recovery, continuation, and analysis informational note admission/promotion. `runner-analysis-agent.integration` runs the `puff-analyst` agent through a real `opencode serve` against the same kind of local provider. Keep that evidence separate from the process fixture and from hosted service execution.
 
 The harness allocates loopback ports and disposable temporary state, then stops its own processes and removes its files. `PUFF_E2E_KEEP=1` preserves a fixture for inspection; its output prints the directory. Do not keep or share fixture credentials beyond the local check.
 

@@ -1,21 +1,21 @@
 import { integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 import type { Coordination } from "@opencode-ai/schema/coordination"
 
-export const FlowerResultTable = sqliteTable(
-  "coordination_flower_result",
+export const AnalysisResultTable = sqliteTable(
+  "coordination_analysis_result",
   {
     report_id: text().primaryKey(),
     project_id: text().$type<Coordination.ProjectID>().notNull(),
     request_id: text().notNull(),
     service_id: text().notNull(),
-    content: text({ mode: "json" }).$type<Coordination.FlowerResultContent>().notNull(),
+    content: text({ mode: "json" }).$type<Coordination.AnalysisResultContent>().notNull(),
     created_at: integer().notNull(),
   },
-  (table) => [uniqueIndex("coordination_flower_result_request_idx").on(table.project_id, table.request_id)],
+  (table) => [uniqueIndex("coordination_analysis_result_request_idx").on(table.project_id, table.request_id)],
 )
 
-export const FlowerDeliveryTable = sqliteTable(
-  "coordination_flower_delivery",
+export const AnalysisDeliveryTable = sqliteTable(
+  "coordination_analysis_delivery",
   {
     report_id: text().notNull(),
     note_id: text().notNull(),
@@ -25,6 +25,6 @@ export const FlowerDeliveryTable = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.report_id, table.note_id] }),
-    uniqueIndex("coordination_flower_delivery_message_idx").on(table.message_id),
+    uniqueIndex("coordination_analysis_delivery_message_idx").on(table.message_id),
   ],
 )

@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ce08b25c-2b4b-457d-a54f-b838ef345e86",
+  "id": "5437ddbb-89c0-449f-bdd4-49e4d41df8c5",
   "prevIds": [
-    "3fb0e520-1a33-4f8e-a670-9a4b29edc2a4"
+    "ce08b25c-2b4b-457d-a54f-b838ef345e86"
   ],
   "ddl": [
     {
@@ -11,11 +11,11 @@
       "entityType": "tables"
     },
     {
-      "name": "coordination_flower_delivery",
+      "name": "coordination_analysis_delivery",
       "entityType": "tables"
     },
     {
-      "name": "coordination_flower_result",
+      "name": "coordination_analysis_result",
       "entityType": "tables"
     },
     {
@@ -246,7 +246,7 @@
       "generated": null,
       "name": "report_id",
       "entityType": "columns",
-      "table": "coordination_flower_delivery"
+      "table": "coordination_analysis_delivery"
     },
     {
       "type": "text",
@@ -256,7 +256,7 @@
       "generated": null,
       "name": "note_id",
       "entityType": "columns",
-      "table": "coordination_flower_delivery"
+      "table": "coordination_analysis_delivery"
     },
     {
       "type": "text",
@@ -266,7 +266,7 @@
       "generated": null,
       "name": "message_id",
       "entityType": "columns",
-      "table": "coordination_flower_delivery"
+      "table": "coordination_analysis_delivery"
     },
     {
       "type": "text",
@@ -276,7 +276,7 @@
       "generated": null,
       "name": "owner_id",
       "entityType": "columns",
-      "table": "coordination_flower_delivery"
+      "table": "coordination_analysis_delivery"
     },
     {
       "type": "integer",
@@ -286,7 +286,7 @@
       "generated": null,
       "name": "created_at",
       "entityType": "columns",
-      "table": "coordination_flower_delivery"
+      "table": "coordination_analysis_delivery"
     },
     {
       "type": "text",
@@ -296,7 +296,7 @@
       "generated": null,
       "name": "report_id",
       "entityType": "columns",
-      "table": "coordination_flower_result"
+      "table": "coordination_analysis_result"
     },
     {
       "type": "text",
@@ -306,7 +306,7 @@
       "generated": null,
       "name": "project_id",
       "entityType": "columns",
-      "table": "coordination_flower_result"
+      "table": "coordination_analysis_result"
     },
     {
       "type": "text",
@@ -316,7 +316,7 @@
       "generated": null,
       "name": "request_id",
       "entityType": "columns",
-      "table": "coordination_flower_result"
+      "table": "coordination_analysis_result"
     },
     {
       "type": "text",
@@ -326,7 +326,7 @@
       "generated": null,
       "name": "service_id",
       "entityType": "columns",
-      "table": "coordination_flower_result"
+      "table": "coordination_analysis_result"
     },
     {
       "type": "text",
@@ -336,7 +336,7 @@
       "generated": null,
       "name": "content",
       "entityType": "columns",
-      "table": "coordination_flower_result"
+      "table": "coordination_analysis_result"
     },
     {
       "type": "integer",
@@ -346,7 +346,7 @@
       "generated": null,
       "name": "created_at",
       "entityType": "columns",
-      "table": "coordination_flower_result"
+      "table": "coordination_analysis_result"
     },
     {
       "type": "text",
@@ -3731,7 +3731,7 @@
       "nameExplicit": false,
       "name": "coordination_flower_delivery_pk",
       "entityType": "pks",
-      "table": "coordination_flower_delivery"
+      "table": "coordination_analysis_delivery"
     },
     {
       "columns": [
@@ -3819,7 +3819,7 @@
       ],
       "nameExplicit": false,
       "name": "coordination_flower_result_pk",
-      "table": "coordination_flower_result",
+      "table": "coordination_analysis_result",
       "entityType": "pks"
     },
     {
@@ -4084,9 +4084,9 @@
       "isUnique": true,
       "where": null,
       "origin": "manual",
-      "name": "coordination_flower_delivery_message_idx",
+      "name": "coordination_analysis_delivery_message_idx",
       "entityType": "indexes",
-      "table": "coordination_flower_delivery"
+      "table": "coordination_analysis_delivery"
     },
     {
       "columns": [
@@ -4102,9 +4102,9 @@
       "isUnique": true,
       "where": null,
       "origin": "manual",
-      "name": "coordination_flower_result_request_idx",
+      "name": "coordination_analysis_result_request_idx",
       "entityType": "indexes",
-      "table": "coordination_flower_result"
+      "table": "coordination_analysis_result"
     },
     {
       "columns": [
@@ -5143,5 +5143,8 @@
       "table": "todo"
     }
   ],
-  "renames": []
+  "renames": [
+    "coordination_flower_delivery->coordination_analysis_delivery",
+    "coordination_flower_result->coordination_analysis_result"
+  ]
 }

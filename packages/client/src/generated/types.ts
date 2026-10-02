@@ -2816,13 +2816,13 @@ export type ProjectCopiesRefreshOutput = void
 
 export type ServerCoordinationStatusOutput = { readonly ready: boolean }
 
-export type ServerCoordinationDataFlowerAwarenessReceiptInput = {
+export type ServerCoordinationDataAnalysisAwarenessReceiptInput = {
   readonly threadId: { readonly threadId: string; readonly reportId: string; readonly noteId: string }["threadId"]
   readonly reportId: { readonly threadId: string; readonly reportId: string; readonly noteId: string }["reportId"]
   readonly noteId: { readonly threadId: string; readonly reportId: string; readonly noteId: string }["noteId"]
 }
 
-export type ServerCoordinationDataFlowerAwarenessReceiptOutput = {
+export type ServerCoordinationDataAnalysisAwarenessReceiptOutput = {
   readonly sessionID: string
   readonly messageID: string
   readonly admittedSeq: number
@@ -2830,7 +2830,7 @@ export type ServerCoordinationDataFlowerAwarenessReceiptOutput = {
   readonly activeObserved: boolean
 }
 
-export type ServerCoordinationDataFlowerResultRegisterInput = {
+export type ServerCoordinationDataAnalysisResultRegisterInput = {
   readonly projectId: { readonly projectId: string }["projectId"]
   readonly requestId: {
     readonly requestId: string
@@ -3034,20 +3034,20 @@ export type ServerCoordinationDataFlowerResultRegisterInput = {
   }["awarenessNoteCandidates"]
 }
 
-export type ServerCoordinationDataFlowerResultRegisterOutput = {
+export type ServerCoordinationDataAnalysisResultRegisterOutput = {
   readonly reportId: string
   readonly requestId: string
   readonly registered: true
 }
 
-export type ServerCoordinationDataFlowerAwarenessDeliverInput = {
+export type ServerCoordinationDataAnalysisAwarenessDeliverInput = {
   readonly threadId: { readonly threadId: string }["threadId"]
   readonly reportId: { readonly reportId: string; readonly noteId: string; readonly messageId: string }["reportId"]
   readonly noteId: { readonly reportId: string; readonly noteId: string; readonly messageId: string }["noteId"]
   readonly messageId: { readonly reportId: string; readonly noteId: string; readonly messageId: string }["messageId"]
 }
 
-export type ServerCoordinationDataFlowerAwarenessDeliverOutput = {
+export type ServerCoordinationDataAnalysisAwarenessDeliverOutput = {
   readonly sessionID: string
   readonly messageID: string
   readonly admittedSeq: number
@@ -3150,7 +3150,7 @@ export type ServerCoordinationDataCooperationPutOutput = {
   readonly updatedAt?: string
 }
 
-export type ServerCoordinationDataFlowerExportInput = {
+export type ServerCoordinationDataAnalysisExportInput = {
   readonly projectId: { readonly projectId: string }["projectId"]
   readonly requestId: {
     readonly requestId: string
@@ -3169,7 +3169,7 @@ export type ServerCoordinationDataFlowerExportInput = {
   }["targetThreadId"]
 }
 
-export type ServerCoordinationDataFlowerExportOutput = {
+export type ServerCoordinationDataAnalysisExportOutput = {
   readonly request: {
     readonly requestId: string
     readonly projectId: string
