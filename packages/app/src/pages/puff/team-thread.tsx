@@ -7,6 +7,7 @@ import { ContextPanel } from "@/components/puff/context-panel"
 import { SessionIdentity, type SessionIdentityProps } from "@/components/puff/session-identity"
 import { teamEventText } from "./team-state"
 import { FixSuggestion } from "./fix-suggestion"
+import "./team-thread.css"
 
 export default function TeamThreadPage() {
   const params = useParams<{ threadId: string }>()
@@ -276,65 +277,63 @@ export default function TeamThreadPage() {
               </Show>
             </div>
           </Show>
-          <Show when={!team.state.simulation}>
-            <form
-              class="team-composer"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void team.send()
-              }}
-            >
-              <Show when={pending() && !team.state.action}>
-                <div class="team-pending-note" role="status">
-                  {language.t("puff.team.unconfirmed")}
-                </div>
-              </Show>
-              <textarea
-                aria-label={language.t("puff.team.message")}
-                placeholder={language.t(
-                  draft().kind === "comment" ? "puff.team.commentPlaceholder" : "puff.team.instructionPlaceholder",
-                )}
-                value={draft().text}
-                onInput={(event) => updateDraft(event.currentTarget.value)}
-                disabled={!team.state.connected || !!pending() || !!team.state.simulation}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.isComposing) {
-                    event.preventDefault()
-                    void team.send()
-                  }
-                }}
-                rows={3}
-              />
-              <div class="team-composer-footer">
-                <label>
-                  <span class="team-sr-only">{language.t("puff.team.messageType")}</span>
-                  <select
-                    value={draft().kind}
-                    disabled={!!pending() || !!team.state.simulation}
-                    onChange={(event) =>
-                      updateDraft(draft().text, event.currentTarget.value as "instruction" | "comment")
-                    }
-                  >
-                    <option value="instruction">{language.t("puff.team.instruction")}</option>
-                    <option value="comment">{language.t("puff.team.comment")}</option>
-                  </select>
-                </label>
-                <span class="team-composer-hint">
-                  {language.t(draft().kind === "comment" ? "puff.team.commentHint" : "puff.team.queueHint")}
-                </span>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  disabled={!team.writable() || !!team.state.action || !draft().text.trim()}
-                >
-                  {language.t(
-                    team.state.action ? "puff.team.sending" : pending() ? "puff.team.retrySame" : "puff.team.send",
-                  )}
-                  <span aria-hidden="true">↑</span>
-                </Button>
+          <form
+            class="team-composer"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void team.send()
+            }}
+          >
+            <Show when={pending() && !team.state.action}>
+              <div class="team-pending-note" role="status">
+                {language.t("puff.team.unconfirmed")}
               </div>
-            </form>
-          </Show>
+            </Show>
+            <textarea
+              aria-label={language.t("puff.team.message")}
+              placeholder={language.t(
+                draft().kind === "comment" ? "puff.team.commentPlaceholder" : "puff.team.instructionPlaceholder",
+              )}
+              value={draft().text}
+              onInput={(event) => updateDraft(event.currentTarget.value)}
+              disabled={!team.state.connected || !!pending()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.isComposing) {
+                  event.preventDefault()
+                  void team.send()
+                }
+              }}
+              rows={3}
+            />
+            <div class="team-composer-footer">
+              <label>
+                <span class="team-sr-only">{language.t("puff.team.messageType")}</span>
+                <select
+                  value={draft().kind}
+                  disabled={!!pending()}
+                  onChange={(event) =>
+                    updateDraft(draft().text, event.currentTarget.value as "instruction" | "comment")
+                  }
+                >
+                  <option value="instruction">{language.t("puff.team.instruction")}</option>
+                  <option value="comment">{language.t("puff.team.comment")}</option>
+                </select>
+              </label>
+              <span class="team-composer-hint">
+                {language.t(draft().kind === "comment" ? "puff.team.commentHint" : "puff.team.queueHint")}
+              </span>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={!team.writable() || !!team.state.action || !draft().text.trim()}
+              >
+                {language.t(
+                  team.state.action ? "puff.team.sending" : pending() ? "puff.team.retrySame" : "puff.team.send",
+                )}
+                <span aria-hidden="true">↑</span>
+              </Button>
+            </div>
+          </form>
         </div>
         <aside
           id="shared-team-context"

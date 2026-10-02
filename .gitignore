@@ -33,4 +33,16 @@ logs/
 *.bun-build
 tsconfig.tsbuildinfo
 apps/web/.puff/
-hackathon/product-runtime/.state/
+script/runtime/.state/
+
+# Local application and integration output
+apps/web/.next/
+.puff-product-runtime/
+.runtime/
+**/__pycache__/
+**/.venv/
+**/*.fab
+
+# Next.js regenerates agent guidance alongside its development output.
+/apps/web/AGENTS.md
+/apps/web/CLAUDE.md

@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test"
 import { createTeamApi } from "./team-api"
 import { Coordination } from "@opencode-ai/schema/coordination"
-import { validSimulationManifest } from "./project-overview/simulation-contract"
 
 test("team_client_uses_current_basic_contract_and_never_supplies_an_actor", async () => {
   const calls: { url: string; body: unknown; auth: string | null }[] = []
@@ -97,8 +96,20 @@ const sourceConfig = { baseUrl: "https://team.example", username: "serdar", pass
 
 test("project_overview_reads_exact_member_and_card_contracts", async () => {
   const calls: string[] = []
-  const project = { id: Coordination.ProjectID.make("project/one"), name: "Puff", createdBy: Coordination.UserID.make("serdar"), createdAt: "2026-09-29T20:00:00Z" }
-  const members = [{ projectId: project.id, userId: Coordination.UserID.make("serdar"), role: "owner" as const, joinedAt: project.createdAt }]
+  const project = {
+    id: Coordination.ProjectID.make("project/one"),
+    name: "Puff",
+    createdBy: Coordination.UserID.make("serdar"),
+    createdAt: "2026-09-29T20:00:00Z",
+  }
+  const members = [
+    {
+      projectId: project.id,
+      userId: Coordination.UserID.make("serdar"),
+      role: "owner" as const,
+      joinedAt: project.createdAt,
+    },
+  ]
   const api = createTeamApi({
     ...sourceConfig,
     transport: async (url, init) => {
@@ -121,173 +132,14 @@ test("project_overview_reads_exact_member_and_card_contracts", async () => {
 test("project_overview_rejects_cross_project_and_malformed_reads", async () => {
   const api = createTeamApi({
     ...sourceConfig,
-    transport: async (url) => String(url).endsWith("work-cards")
-      ? Response.json([{ projectId: "other", threadId: "thread-a" }])
-      : Response.json({
-        project: { id: "other", name: "Other", createdBy: "serdar", createdAt: "2026-09-29T20:00:00Z" },
-        members: [],
-      }),
+    transport: async (url) =>
+      String(url).endsWith("work-cards")
+        ? Response.json([{ projectId: "other", threadId: "thread-a" }])
+        : Response.json({
+            project: { id: "other", name: "Other", createdBy: "serdar", createdAt: "2026-09-29T20:00:00Z" },
+            members: [],
+          }),
   })
   await expect(api.project("project/one")).rejects.toMatchObject({ code: "invalid" })
   await expect(api.workCards("project/one")).rejects.toMatchObject({ code: "invalid" })
-})
-
-const simulated = {
-  simulated: true, mode: "synthetic", label: "SIMULATED", selectedScenarioId: "wf01",
-  scenarios: ["wf01", "wf02", "wf03"].map((id) => ({
-    id, projectId: `sim-${id}`, title: id, classification: "alternative", summary: id, threadIds: [],
-    ...(id === "wf01" ? { privateSessionExcluded: true } : {}),
-    ...(id === "wf03" ? { comparisons: [
-      { id: "overlap", classification: "likely_overlap", threadIds: [], finding: "Tentative overlap" },
-      { id: "unrelated", classification: "none", threadIds: [], finding: null },
-    ] } : {}),
-  })),
-  actors: [],
-  wf02: { stage: 0, phase: "source", sourceRef: { threadId: "wf02-A", eventId: "finding", seq: 4 }, targetThreadId: "wf02-B",
-    milestones: ["source", "admitted", "promoted", "used"].map((phase, index) => ({
-      phase, state: index === 0 ? "simulated_current" : "simulated_future", receiptId: phase,
-      observedAt: index === 0 ? "2026-09-29T19:00:00Z" : null,
-      sourceRef: { threadId: "wf02-A", eventId: "finding", seq: 4 }, targetThreadId: "wf02-B",
-    })) },
-}
-
-test("simulation_probe_requires_an_explicit_marker_and_keeps_a_missing_route_live", async () => {
-  const config = { baseUrl: "http://127.0.0.1:4187", username: "alice", password: "demo-alice" }
-  const preview = (manifest: unknown) => createTeamApi({ ...config, transport: async (url) =>
-    String(url).endsWith("/status")
-      ? Response.json({ ready: true, simulated: true })
-      : Response.json(manifest),
-  })
-  const demo = preview(simulated)
-  expect(validSimulationManifest((await demo.simulation())!)).toBe(true)
-  const calls: string[] = []
-  const live = createTeamApi({ ...config, transport: async (url) => {
-    calls.push(new URL(url).pathname)
-    if (String(url).endsWith("/status")) return Response.json({ ready: true })
-    return new Response("<html>app fallback</html>", { headers: { "Content-Type": "text/html" } })
-  } })
-  expect(await live.simulation()).toBeUndefined()
-  expect(calls).toEqual(["/api/coordination/v1/status"])
-  const malformed = preview({ ...simulated, simulated: false })
-  await expect(malformed.simulation()).rejects.toMatchObject({ code: "invalid" })
-  const premature = preview({
-    ...simulated,
-    wf02: { ...simulated.wf02, milestones: simulated.wf02.milestones.map((item, index) =>
-      index === 2 ? { ...item, observedAt: "2026-09-29T19:00:00Z" } : item) },
-  })
-  await expect(premature.simulation()).rejects.toMatchObject({ code: "invalid" })
-})
-
-test("simulation_controls_send_only_demo_post_routes_and_decode_each_manifest", async () => {
-  const calls: { path: string; method: string; body: unknown }[] = []
-  const api = createTeamApi({
-    baseUrl: "http://127.0.0.1:4187", username: "alice", password: "demo-alice",
-    transport: async (url, init) => {
-      calls.push({ path: new URL(url).pathname, method: init.method ?? "", body: JSON.parse(String(init.body)) })
-      return Response.json(simulated)
-    },
-  })
-  await api.selectSimulation("wf02")
-  await api.advanceSimulation()
-  await api.resetSimulation()
-  expect(calls).toEqual([
-    { path: "/api/coordination/v1/simulation/select", method: "POST", body: { scenarioId: "wf02" } },
-    { path: "/api/coordination/v1/simulation/wf02/advance", method: "POST", body: {} },
-    { path: "/api/coordination/v1/simulation/reset", method: "POST", body: {} },
-  ])
-})
-
-test("source_resolves_only_the_exact_authenticated_project_event", async () => {
-  const abort = new AbortController()
-  const api = createTeamApi({
-    ...sourceConfig,
-    transport: async (url, init) => {
-      expect(url).toBe("https://team.example/api/coordination/v1/projects/project%2Fone/events?after=6&limit=1")
-      expect(init.method).toBe("GET")
-      expect(new Headers(init.headers).get("authorization")).toBe("Basic c2VyZGFyOnRlc3Qtb25seQ==")
-      expect(init.credentials).toBe("omit")
-      expect(init.redirect).toBe("error")
-      expect(init.body).toBeUndefined()
-      expect(init.signal?.aborted).toBe(false)
-      return Response.json({ events: [sourceEvent], cursor: 7, hasMore: true })
-    },
-  })
-  expect(await api.source(sourceEvent.projectId, sourceRef, abort.signal)).toEqual(sourceEvent)
-})
-
-test.each([
-  { projectId: "other-project" },
-  { threadId: "other-thread" },
-  { threadId: undefined },
-  { id: "other-event" },
-  { seq: 8 },
-])("source_rejects_a_mismatched_event_%j", async (change) => {
-  const api = createTeamApi({
-    ...sourceConfig,
-    transport: async () => Response.json({ events: [{ ...sourceEvent, ...change }], cursor: 7, hasMore: false }),
-  })
-  await expect(api.source(sourceEvent.projectId, sourceRef)).rejects.toMatchObject({ code: "invalid" })
-})
-
-test.each([{ events: [] }, { events: [sourceEvent, sourceEvent] }, { events: [{ ...sourceEvent, payload: null }] }])(
-  "source_rejects_missing_extra_or_malformed_events_%j",
-  async ({ events }) => {
-    const api = createTeamApi({
-      ...sourceConfig,
-      transport: async () => Response.json({ events, cursor: 7, hasMore: false }),
-    })
-    await expect(api.source(sourceEvent.projectId, sourceRef)).rejects.toMatchObject({ code: "invalid" })
-  },
-)
-
-test.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
-  "source_rejects_invalid_sequence_before_transport_%s",
-  async (seq) => {
-    let calls = 0
-    const api = createTeamApi({
-      ...sourceConfig,
-      transport: async () => {
-        calls++
-        return Response.json({ events: [sourceEvent], cursor: 7, hasMore: false })
-      },
-    })
-    await expect(api.source(sourceEvent.projectId, { ...sourceRef, seq })).rejects.toMatchObject({ code: "invalid" })
-    expect(calls).toBe(0)
-  },
-)
-
-test.each([401, 403, 404, 503])("source_preserves_access_and_availability_errors_%s", async (status) => {
-  const api = createTeamApi({ ...sourceConfig, transport: async () => new Response(null, { status }) })
-  await expect(api.source(sourceEvent.projectId, sourceRef)).rejects.toMatchObject({
-    code: status === 503 ? "unavailable" : status === 404 ? "request" : "unauthorized",
-    status,
-  })
-})
-
-test("source_forwards_abort_and_rejects_a_late_result_even_when_transport_ignores_it", async () => {
-  const abort = new AbortController()
-  const response = Promise.withResolvers<Response>()
-  let signal: AbortSignal | null | undefined
-  const api = createTeamApi({
-    ...sourceConfig,
-    transport: async (_url, init) => {
-      signal = init.signal
-      return response.promise
-    },
-  })
-  const reading = api.source(sourceEvent.projectId, sourceRef, abort.signal)
-  abort.abort()
-  expect(signal?.aborted).toBe(true)
-  response.resolve(Response.json({ events: [sourceEvent], cursor: 7, hasMore: false }))
-  await expect(reading).rejects.toBeDefined()
-})
-
-test("source_checks_the_requested_citation_when_the_callers_reference_changes", async () => {
-  const response = Promise.withResolvers<Response>()
-  const api = createTeamApi({ ...sourceConfig, transport: async () => response.promise })
-  const ref = { ...sourceRef }
-  const reading = api.source(sourceEvent.projectId, ref)
-  ref.eventId = "replacement"
-  response.resolve(Response.json({ events: [{ ...sourceEvent, id: "replacement" }], cursor: 7, hasMore: false }))
-  await expect(reading).rejects.toMatchObject({ code: "invalid" })
 })

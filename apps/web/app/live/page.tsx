@@ -1,6 +1,5 @@
-import { ConnectedWorkspace } from "../../components/connected-workspace"
-import "../workflow.css"
+import { redirect } from "next/navigation"
 
-export default function LiveWorkspacePage() {
-  return <ConnectedWorkspace />
+export default function SharedWorkspace() {
+  redirect("/")
 }

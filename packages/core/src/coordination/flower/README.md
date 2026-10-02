@@ -1,7 +1,7 @@
 # Selected Flower input boundary
 
 `captureSelected` creates the `request` and `snapshot` accepted by
-`hackathon/flower/coordinator.py` from two authorized Puff Threads and their
+`integrations/flower/coordinator.py` from two authorized Puff Threads and their
 durable coordination events. Its caller supplies the existing `Access`,
 `SessionBinding`, and `Events` services plus a **server-owned current selection**
 port. The selection must resolve an owner, exact project/Session/worker, topic,
@@ -28,7 +28,7 @@ not model input. A caller must revalidate consent, binding, source event and
 freshness before submitting remotely and again before storing or delivering
 any result; capture cannot make a later remote result authoritative.
 
-There is no persisted owner-selection store, user selection route, authenticated
-Flower job port or result-delivery connection in this slice. Tests inject a
-selection port and do not establish a live SuperGrid producer. Do not wire this
-to a client-supplied grant or snapshot, or label it a complete sharing flow.
+The combined product supplies owner cooperation selection, authenticated export,
+analysis result registration, and currentness checks through the server's
+coordination layer. Those product ports are separate from this low-level capture
+helper. See [the Flower setup](../../../../../integrations/flower/README.md).

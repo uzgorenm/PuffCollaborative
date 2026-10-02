@@ -1,117 +1,21 @@
-# Puff web workspace
+# Puff Collab web workspace
 
-The copied Next.js interface now defaults to a real authenticated coordination service. It groups recorded work by person, then by individual Session; one person can run several Sessions in parallel. The original sample workspace is available through **Try demo** and stays separate from live data.
+The supported shared-project UI uses Next.js and React. Run it with the retained OpenCode backend through `bun start` at the repository root. Installation, model configuration, individual sign-in, and teammate tunneling are documented in the [main README](../../README.md).
 
-## Run the combined product
+The browser uses the authenticated `/api/connection` and `/api/coordination` proxy. Backend credentials are encrypted in a strict HttpOnly cookie. Every browser signs in separately; credentials and transcripts are not stored in localStorage. Draft text is stored locally per account/project/thread.
 
-From the repository root, with Bun on PATH:
+From the repository root:
 
 ```sh
-bun run product
+bun run --cwd apps/web typecheck
+bun run --cwd apps/web build
 ```
 
-Open <http://127.0.0.1:3006>. The launcher owns a loopback-only backend, Next.js process, isolated SQLite database and approved Git worktrees. It stops its own children on Ctrl-C. Data and individual local member credentials persist in the private sibling `.puff-product-runtime` directory. Another launcher cannot use that same runtime concurrently; the backend address remains stable across restarts.
-
-The fixed local roster is Serdar, Serhat, Talha and Ferit. The default browser identity is Serdar. `PUFF_PRODUCT_MEMBER=serhat` selects the default login for a new connection; an existing browser connection retains its identity until explicitly changed. Connection settings can authenticate another member with its local credential. Display names do not grant access.
-
-The root Bun dependencies and this package's npm dependencies must be installed. This package retains its own npm lockfile:
+For the focused access, action-retry, and source/currentness checks:
 
 ```sh
 cd apps/web
-npm ci
+bun test lib/server-connection.test.ts lib/coordination-client.test.ts lib/live-actions.test.ts lib/live-workspace.test.ts
 ```
 
-For a standalone interface, `npm run dev` listens on port 3006 and Connection settings accepts a running loopback coordination backend. Without a connected backend, live mode shows the connection error and never invents teammate activity. `npm run build` and `npm start` provide a production preview of the interface.
-
-## Coding model configuration
-
-A model provider is required before a real coding Session can be created. Configure the launcher with an existing OpenCode provider configuration; do not commit that file or paste keys into chat:
-
-```sh
-PUFF_MODEL_PROVIDER=provider-id PUFF_MODEL_ID=model-id PUFF_PROVIDER_CONFIG=/absolute/private/opencode.json bun run product
-```
-
-The provider configuration stays in the isolated global OpenCode config directory, outside agent worktrees. Each provisioned Session has a durable owner and a separate approved worktree. The model readiness check confirms the registered/native-supported model, not a successful paid model request.
-
-## Live workflows
-
-- Save a versioned project brief and your personal focus. Person totals combine recorded Session summaries and label their freshness separately from stated focus.
-- Create an explicitly shared Session and send owner instructions. New Sessions do not replace existing parallel work. Failed or interrupted requests retain the exact request identity through reload.
-- Read teammate conversations and add comments. Only a provisioned Session's verified owner can instruct, cancel its Run, or decide a tool permission.
-- Inspect exact cited events before sending reviewed context. Source identity and target identity remain distinct. This creates a human instruction; receipt, execution and actual use are separate evidence.
-- Review the actual native tool, arguments and permission scope before approving. The scope is rechecked after a versioned claim. Missing or changed review details keep Allow unavailable. A recorded decision awaiting forwarding is shown separately from delivery.
-- Opt selected Sessions into Flower analysis with a topic and open/complementary/alternative relationship. Deliberate alternatives remain valid. Analysis defaults off and requires owner consent. A separate text choice permits bounded owner instructions and already-redacted runner output; metadata-only analysis excludes that text. Runtime journals retain run IDs, mapped reports and pending proposals.
-
-Private Sessions are not implemented by this provisioning service (`privateSessions:false`); the live UI explicitly creates shared Sessions. Demo privacy controls remain illustrative.
-
-## Flower processing
-
-Install the pinned environment described in [the Flower README](../../hackathon/flower/README.md), authenticate Flower separately, and provide its Python executable:
-
-```sh
-PUFF_FLOWER_PYTHON=/absolute/path/to/flower/.venv/bin/python bun run product
-```
-
-The serialized background connector captures only server-authorized selected evidence, executes the existing two-AgentApp/three-run chain, validates citations and revisions, and submits source/version-checked WorkCards. A trusted analysis identity registers informational findings. When the target owner opted into notifications, the existing active Session can admit the finding and promote it at the next safe boundary. A stopped or changed target can leave delivery pending/stale; it is not reported as use. Lost responses remain an unknown outcome until a durable receipt confirms admission. Historical receipt reconciliation never replays stale analysis or delivery. Redirection proposals are never automatically adopted.
-
-Hosted analysis depends on Flower login, service availability and provider configuration. Local fixture tests do not establish successful live model execution, hosted analysis or receiving-agent use. The legacy simulator `/api/sessions` route remains separate and is not used by the live controller.
-
-## Verify
-
-From `apps/web`:
-
-```sh
-npm test
-npm run typecheck
-npm run build
-```
-
-Transport tests use a real local HTTP fixture; controller tests exercise identity switching, exact retries, source references and permission review. Core/server fixtures verify real worktrees, ownership, the embedded OpenCode runner and safe-boundary admission against a deterministic test model. Browser acceptance and actual hosted execution are separate checks. Integration evidence is recorded in [next-product-integration.md](../../docs/hackathon/next-product-integration.md).
-
-The Puff logo remains `public/puff-logo.png`.
-
-## Repeat the original demo
-
-Choose **Try demo**, then **Reset workspace** and confirm to restore the source interface's six starting Sessions for You, Sam and Alice. **Undo reset** restores the previous demo workspace, including after reload. These controls affect browser demo storage; the live service remains separate.
-
-The original walkthrough supports project setup/task assignment, reviewing Sam's overlapping frontend work, starting complementary work or an alternative, and inspecting Alice's recorded `EADDRINUSE` finding before adding it as context. Its compact sidebar shows five Session rows before an expandable overflow and a collapsed recent-update view. Custom tasks produce independent illustrative plans; an unrelated server error never inherits the port-conflict finding. Choose **Return to live workspace** to resume the authenticated service.
-
-The latest teammate task flow uses `POST /api/workspace` and atomic filesystem storage under `.puff-workspaces/`. New session → typed frontend task → scope choices → continued conversation survives reload. `lib/session-api.ts`, `session-service.ts` and `session-engine.ts` preserve this separate command boundary. Its seeded conversations and deterministic guidance do not call a model or edit repository files. This local task store has no individual authentication or cross-device sharing and is used only by the demo controller.
-
-## Connected Alice preview
-
-The team's additional `/live` page preserves the narrow Alice source-reuse integration. It reads a registered coordination backend using one server-configured member (`PUFF_BACKEND_MEMBER_PATH`), shows actual Sessions/Run states, and lets that member inspect an exact `EADDRINUSE` source before adding context to a receiving Thread they shared. Its seeded legacy Sessions have trusted sharing grants but no provisioned owner record; creator grouping is labeled "Shared by" and is this preview's UI policy. The default live controller requires verified provisioned ownership and uses per-member cookie connections.
-
-Run `bun hackathon/alice-preview/run.ts` and follow its printed web command; see [the preview instructions](../../hackathon/alice-preview/README.md). Default mode records a human finding from a real local port-collision/health-check scenario. `PUFF_PREVIEW_NATIVE_SCENARIO=1` with an explicit provider runs actual Alice and Serdar tasks instead. The replacement Flower key produced real native tool responses and Alice's proposed change, paused at owner approval. Serdar later hit the key's credit cap. [The current receipt](../../docs/hackathon/evidence/2026-09-29-alice-real-overlap.md) separates provider output, current-work detection and unverified receiving-model use. The single-member preview requires individual authentication before any hosted multi-user deployment. Use separate checkouts for concurrent Next.js previews, or stop one before starting another from this checkout.
-
-In Serdar's Session, type `Improve the server startup EADDRINUSE diagnostics in server.ts.` and choose **Send**. A fresh permitted running/approval-waiting Alice Session triggers **Alice is already working on this** before the instruction is saved. Inspect the exact source, then choose to send the original request with attributed context, continue independently, or edit the request. The matcher is local and lexical; unrelated work and terminal Runs are excluded. Freshness checks and backend admission are separate operations, so review-time context is not an atomic guarantee that the source remains unchanged.
-
-## Render the walkthrough video
-
-`scripts/render_walkthrough.py` turns screenshots captured from the running interface into one MP4. It retains the captured application UI, adds a bottom caption band, and overlays an animated mouse cursor and click rings. This is a screenshot-based walkthrough of browser interactions, with cursor animation added during encoding; it is not a continuous screen recording or evidence of live agent execution.
-
-Requires a Python runtime with Pillow and an `ffmpeg` executable. For this machine:
-
-```sh
-/opt/homebrew/bin/python3 scripts/render_walkthrough.py /absolute/path/to/manifest.json --ffmpeg /opt/homebrew/bin/ffmpeg
-```
-
-Example manifest:
-
-```json
-{
-  "title": "Puff • Interactive demo walkthrough",
-  "output": "puff-walkthrough.mp4",
-  "steps": [
-    {
-      "image": "frames/01-project-overview.png",
-      "caption": "Review each person's total work and open a session.",
-      "duration": 4.5,
-      "cursor": [420, 260],
-      "click": true
-    }
-  ]
-}
-```
-
-Image and output paths are relative to the manifest unless absolute. Cursor coordinates use the original screenshot's pixels. `duration` defaults to 4.5 seconds; `cursor` and `click` are optional. The encoder preserves screenshot proportions inside a 1280 × 720 area, adds a 90-pixel caption band, and streams H.264 video at 24 fps to a 1280 × 810 MP4. No audio track is added.
+The `/live` URL redirects to the same workspace. There is one product interface; no demo backend is selected by a query parameter.

@@ -3,7 +3,6 @@ import { createStore, reconcile, unwrap } from "solid-js/store"
 import { createTeamApi, type TeamThread } from "./team-api"
 import { ProjectApiError, serviceUrl, type ProjectTransport } from "./project-api"
 import type { Coordination } from "@opencode-ai/schema/coordination"
-import { scenarioForProject, type SimulationManifest } from "./project-overview/simulation-contract"
 import { activeFailure, verifiedFix, fixInstruction, type VerifiedFix } from "./fix-reuse"
 
 export type FixAttempt = { fix: VerifiedFix; requestId: string; runId?: string; uncertain: boolean }
@@ -82,10 +81,6 @@ export function createTeamController(transport?: ProjectTransport) {
     overviewLoading: false,
     overviewError: "" as "" | ProjectApiError["code"],
     overviewLastSuccess: 0,
-    simulation: undefined as SimulationManifest | undefined,
-    simulationOperator: false,
-    simulationAction: "" as "" | "select" | "advance" | "reset",
-    simulationError: "" as "" | ProjectApiError["code"],
     projectId: "",
     threadId: "",
     serviceUrl: "",
@@ -125,7 +120,6 @@ export function createTeamController(transport?: ProjectTransport) {
 
   const writable = () =>
     state.connected &&
-    !state.simulation &&
     !!state.snapshot &&
     !state.error &&
     state.lastSuccess > 0 &&
@@ -182,10 +176,6 @@ export function createTeamController(transport?: ProjectTransport) {
         overviewLoading: false,
         overviewError: "",
         overviewLastSuccess: 0,
-        simulation: undefined,
-        simulationOperator: false,
-        simulationAction: "",
-        simulationError: "",
         projectId: "",
         snapshot: undefined,
         events: [],
@@ -223,10 +213,7 @@ export function createTeamController(transport?: ProjectTransport) {
       const url = serviceUrl(baseUrl).replace(/\/+$/, "")
       const member = username.trim()
       const client = createTeamApi({ baseUrl: url, username: member, password, transport })
-      const [projects, simulation] = await Promise.all([
-        client.projects(controller.signal),
-        client.simulation(controller.signal),
-      ])
+      const projects = await client.projects(controller.signal)
       if (ticket !== connection) return false
       api = client
       account = JSON.stringify([url, member])
@@ -250,19 +237,13 @@ export function createTeamController(transport?: ProjectTransport) {
         set({
           connected: true,
           projects,
-          simulation,
-          simulationOperator: !!simulation && member === "alice",
-          simulationError: "",
           serviceUrl: url,
           sourceScope: crypto.randomUUID(),
           loading: !!state.threadId,
           lastSuccess: 0,
         })
       })
-      const selected = simulation?.scenarios.find((scenario) => scenario.id === simulation.selectedScenarioId)
-      if (selected && projects.some((project) => project.id === selected.projectId))
-        await loadProject(selected.projectId)
-      else if (projects[0]) await loadProject(projects[0].id)
+      if (projects[0]) await loadProject(projects[0].id)
       if (ticket !== connection) return false
       void refreshThread()
       return true
@@ -280,62 +261,6 @@ export function createTeamController(transport?: ProjectTransport) {
   function disconnect() {
     if (state.action) return
     clearConnection()
-  }
-
-  async function simulationControl(kind: "select" | "advance" | "reset", projectId?: string) {
-    const current = api
-    const connected = state.simulation
-    if (!current || !connected || !state.simulationOperator || state.simulationAction) return false
-    const scenario = kind === "select" ? scenarioForProject(connected, projectId ?? "") : undefined
-    if (kind === "select" && !scenario) return false
-    const ticket = connection
-    set({ simulationAction: kind, simulationError: "" })
-    try {
-      const next =
-        kind === "advance"
-          ? await current.advanceSimulation()
-          : kind === "reset"
-            ? await current.resetSimulation()
-            : await current.selectSimulation(scenario!.id)
-      if (ticket !== connection || current !== api) return false
-      set("simulation", reconcile(next))
-      const selected = next.scenarios.find((item) => item.id === next.selectedScenarioId)
-      if (kind === "select" && projectId) await loadProject(projectId)
-      else if (kind === "reset" && selected && state.projectId !== selected.projectId)
-        await loadProject(selected.projectId)
-      overviewRead?.controller.abort()
-      overviewRead = undefined
-      invalidateThread()
-      set({
-        overview: undefined,
-        overviewLastSuccess: 0,
-        snapshot: undefined,
-        events: [],
-        cursor: 0,
-        loading: !!state.threadId,
-      })
-      await Promise.all([refreshOverview(), refreshThread()])
-      return true
-    } catch (error) {
-      if (ticket === connection) set("simulationError", error instanceof ProjectApiError ? error.code : "connection")
-      return false
-    } finally {
-      if (ticket === connection) set("simulationAction", "")
-    }
-  }
-
-  function chooseProject(id: string) {
-    if (!state.simulation) return loadProject(id)
-    if (!scenarioForProject(state.simulation, id)) return Promise.resolve()
-    if (!state.simulationOperator) return loadProject(id)
-    return simulationControl("select", id)
-  }
-
-  function advanceSimulation() {
-    return simulationControl("advance")
-  }
-  function resetSimulation() {
-    return simulationControl("reset")
   }
 
   function loadProject(id: string) {
@@ -652,7 +577,6 @@ export function createTeamController(transport?: ProjectTransport) {
       !!state.lastSuccess &&
       Date.now() - state.lastSuccess < 8_000 &&
       !state.action &&
-      (!state.simulation || !!state.simulation.capabilities?.fixReuse) &&
       !state.pending[state.threadId] &&
       !state.fixAttempts[state.threadId]?.runId
     )
@@ -792,19 +716,14 @@ export function createTeamController(transport?: ProjectTransport) {
     const cited = (overview: OverviewRead | undefined) =>
       !!overview &&
       overview.project.id === projectId &&
-      (overview.cards.some(
+      overview.cards.some(
         (card) =>
           card.threadId === expected.threadId &&
           card.evidenceRefs.some(
             (item) =>
               item.threadId === expected.threadId && item.eventId === expected.eventId && item.seq === expected.seq,
           ),
-      ) ||
-        (state.simulation &&
-          scenarioForProject(state.simulation, projectId)?.id === "wf02" &&
-          state.simulation.wf02?.sourceRef.threadId === expected.threadId &&
-          state.simulation.wf02.sourceRef.eventId === expected.eventId &&
-          state.simulation.wf02.sourceRef.seq === expected.seq))
+      )
     if (!current || !state.connected || !identity || !scope || !projectId || !cited(read) || signal.aborted)
       throw new ProjectApiError("invalid")
     const event = await current.source(projectId, expected, signal)
@@ -927,9 +846,6 @@ export function createTeamController(transport?: ProjectTransport) {
     connect,
     disconnect,
     loadProject,
-    chooseProject,
-    advanceSimulation,
-    resetSimulation,
     selectThread,
     refresh,
     refreshOverview,

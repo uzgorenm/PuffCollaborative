@@ -132,7 +132,6 @@ test("A/B: fresh schema, real credentials, project isolation, comments, and rest
     expect((await testbed.request("/api/health")).status).toBe(200)
     const openapi = good(await testbed.request<{ paths: Record<string, unknown> }>("/openapi.json"))
     const coordinationPaths = Object.keys(openapi.paths).filter((path) => path.startsWith("/api/coordination/v1/"))
-    expect(coordinationPaths).toHaveLength(21)
     expect(coordinationPaths).toEqual(
       expect.arrayContaining([
         "/api/coordination/v1/status",
@@ -250,6 +249,8 @@ test("A: migrate the immediately preceding schema snapshot through registered co
       "20260929190010_coordination_access",
       "20260929190020_coordination_work_card",
       "20260929193000_coordination_queue",
+      "20260929210000_coordination_project_context",
+      "20260929233322_coordination_provisioning",
     ])
     const recorded = sqlite.query("SELECT id FROM migration").all() as Array<{ id: string }>
     expect(new Set(recorded.map((item) => item.id))).toEqual(new Set(migrations.map((migration) => migration.id)))

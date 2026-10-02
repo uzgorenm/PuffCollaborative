@@ -64,7 +64,7 @@ const safeTools = new Set([
   "grep",
 ])
 
-// Builds the exact request/snapshot accepted by hackathon/flower/coordinator.py.
+// Builds the exact request/snapshot accepted by integrations/flower/coordinator.py.
 // Only separately consented owner instructions and redacted runner output can add bounded text.
 export const captureSelected = (input: Input) =>
   Effect.gen(function* () {

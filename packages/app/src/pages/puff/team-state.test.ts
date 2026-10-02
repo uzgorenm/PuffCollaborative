@@ -90,27 +90,6 @@ function service(
   }
 }
 
-const demoManifest = (stage = 0) => ({
-  simulated: true, mode: "synthetic", label: "SIMULATED", selectedScenarioId: "wf01",
-  scenarios: ["wf01", "wf02", "wf03"].map((id) => ({
-    id, projectId: `sim-${id}`, title: `Scenario ${id}`, classification: "alternative",
-    summary: `Summary ${id}`, threadIds: [],
-    ...(id === "wf01" ? { privateSessionExcluded: true } : {}),
-    ...(id === "wf03" ? { comparisons: [
-      { id: "overlap", classification: "likely_overlap", threadIds: [], finding: "Tentative overlap" },
-      { id: "unrelated", classification: "none", threadIds: [], finding: null },
-    ] } : {}),
-  })),
-  actors: [],
-  wf02: { stage, phase: ["source", "admitted", "promoted", "used"][stage],
-    sourceRef: { threadId: "wf02-A", eventId: "finding", seq: 4 }, targetThreadId: "wf02-B",
-    milestones: ["source", "admitted", "promoted", "used"].map((phase, index) => ({
-      phase, state: index < stage ? "simulated_observed" : index === stage ? "simulated_current" : "simulated_future",
-      receiptId: phase, observedAt: index <= stage ? "2026-09-29T19:00:00Z" : null,
-      sourceRef: { threadId: "wf02-A", eventId: "finding", seq: 4 }, targetThreadId: "wf02-B",
-    })) },
-})
-
 // Drain only promise continuations; no wall-clock sleeps or live service requests.
 async function settle() {
   for (let i = 0; i < 400; i++) await Promise.resolve()
@@ -169,13 +148,27 @@ test("roster_refresh_discovers_a_shared_thread_while_another_is_open", async () 
 })
 
 test("overview_refresh_reads_exact_project_and_thread_snapshots", async () => {
-  const project = { id: "prj_test" as Coordination.ProjectID, name: "Project", createdBy: "alice" as Coordination.UserID, createdAt: "2026-09-29T19:00:00Z" }
-  const members = [{ projectId: project.id, userId: "alice" as Coordination.UserID, role: "owner" as const, joinedAt: project.createdAt }]
-  const team = await connected(service((path) => {
-    if (path === "/projects/prj_test") return Response.json({ project, members })
-    if (path === "/projects/prj_test/work-cards") return Response.json([])
-    return
-  }))
+  const project = {
+    id: "prj_test" as Coordination.ProjectID,
+    name: "Project",
+    createdBy: "alice" as Coordination.UserID,
+    createdAt: "2026-09-29T19:00:00Z",
+  }
+  const members = [
+    {
+      projectId: project.id,
+      userId: "alice" as Coordination.UserID,
+      role: "owner" as const,
+      joinedAt: project.createdAt,
+    },
+  ]
+  const team = await connected(
+    service((path) => {
+      if (path === "/projects/prj_test") return Response.json({ project, members })
+      if (path === "/projects/prj_test/work-cards") return Response.json([])
+      return
+    }),
+  )
   await team.refreshOverview()
   expect(team.state.overview?.project).toEqual(project)
   expect(team.state.overview?.members).toEqual(members)
@@ -188,19 +181,28 @@ test("overview_refresh_reads_exact_project_and_thread_snapshots", async () => {
 test("overview_switch_aborts_old_read_and_never_publishes_a_partial_project", async () => {
   const pending = Promise.withResolvers<Response>()
   let oldSignal: AbortSignal | null | undefined
-  const second = { id: "prj_other" as Coordination.ProjectID, name: "Other", createdBy: "bob", createdAt: "2026-09-29T19:00:00Z" }
-  const team = await connected(service((path, init) => {
-    if (path === "/projects/prj_test") {
-      oldSignal = init.signal
-      return pending.promise
-    }
-    if (path === "/projects/prj_other") return Response.json({ project: second, members: [] })
-    if (path === "/projects/prj_other/threads" || path === "/projects/prj_other/work-cards") return Response.json([])
-    if (path === "/projects") return Response.json([
-      { id: "prj_test", name: "Project", createdBy: "alice", createdAt: second.createdAt }, second,
-    ])
-    return
-  }))
+  const second = {
+    id: "prj_other" as Coordination.ProjectID,
+    name: "Other",
+    createdBy: "bob",
+    createdAt: "2026-09-29T19:00:00Z",
+  }
+  const team = await connected(
+    service((path, init) => {
+      if (path === "/projects/prj_test") {
+        oldSignal = init.signal
+        return pending.promise
+      }
+      if (path === "/projects/prj_other") return Response.json({ project: second, members: [] })
+      if (path === "/projects/prj_other/threads" || path === "/projects/prj_other/work-cards") return Response.json([])
+      if (path === "/projects")
+        return Response.json([
+          { id: "prj_test", name: "Project", createdBy: "alice", createdAt: second.createdAt },
+          second,
+        ])
+      return
+    }),
+  )
   const old = team.refreshOverview()
   await team.loadProject(second.id)
   expect(oldSignal?.aborted).toBe(true)
@@ -214,12 +216,14 @@ test("overview_switch_aborts_old_read_and_never_publishes_a_partial_project", as
 
 test("overview_rejects_mixed_activity_revisions_instead_of_showing_a_card_as_current", async () => {
   const project = { id: "prj_test", name: "Project", createdBy: "alice", createdAt: "2026-09-29T19:00:00Z" }
-  const team = await connected(service((path) => {
-    if (path === "/projects/prj_test") return Response.json({ project, members: [] })
-    if (path === "/projects/prj_test/work-cards") return Response.json([])
-    if (path === "/threads/a") return Response.json({ ...snapshot(), thread: { ...thread(), activitySeq: 1 } })
-    return
-  }))
+  const team = await connected(
+    service((path) => {
+      if (path === "/projects/prj_test") return Response.json({ project, members: [] })
+      if (path === "/projects/prj_test/work-cards") return Response.json([])
+      if (path === "/threads/a") return Response.json({ ...snapshot(), thread: { ...thread(), activitySeq: 1 } })
+      return
+    }),
+  )
   await team.refreshOverview()
   expect(team.state.overview).toBeUndefined()
   expect(team.state.overviewError).toBe("invalid")
@@ -229,86 +233,53 @@ test("overview_rejects_mixed_activity_revisions_instead_of_showing_a_card_as_cur
 test("overview_inspects_an_exact_non_conversation_source_without_changing_the_target_draft", async () => {
   const stamp = "2026-09-29T19:00:00Z"
   const cited = {
-    id: "work-card-event", projectId: "prj_test" as Coordination.ProjectID,
-    threadId: "a" as Coordination.ThreadID, seq: 1,
-    kind: "work-card.updated" as const, occurredAt: stamp, payload: { version: 1 },
+    id: "work-card-event",
+    projectId: "prj_test" as Coordination.ProjectID,
+    threadId: "a" as Coordination.ThreadID,
+    seq: 1,
+    kind: "work-card.updated" as const,
+    occurredAt: stamp,
+    payload: { version: 1 },
   } satisfies Coordination.Event
   const card = {
-    id: "card-a", projectId: "prj_test", threadId: "a", version: 1, sourceActivitySeq: 1,
-    currentTask: "Review", progress: "In progress", blockers: [], status: "active",
-    recentVerifiedOutcome: null, contributors: [], evidenceRefs: [{ threadId: "a", eventId: cited.id, seq: 1 }],
-    generatedAt: stamp, submittedBy: "analyst", updatedAt: stamp, summaryJobId: "job-a",
+    id: "card-a",
+    projectId: "prj_test",
+    threadId: "a",
+    version: 1,
+    sourceActivitySeq: 1,
+    currentTask: "Review",
+    progress: "In progress",
+    blockers: [],
+    status: "active",
+    recentVerifiedOutcome: null,
+    contributors: [],
+    evidenceRefs: [{ threadId: "a", eventId: cited.id, seq: 1 }],
+    generatedAt: stamp,
+    submittedBy: "analyst",
+    updatedAt: stamp,
+    summaryJobId: "job-a",
   }
-  const team = await connected(service((path) => {
-    if (path === "/projects/prj_test") return Response.json({
-      project: { id: "prj_test", name: "Project", createdBy: "alice", createdAt: stamp }, members: [],
-    })
-    if (path === "/projects/prj_test/threads") return Response.json([{ ...thread(), activitySeq: 1 }])
-    if (path === "/projects/prj_test/work-cards") return Response.json([card])
-    if (path === "/threads/a") return Response.json({ ...snapshot(), thread: { ...thread(), activitySeq: 1 } })
-    if (path === "/projects/prj_test/events?after=0&limit=1")
-      return Response.json({ events: [cited], cursor: 1, hasMore: false })
-    return
-  }))
+  const team = await connected(
+    service((path) => {
+      if (path === "/projects/prj_test")
+        return Response.json({
+          project: { id: "prj_test", name: "Project", createdBy: "alice", createdAt: stamp },
+          members: [],
+        })
+      if (path === "/projects/prj_test/threads") return Response.json([{ ...thread(), activitySeq: 1 }])
+      if (path === "/projects/prj_test/work-cards") return Response.json([card])
+      if (path === "/threads/a") return Response.json({ ...snapshot(), thread: { ...thread(), activitySeq: 1 } })
+      if (path === "/projects/prj_test/events?after=0&limit=1")
+        return Response.json({ events: [cited], cursor: 1, hasMore: false })
+      return
+    }),
+  )
   await team.refreshOverview()
   team.selectThread("a")
   team.set("drafts", "a", { text: "Keep this draft", kind: "comment" })
   expect(await team.resolveOverviewSource(card.evidenceRefs[0]!, new AbortController().signal)).toEqual(cited)
   expect(team.state.threadId).toBe("a")
   expect(team.state.drafts.a?.text).toBe("Keep this draft")
-  team.dispose()
-})
-
-test("simulated_connection_is_explicit_and_disables_real_instruction_controls", async () => {
-  const team = await connected(service((path) => {
-    if (path === "/status") return Response.json({ ready: true, simulated: true })
-    if (path === "/simulation") return Response.json(demoManifest())
-    return
-  }))
-  expect(team.state.simulation?.label).toBe("SIMULATED")
-  team.selectThread("a")
-  await settle()
-  expect(team.writable()).toBe(false)
-  team.dispose()
-})
-
-test("simulation_stage_and_reset_controls_refresh_only_the_declared_demo", async () => {
-  let stage = 0
-  const calls: string[] = []
-  const team = await connected(service((path) => {
-    if (path === "/status") return Response.json({ ready: true, simulated: true })
-    if (path === "/simulation") return Response.json(demoManifest(stage))
-    if (path === "/simulation/wf02/advance") { calls.push(path); return Response.json(demoManifest(++stage)) }
-    if (path === "/simulation/reset") { calls.push(path); stage = 0; return Response.json(demoManifest()) }
-    return
-  }))
-  await team.advanceSimulation()
-  expect(team.state.simulation?.wf02?.phase).toBe("admitted")
-  await team.resetSimulation()
-  expect(team.state.simulation?.wf02?.stage).toBe(0)
-  expect(calls).toEqual(["/simulation/wf02/advance", "/simulation/reset"])
-  team.dispose()
-})
-
-test("a_nonoperator_can_switch_between_authorized_simulated_projects_without_demo_mutation", async () => {
-  const calls: string[] = []
-  const manifest = { ...demoManifest(), scenarios: demoManifest().scenarios.slice(0, 2) }
-  const team = createTeamController(service((path) => {
-    if (path === "/projects") return Response.json(manifest.scenarios.map((scenario) => ({
-      id: scenario.projectId, name: scenario.title, createdBy: "alice", createdAt: "2026-09-29T19:00:00Z",
-    })))
-    if (path === "/status") return Response.json({ ready: true, simulated: true })
-    if (path === "/simulation") return Response.json(manifest)
-    if (path === "/projects/sim-wf01/threads" || path === "/projects/sim-wf02/threads") return Response.json([])
-    if (path.startsWith("/simulation/")) { calls.push(path); return Response.json(manifest) }
-    return
-  }))
-  expect(await team.connect("http://127.0.0.1:4187", "bob", "demo-bob")).toBe(true)
-  expect(team.state.simulationOperator).toBe(false)
-  await team.chooseProject("sim-wf02")
-  expect(team.state.projectId).toBe("sim-wf02")
-  expect(await team.advanceSimulation()).toBe(false)
-  expect(calls).toEqual([])
   team.dispose()
 })
 

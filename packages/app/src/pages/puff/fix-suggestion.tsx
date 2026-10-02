@@ -18,13 +18,10 @@ export function FixSuggestion() {
       : undefined
   const person = () => {
     const id = fix()?.actorId ?? ""
-    return (
-      team.state.simulation?.actors.find((actor) => actor.userId === id)?.displayName ??
-      id
-        .replace(/^usr_/, "")
-        .replace(/[_-]+/g, " ")
-        .replace(/\b\w/g, (letter) => letter.toUpperCase())
-    )
+    return id
+      .replace(/^usr_/, "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
   }
   createEffect(() => {
     fix()?.source.id
