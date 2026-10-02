@@ -42,6 +42,17 @@ Chrome and a separate in-app browser authenticated as `serdar` and `serhat`. The
 
 The main browser thread was `thr_0a183abe-a89a-4cea-807d-4f8410ffe768`; the independent owner thread was `thr_d181fe1a-ace3-42d0-8255-2e8b694eeef3`. All three recorded runs ended in `completed`, attempt 1. Screenshots were captured from the committed UI.
 
+## Flower removal and OpenCode analysis agent
+
+Verified source commit: [`027ae2c0f2`](https://github.com/uzgorenm/PuffCollaborative/commit/027ae2c0f2). Checked on macOS arm64, October 2, 2026 UTC, with Bun 1.3.14. This commit removes `integrations/flower`; the Flower rows above describe the earlier commit only.
+
+- `bun typecheck` passed in `packages/schema`, `packages/protocol`, `packages/core`, `packages/server`, `packages/client`, `apps/web`, and `packages/app`. `script/runtime` typechecked through the `packages/core` configuration.
+- `bun run migration --check` passed in `packages/core`; the `20261002045007_analysis_results` migration renames the result and delivery tables.
+- `packages/server` `bun test`: 17 passed, including `runner-analysis-agent.integration`, which runs the `puff-analyst` agent through a real `opencode serve` and the local fixture provider and asserts that no tools reach the provider.
+- `packages/core` `test/coordination` plus `session-runner`: 149 passed. `script/runtime` `bun test`: 9 passed. `apps/web` `bun test lib`: 34 passed. `packages/app` `src/components/puff`: 17 passed.
+
+Analysis with a hosted model and a browser walkthrough of cooperation analysis were not exercised.
+
 ## Limits
 
 Hosted coding-provider authentication and execution, hosted Flower submission/results, and the SSH connection from a separate physical computer were not exercised. No signing or installer packaging was performed, and the Electron application was built but not inspected interactively. The source web startup and two-browser collaboration path were verified locally. Flower remains optional and requires its own configured federation and credentials.
